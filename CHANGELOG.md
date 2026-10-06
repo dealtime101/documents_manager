@@ -11,8 +11,8 @@ Préparation d'une diffusion publique sous licence MIT.
 ### Ajouté
 - **Application de bureau Windows** (`DocumentsManager.exe`, construite par `packaging/build_windows.bat`) : une fenêtre native qui
   démarre le serveur local (`127.0.0.1`, jamais le réseau) et s'ouvre déjà connectée grâce à un jeton à usage unique, sans mot de
-  passe à créer. La base, les réglages et les règles vivent dans le dossier de l'utilisateur. Tesseract (OCR) s'installe à part ;
-  il est trouvé tout seul là où son installateur le place.
+  passe à créer. La base, les réglages et les règles vivent dans le dossier de l'utilisateur. Tesseract (OCR, avec le français, l'anglais
+  et la détection d'orientation) est **fourni dans l'exécutable** : rien à installer.
 - **Écran « Réglages »** : on choisit dans l'outil le dossier à surveiller, la bibliothèque, la quarantaine et d'autres dossiers
   à surveiller, avec un sélecteur de dossier et un message par champ s'il y a une erreur (dossier introuvable, inbox et
   bibliothèque confondues, quarantaine dans la bibliothèque). Ils sont enregistrés dans le dossier de l'utilisateur, pas dans

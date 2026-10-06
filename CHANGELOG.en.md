@@ -10,8 +10,8 @@ Preparation for a public release under the MIT license.
 ### Added
 - **Windows desktop application** (`DocumentsManager.exe`, built by `packaging/build_windows.bat`): a native window that starts
   the local server (`127.0.0.1`, never the network) and opens already signed in thanks to a one-time token, with no password to
-  create. The database, the settings and the rules live in the user's folder. Tesseract (OCR) is installed separately; it is
-  found on its own where its installer puts it.
+  create. The database, the settings and the rules live in the user's folder. Tesseract (OCR, with French, English and
+  orientation detection) is **bundled in the executable**: nothing to install.
 - **"Settings" screen**: the folder to watch, the library, the quarantine and more folders to watch are chosen in the tool, with
   a folder picker and one message per field when something is wrong (folder not found, access refused, inbox and library
   the same, quarantine inside the library). They are saved in the user's folder, not in the program's. On a first run this
