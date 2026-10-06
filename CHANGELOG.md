@@ -4,6 +4,15 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.4.0] - 2026-10-06
+
+### Ajouté
+- **Tesseract (OCR) fourni dans l'exécutable** : avec le français, l'anglais et la détection d'orientation. Plus rien à installer
+  pour lire les documents numérisés.
+
+### Retiré
+- Le message « OCR indisponible » quand Tesseract n'est pas installé sur la machine.
+
 ## [0.3.0] - 2026-10-06
 
 Préparation d'une diffusion publique sous licence MIT.

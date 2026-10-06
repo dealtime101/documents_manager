@@ -3,6 +3,15 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.4.0] - 2026-10-06
+
+### Added
+- **Tesseract (OCR) bundled in the executable**, with French, English and orientation detection. Nothing to install to read
+  scanned documents.
+
+### Removed
+- The "OCR is unavailable" message when Tesseract is not installed on the machine.
+
 ## [0.3.0] - 2026-10-06
 
 Preparation for a public release under the MIT license.
