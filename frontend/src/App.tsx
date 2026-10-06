@@ -9,7 +9,6 @@ import Notes from '@/pages/Notes'
 import Settings from '@/pages/Settings'
 import Rules from '@/pages/Rules'
 import Search from '@/pages/Search'
-import Login from '@/pages/Login'
 import Queue from '@/pages/Queue'
 import { parseHash, toHash, type Page, type Route } from '@/route'
 
@@ -29,15 +28,14 @@ function Shell() {
   // the raw server text of a failed session check: an outage is not a logout (/auth/me answers 200 for an anonymous visitor)
   const [failure, setFailure] = useState('')
   const [version, setVersion] = useState('')  // the program's version, from the server (written once, in pyproject.toml)
-  const [local, setLocal] = useState(false)  // the desktop application: one user, signed in by the launcher: nothing to log out of
-  const refresh = () => api.me().then((m) => { setAuth(m.authenticated); setVersion(m.version); setLocal(m.local) })
+  const refresh = () => api.me().then((m) => { setAuth(m.authenticated); setVersion(m.version) })
     .catch((e) => setFailure(errorText(e)))
   useEffect(() => {
     // The desktop application opens the page as /?t=<token>: sign in with it, then take it out of the address at once.
     const token = new URLSearchParams(window.location.search).get('t')
     const start = async () => {
       if (token) {
-        try { await api.me(); await api.localLogin(token) } catch { /* wrong token: the normal login page follows */ }
+        try { await api.me(); await api.localLogin(token) } catch { /* wrong token: the message below says what to do */ }
         window.history.replaceState(null, '', window.location.pathname + window.location.hash)
       }
       await refresh()
@@ -51,16 +49,6 @@ function Shell() {
     setCheckedSetup(true)
     api.settings().then((s) => { if (!s.configured) window.location.hash = '#settings' }).catch(() => {})
   }, [auth, checkedSetup])
-  // a logout that failed leaves the session open: say so (and do not claim otherwise by re-checking and showing the login form)
-  const [logoutFailed, setLogoutFailed] = useState(false)
-  const [loggingOut, setLoggingOut] = useState(false)  // one request at a time, and the wait is visible
-  const logout = () => {
-    if (loggingOut) return
-    setLoggingOut(true)
-    api.logout().then(() => { setLogoutFailed(false); return refresh() }).catch(() => setLogoutFailed(true))
-      .finally(() => setLoggingOut(false))
-  }
-
   if (failure) {
     return (
       <div role="alert" className="mx-auto max-w-md space-y-3 p-4">
@@ -71,7 +59,8 @@ function Shell() {
   }
   // not a blank page while the session is being checked: a slow network must not look like a broken application
   if (auth === null) return <p role="status" className="p-4 text-slate-500">{t('common.loading')}</p>
-  if (!auth) return <Login onDone={refresh} />
+  // the launcher signs the window in; if that did not happen (the page was opened some other way), say what to do
+  if (!auth) return <p role="alert" className="mx-auto max-w-md p-4 text-rose-700">{t('app.notSignedIn')}</p>
   return (
     // ONE Tabs around the header and the pages: a tab is only a tab if a tabpanel belongs to it
     <Tabs value={page} onValueChange={(v) => go({ page: v as Page, group: null })}
@@ -90,16 +79,8 @@ function Shell() {
         </TabsList>
         <div className="flex items-center gap-2">
           <LangSwitch />
-          {!local && (
-            <Button variant="outline" size="sm" onClick={logout} disabled={loggingOut} aria-busy={loggingOut}>
-              {t(loggingOut ? 'nav.loggingOut' : 'nav.logout')}
-            </Button>
-          )}
         </div>
       </header>
-      <div role="alert" className="empty:hidden">
-        {logoutFailed && <p className="mb-3 rounded bg-rose-50 p-2 text-sm text-rose-900"><span aria-hidden="true">✕ </span>{t('app.logoutFailed')}</p>}
-      </div>
       {/* text-base: the panel's own text-sm would shrink every page */}
       <TabsContent value="dashboard" className="text-base"><Dashboard open={open} /></TabsContent>
       <TabsContent value="queue" className="text-base"><Queue group={group} onShowAll={() => go({ page: 'queue', group: null })} /></TabsContent>

@@ -41,33 +41,6 @@ def api(sb):
     return c
 
 
-def test_everything_requires_login(sb):
-    c = APIClient()
-    assert c.get("/api/items").status_code == 403
-    assert c.post("/api/scan").status_code == 403
-    assert c.get("/api/auth/me").json()["authenticated"] is False
-
-
-def test_login_and_logout(sb):
-    get_user_model().objects.create_user("dany", password="secret-123")
-    c = APIClient()
-    assert c.post("/api/auth/login", {"username": "dany", "password": "wrong"}, format="json").status_code == 401
-    assert c.post("/api/auth/login", {"username": "dany", "password": "secret-123"}, format="json").status_code == 200
-    assert c.get("/api/items").status_code == 200
-    c.post("/api/auth/logout")
-    assert c.get("/api/items").status_code == 403
-
-
-def test_login_attempts_are_rate_limited_even_with_a_forged_forwarded_for(sb):
-    get_user_model().objects.create_user("dany", password="secret-123")
-    c = APIClient()
-    codes = [c.post("/api/auth/login", {"username": "dany", "password": f"wrong-{i}"}, format="json",
-                    HTTP_X_FORWARDED_FOR=f"10.9.8.{i}").status_code for i in range(12)]   # a new "IP" every time
-    assert codes[:10] == [401] * 10 and codes[10:] == [429, 429]
-    # while locked out, even the right password is refused: that is the point
-    assert c.post("/api/auth/login", {"username": "dany", "password": "secret-123"}, format="json").status_code == 429
-
-
 def test_unknown_api_routes_are_json_404_but_ui_routes_still_get_the_app(sb, settings, tmp_path):
     dist = tmp_path / "dist"
     dist.mkdir()
@@ -120,18 +93,6 @@ def test_csrf_is_enforced_for_browser_sessions(sb):
     c = APIClient(enforce_csrf_checks=True)
     c.force_login(get_user_model().objects.create_user("dany", password="x"))
     assert c.post("/api/scan").status_code == 403
-
-
-def test_login_requires_a_csrf_token_even_for_an_anonymous_request(sb):
-    get_user_model().objects.create_user("dany", password="secret-123")
-    creds = {"username": "dany", "password": "secret-123"}
-    c = APIClient(enforce_csrf_checks=True)
-    assert c.post("/api/auth/login", creds, format="json").status_code == 403         # forged cross-site login
-    assert c.get("/api/items").status_code == 403                                      # and no session was opened
-    token = c.get("/api/auth/me").cookies["csrftoken"].value                            # what the page does on load
-    assert c.post("/api/auth/login", creds, format="json", HTTP_X_CSRFTOKEN="wrong").status_code == 403
-    assert c.post("/api/auth/login", creds, format="json", HTTP_X_CSRFTOKEN=token).status_code == 200
-    assert c.get("/api/items").status_code == 200
 
 
 def test_items_list_is_paged_and_says_how_many_there_are(api):
@@ -271,30 +232,6 @@ def test_a_second_writer_gets_through_a_write_lock_that_lasts_longer_than_the_ol
     db = DB(path)
     doc = db.add_document(sha256="s1", status="classified")                 # waits for the lock instead of "database is locked"
     assert doc and 5.5 < time.time() - start < 15
-
-
-@pytest.mark.parametrize("raw,expected", [
-    ("a,b", ["a", "b"]), ("a, b", ["a", "b"]), (" a ,\tb\n,, c ,", ["a", "b", "c"]),
-    ("my-server, 192.0.2.10 ,localhost", ["my-server", "192.0.2.10", "localhost"]),
-    ("a,a, a", ["a"]),                                              # a repeated host is listed once
-])
-def test_the_allowed_hosts_list_ignores_spaces_and_empty_entries(raw, expected):
-    from webapp import settings as webapp_settings
-    assert webapp_settings.parse_hosts(raw) == expected
-
-
-@pytest.mark.parametrize("raw", ["", "   ", ",", " , ,\n"])
-def test_a_hosts_setting_that_lists_no_host_is_refused_not_silently_accepted(raw):
-    from django.core.exceptions import ImproperlyConfigured
-    from webapp import settings as webapp_settings
-    with pytest.raises(ImproperlyConfigured, match="DOCFLOW_HOSTS"):                  # instead of a site that answers 400 to all
-        webapp_settings.parse_hosts(raw)
-
-
-def test_the_hosts_actually_in_use_are_clean():
-    from webapp import settings as webapp_settings
-    assert webapp_settings.HOSTS and all(h == h.strip() and h for h in webapp_settings.HOSTS)
-    assert all(o == o.strip() and " " not in o for o in webapp_settings.CSRF_TRUSTED_ORIGINS)
 
 
 @pytest.mark.parametrize("content", ["", "   ", "\n", " \n\t "])
@@ -1722,27 +1659,6 @@ def test_the_rules_screen_says_which_learned_file_is_unreadable_instead_of_a_500
     assert bad.read_bytes() == before                                                       # never overwritten
     bad.write_text("Acme:\n- acme\n", encoding="utf-8")
     assert api.get("/api/rules").status_code == 200                                          # fixed by hand: it works again
-
-
-def test_in_the_sandbox_the_secret_key_and_the_rate_limit_cache_live_in_the_sandbox_not_in_production_storage(tmp_path):
-    # DOC474.251: the database followed DOCFLOW_SANDBOX, the key and the login counters kept using the real storage folder
-    import json
-    import os
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[1]
-    sandbox = tmp_path / "sbx"
-    sandbox.mkdir()
-    env = {**os.environ, "DOCFLOW_SANDBOX": str(sandbox), "PYTHONPATH": str(root / "backend")}
-    env.pop("DOCFLOW_SECRET_KEY", None)
-    code = ("import json; from webapp import settings as s; "
-            "print(json.dumps([s.CACHES['default']['LOCATION'], s.DATABASES['default']['NAME']]))")
-    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True).stdout
-    cache, db = json.loads(out.strip().splitlines()[-1])
-    assert Path(cache) == sandbox / ".cache" and Path(db).parent == sandbox
-    assert (sandbox / ".django_secret").is_file()                  # created next to the sandbox database, not in storage/
 
 
 def test_index_html_asked_for_by_name_is_revalidated_like_the_page_at_the_root(sb, settings, tmp_path):

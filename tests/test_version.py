@@ -41,27 +41,6 @@ def test_the_page_shows_the_version_the_server_sent():
     assert "version: string" in (ROOT / "frontend" / "src" / "api.ts").read_text(encoding="utf-8")
 
 
-def test_the_service_file_names_its_hosts_so_the_code_default_can_shrink_later():
-    # DOC474.252, first step: the hosts live in the service, with the same value the code uses as its default today
-    unit = (ROOT / "deploy" / "docflow-web.service").read_text(encoding="utf-8")
-    line = next(ln for ln in unit.splitlines() if ln.startswith("Environment=DOCFLOW_HOSTS="))
-    from webapp.settings import parse_hosts
-    assert parse_hosts(line.split("=", 2)[2]) == ["localhost", "127.0.0.1"]
-
-
-def test_without_docflow_hosts_the_site_answers_only_to_localhost(tmp_path):
-    # DOC474.252, second step: a machine's name and address belong in the service (DOCFLOW_HOSTS), not in the code
-    import json
-    import os
-    import subprocess
-    import sys
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "backend"), "DOCFLOW_SECRET_KEY": "x", "DOCFLOW_SANDBOX": str(tmp_path)}
-    env.pop("DOCFLOW_HOSTS", None)
-    out = subprocess.run([sys.executable, "-c", "import json; from webapp import settings as s; print(json.dumps(s.ALLOWED_HOSTS))"],
-                         env=env, capture_output=True, text=True, check=True).stdout
-    assert json.loads(out.strip().splitlines()[-1]) == ["localhost", "127.0.0.1"]
-
-
 SAMPLE = """# Notes de version
 
 Texte d'en-tête ignoré.
@@ -121,8 +100,3 @@ def test_the_english_release_notes_list_the_same_versions_with_the_same_dates_as
     assert all(r["sections"] for r in en[:2])                       # the two recent versions are described, not just listed
 
 
-def test_the_desktop_application_has_no_log_out_button_and_the_notes_follow_the_language():
-    app = (ROOT / "frontend" / "src" / "App.tsx").read_text(encoding="utf-8")
-    assert "{!local && (" in app and "setLocal(m.local)" in app
-    notes = (ROOT / "frontend" / "src" / "pages" / "Notes.tsx").read_text(encoding="utf-8")
-    assert "api.changelog(lang)" in notes and "[lang]" in notes

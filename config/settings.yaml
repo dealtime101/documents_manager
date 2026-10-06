@@ -5,9 +5,6 @@ thresholds:
   auto: 0.95      # >= : automatic filing
   confirm: 0.80   # >= : confirmation requested; below: manual validation
 
-backup:           # `manage.py backup` (see deploy/docflow-backup.timer); dir = where to write the dated backups
-  keep: 14        # how many dated backups to keep
-
 ocr:
   enabled: true
   languages: "fra+eng"          # Tesseract language packs, e.g. "eng" or "deu+eng"

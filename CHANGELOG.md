@@ -23,8 +23,12 @@ Préparation d'une diffusion publique sous licence MIT.
 
 - **Notes de version en anglais et en français** : l'écran suit la langue de l'interface (`CHANGELOG.en.md` et `CHANGELOG.md`).
 
+### Retiré
+- **Tout ce qui ne servait qu'au mode serveur** : connexion par mot de passe, déconnexion, limitation des essais de connexion,
+  liste d'hôtes (`DOCFLOW_HOSTS`), modèles de service systemd (`deploy/`), `gunicorn`, et la commande de sauvegarde `backup`. Le
+  programme n'écoute plus que `127.0.0.1` et n'a plus de mot de passe : seule la connexion par jeton du lanceur existe.
+
 ### Modifié
-- **Pas de bouton « Déconnexion » dans l'application de bureau** (un seul utilisateur, connecté par le lanceur).
 - **Nom du produit : Documents Manager** (titre de la page, de l'onglet du navigateur, du README et de ces notes). Le nom
   interne `docflow` (commande, dossiers, services, variables `DOCFLOW_*`) est conservé : le changer casserait votre installation.
 - **Lecture des PDF : PyMuPDF (AGPL) est remplacé par PDFium** (via `pypdfium2`, Apache-2.0/BSD). Le programme ne contient plus

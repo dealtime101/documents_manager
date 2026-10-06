@@ -58,19 +58,8 @@ SECRET_KEY = _secret()
 DEBUG = os.environ.get("DOCFLOW_DEBUG") == "1"
 
 
-def parse_hosts(raw: str) -> list[str]:
-    """'a, b ,,c' -> ['a', 'b', 'c']: spaces and empty entries dropped, repeats listed once. A host with a stray space never
-    matches the Host header (a site that answers 400 to everybody), so a setting with NO host at all is refused outright."""
-    hosts = list(dict.fromkeys(h.strip() for h in raw.split(",") if h.strip()))
-    if not hosts:
-        raise ImproperlyConfigured("DOCFLOW_HOSTS is set but lists no host name: give at least one, e.g. localhost")
-    return hosts
-
-
-# this machine's own names and address go in the service (DOCFLOW_HOSTS in deploy/docflow-web.service), not in the code
-HOSTS = parse_hosts(os.environ.get("DOCFLOW_HOSTS", "localhost,127.0.0.1"))
-ALLOWED_HOSTS = HOSTS
-CSRF_TRUSTED_ORIGINS = [f"http://{h}:{os.environ.get('DOCFLOW_PORT', '8420')}" for h in HOSTS]
+# The application only answers on this computer: it listens on 127.0.0.1 and has no password, so nothing else may reach it.
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 INSTALLED_APPS = [
     "django.contrib.auth", "django.contrib.contenttypes", "django.contrib.sessions",
@@ -111,12 +100,7 @@ LOGGING = {
     "loggers": {name: {"handlers": ["console"], "level": "WARNING", "propagate": False} for name in ("django", "docflow", "triage")},
 }
 
-# Shared by the gunicorn workers (a per-process cache would multiply every limit by the number of workers).
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-                      "LOCATION": str(STATE_DIR / ".cache")}}
-
 REST_FRAMEWORK = {
-    "DEFAULT_THROTTLE_RATES": {"login": "10/min"},
     # The server is reached directly on the LAN: trust REMOTE_ADDR only. With the default (None) DRF believes a client's
     # X-Forwarded-For header, and forging it would reset every per-address limit.
     "NUM_PROXIES": 0,

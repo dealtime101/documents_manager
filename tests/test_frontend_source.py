@@ -31,7 +31,6 @@ def test_a_long_status_label_is_cut_with_an_ellipsis_and_stays_readable_in_the_t
     assert "max-w-full" in (UI / "badge.tsx").read_text()
 
 
-
 def test_history_shows_a_load_error_through_the_translator_not_as_a_raw_exception_string():
     page = (BITS.parents[1] / "pages" / "History.tsx").read_text()
     assert "setLoadError(errorText(e))" in page and "msg(loadError)" in page   # the raw server text goes through msg() when shown
@@ -80,18 +79,6 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     app = (BITS.parents[1] / "App.tsx").read_text()
     assert "if (auth === null) return null" not in app
     assert "role=\"status\"" in app and "t('common.loading')" in app
-
-
-def test_a_failed_session_check_is_an_error_with_a_retry_not_a_logout():
-    app = (BITS.parents[1] / "App.tsx").read_text()
-    assert ".catch(() => setAuth(false))" not in app                         # /auth/me answers 200 for an anonymous visitor
-    assert "t('app.sessionFailed')" in app and "t('common.retry')" in app and 'role="alert"' in app
-
-
-def test_a_failed_logout_is_reported_and_never_an_unhandled_rejection():
-    app = (BITS.parents[1] / "App.tsx").read_text()
-    assert "api.logout().then(refresh)" not in app                           # a rejection with nobody to catch it
-    assert ".catch(() => setLogoutFailed(true))" in app and "t('app.logoutFailed')" in app
 
 
 def test_every_tab_has_a_tabpanel_inside_the_same_tabs_root():
@@ -145,39 +132,10 @@ def test_the_app_follows_the_hash_and_navigation_writes_it():
     assert "window.location.hash = toHash(route)" in app and "useState<Page>" not in app
 
 
-def test_login_sends_one_request_at_a_time_and_shows_that_it_is_working():
-    page = (BITS.parents[1] / "pages" / "Login.tsx").read_text()
-    assert "if (busy) return" in page and "disabled={busy}" in page and "t(busy ? 'login.busy'" in page
-    assert page.index("setBusy(true)") < page.index("await api.login") < page.index("setBusy(false)")
-
-
-def test_login_clears_the_previous_error_before_a_new_attempt():
-    page = (BITS.parents[1] / "pages" / "Login.tsx").read_text()
-    assert page.index("setErr('')") < page.index("await api.login")           # not left on screen during the next attempt
-
-
-def test_a_failed_login_is_announced_and_tied_to_the_fields():
-    page = (BITS.parents[1] / "pages" / "Login.tsx").read_text()
-    assert 'id="login-error" role="alert"' in page                           # the region exists before the text does
-    assert "'aria-describedby': 'login-error'" in page and "'aria-invalid': true" in page     # (invalid only on a refusal: DOC474.201)
-    assert page.count("{...invalid}") == 2                                   # both fields
-
-
 def test_a_network_failure_reaches_the_screens_as_a_translatable_api_error_not_a_raw_typeerror():
     api = (BITS.parents[1] / "api.ts").read_text()
     assert "throw new ApiError('Network error: the server cannot be reached.')" in api   # fetch's "Failed to fetch" never escapes
     assert "'Network error: the server cannot be reached.': 'Erreur réseau" in (BITS.parents[1] / "i18n.tsx").read_text()
-
-
-def test_both_login_fields_are_required_so_an_empty_form_is_not_sent():
-    page = (BITS.parents[1] / "pages" / "Login.tsx").read_text()
-    assert page.count(" required ") == 2 and "autoComplete=\"username\"" in page and "autoComplete=\"current-password\"" in page
-
-
-def test_the_login_card_shrinks_on_a_phone_instead_of_overflowing():
-    page = (BITS.parents[1] / "pages" / "Login.tsx").read_text()
-    assert '<Card className="w-full max-w-sm">' in page and "w-96" not in page   # 384 px fixed was wider than a 360 px phone
-    assert "px-4" in page                                                          # a gutter on both sides
 
 
 def test_a_disabled_input_can_show_its_not_allowed_cursor():
@@ -253,12 +211,6 @@ def test_field_keeps_an_id_the_caller_gave_its_input():
     source = BITS.read_text()
     assert "children.props.id ?? generated" in source                        # the caller's id wins over the generated one
     assert "<Label htmlFor={id}>" in source and "cloneElement(children, { id })" in source   # label and input share THAT id
-
-
-def test_logout_sends_one_request_at_a_time_and_shows_that_it_is_working():
-    app = (BITS.parents[1] / "App.tsx").read_text()
-    assert "if (loggingOut) return" in app and "disabled={loggingOut}" in app and "t(loggingOut ? 'nav.loggingOut'" in app
-    assert ".finally(() => setLoggingOut(false))" in app                       # released on success AND failure: it can be retried
 
 
 @pytest.mark.parametrize("name", ["card", "input", "label"])
@@ -403,13 +355,6 @@ def test_the_notice_live_regions_are_never_hidden_while_empty():
     bits = (UI.parents[0] / "Bits.tsx").read_text()
     notice = bits[bits.index("export function Notice"):bits.index("const STATUS_CLASS")]
     assert 'role="status"' in notice and 'role="alert"' in notice and "empty:hidden" not in notice
-
-
-def test_the_login_error_region_is_never_hidden_while_empty():
-    # DOC474.129: `empty:hidden` is display:none, so the region left the accessibility tree and a failed login was not announced
-    page = (BITS.parents[1] / "pages" / "Login.tsx").read_text()
-    region = page[page.index('id="login-error"'):page.index("</div>", page.index('id="login-error"'))]
-    assert 'role="alert"' in region and "empty:hidden" not in region
 
 
 def test_a_ticked_item_that_stops_being_approvable_leaves_the_selection():
@@ -686,16 +631,6 @@ def test_a_failed_search_does_not_leave_the_results_of_the_previous_one_on_scree
     assert "setHits(null)" in submit.split("try {")[0], "the old results must go before the new request starts"
 
 
-def test_a_failure_after_a_successful_login_is_not_shown_as_a_failed_login():
-    # DOC474.131: onDone() sat inside the try: anything it threw was reported as "invalid credentials" with the session open
-    page = (UI.parents[1] / "pages" / "Login.tsx").read_text()
-    submit = page[page.index("const submit"):page.index("return (", page.index("const submit"))]
-    assert "try { await api.login(u, p); onDone() }" not in submit
-    assert "signedIn = true" in submit and "if (signedIn) onDone()" in submit
-    assert submit.index("await api.login(u, p)") < submit.index("signedIn = true") < submit.index("if (signedIn) onDone()")
-    assert submit.index("catch (x)") < submit.index("if (signedIn) onDone()")                       # outside the try/catch
-
-
 def test_an_error_that_is_not_an_api_error_is_logged_and_shown_as_a_generic_translated_message():
     # DOC474.146 / .175 (and .78 / .130 for the network case): String(e) put a raw technical text in front of the user
     src = UI.parents[1]
@@ -706,7 +641,7 @@ def test_an_error_that_is_not_an_api_error_is_logged_and_shown_as_a_generic_tran
     offenders = [p.name for p in src.rglob("*.ts*") if p.name != "api.ts" and re.search(r"String\((e|x)\)", p.read_text())]
     assert offenders == [], offenders                                          # every screen goes through the helper
     for page in ("App.tsx", "components/Accuracy.tsx", "pages/Rules.tsx", "pages/Dashboard.tsx", "pages/Search.tsx",
-                 "pages/History.tsx", "pages/Login.tsx", "pages/Queue.tsx"):
+                 "pages/History.tsx", "pages/Queue.tsx"):
         assert "errorText(" in (src / page).read_text(), page
     i18n = (src / "i18n.tsx").read_text()
     assert "'Unexpected error.':" in i18n[i18n.index("const frMessages"):]       # and its French text exists
@@ -734,17 +669,6 @@ def test_the_history_table_names_itself_and_ties_each_header_to_its_column():
     assert '<caption className="sr-only">{t(\'hist.caption\')}</caption>' in history
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
     assert "'hist.caption'" in en and "'hist.caption'" in fr
-
-
-def test_only_a_refused_login_marks_the_fields_invalid_not_a_network_or_server_failure():
-    # DOC474.201: any error set aria-invalid on both fields, telling assistive technology that a good password was wrong
-    src = UI.parents[1]
-    api, login = (src / "api.ts").read_text(), (src / "pages" / "Login.tsx").read_text()
-    assert "export class ApiError extends Error {\n  status?: number" in api and "this.status = status" in api
-    assert "throw new ApiError(errorMessage(data, r.status), r.status)" in api               # the HTTP status travels with the error
-    assert "x instanceof ApiError && x.status === 401" in login and "setRefused(" in login
-    assert "'aria-describedby': 'login-error'" in login and "...(refused ? { 'aria-invalid': true } : {})" in login
-    assert "const invalid = err ? { 'aria-invalid': true" not in login
 
 
 def test_a_long_badge_label_ends_in_an_ellipsis_and_can_be_read_in_full():

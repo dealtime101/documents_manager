@@ -119,9 +119,9 @@ def test_a_fresh_install_starts_empty_in_the_users_folder_and_says_it_is_not_con
 
 def test_a_users_own_settings_yaml_overrides_section_by_section_it_does_not_replace_the_shipped_one(home):
     (home / "config").mkdir(parents=True)
-    (home / "config" / "settings.yaml").write_text("backup:\n  dir: /somewhere\nocr:\n  languages: eng\n", encoding="utf-8")
+    (home / "config" / "settings.yaml").write_text("ocr:\n  languages: eng\nextra_section:\n  a: 1\n", encoding="utf-8")
     s = load_config().settings
-    assert s["backup"] == {"keep": 14, "dir": "/somewhere"} or s["backup"].get("dir") == "/somewhere"   # keep (shipped) + dir (user's)
+    assert s["extra_section"] == {"a": 1}                                                              # a section the user adds
     assert s["ocr"]["languages"] == "eng" and s["ocr"]["enabled"] is True                              # one key changed, the rest kept
     assert s["thresholds"]["auto"] == 0.95
 

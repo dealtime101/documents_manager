@@ -21,6 +21,11 @@ Preparation for a public release under the MIT license.
   or folder of the author.
 - **Release notes in English and French**: the screen follows the interface language.
 
+### Removed
+- **Everything that only served the server mode**: password sign-in, log-out, the sign-in attempt limit, the host list
+  (`DOCFLOW_HOSTS`), the systemd service templates (`deploy/`), `gunicorn`, and the `backup` command. The program now listens on
+  `127.0.0.1` only and has no password: only the launcher's token sign-in exists.
+
 ### Changed
 - **Product name: Documents Manager** (page title, browser tab, README and these notes). The internal name `docflow` (command,
   folders, services, `DOCFLOW_*` variables) is kept: changing it would break an existing installation.
@@ -28,7 +33,6 @@ Preparation for a public release under the MIT license.
   copyleft library, which allows publishing it under the MIT license. PDFium is not safe in parallel: every call into it goes
   through a lock (OCR, the slow part, stays outside). PyMuPDF is now used only to build sample PDFs in the tests (a development
   dependency).
-- **No log-out button in the desktop application** (one user, signed in by the launcher).
 
 ## [0.2.0] - 2026-10-05
 

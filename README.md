@@ -13,29 +13,24 @@ leaves it, no cloud service is used (Ollama on `localhost` is an optional extra)
 
 > The program's internal name — used by its command, its services and its settings folder — is `docflow`.
 
-## Requirements
+## Install
 
-- Python 3.12 or newer, and [uv](https://docs.astral.sh/uv/) (or pip).
-- [Tesseract OCR](https://tesseract-ocr.github.io/tessdoc/Installation.html) with the language packs you need (`fra`, `eng`, …)
-  for scanned documents. Without it, only PDFs that already contain text are read.
-- Node.js 20+ only to build the web interface from source.
+**Windows (recommended):** download `DocumentsManager.exe` and double-click it. It opens a window already signed in (no password,
+no account): the program runs only on your computer and listens on `127.0.0.1`. On the first run the **Settings** screen opens:
+choose the folder to watch (the inbox) and the folder documents are filed into (the library). Then press **Scan inbox** in **To file**.
+It files with the rights of your Windows session: a folder on a network drive works if the drive is connected in Windows.
 
-## Install and run
+**From source** (any system): Python 3.12+, [uv](https://docs.astral.sh/uv/), Node.js 20+ and [Tesseract
+OCR](https://tesseract-ocr.github.io/tessdoc/Installation.html) (scans only; PDFs that already contain text are read without it).
 
 ```bash
 git clone <this repository> documents-manager && cd documents-manager
 uv sync
-cd frontend && npm ci && npm run build && cd ..          # builds the interface into frontend/dist
-uv run python manage.py migrate                          # creates the database
-uv run python manage.py createsuperuser                  # your login
-uv run gunicorn webapp.wsgi:application --bind 127.0.0.1:8420
+cd frontend && npm ci && npm run build && cd ..
+uv run python -m docflow.desktop                  # the same window as the .exe
 ```
 
-Open `http://127.0.0.1:8420`, sign in. On the first run the **Settings** screen opens: choose the folder to watch (the inbox)
-and the folder documents are filed into (the library). Then press **Scan inbox** in **To file**.
-
-By default the site answers to `localhost` only. To reach it from another computer, set `DOCFLOW_HOSTS` (comma separated host
-names or addresses) before starting it, and keep it on a trusted network: it has no protection against the open internet.
+To build the Windows executable: `packaging\build_windows.bat` on Windows.
 
 ## Where your data lives
 
@@ -60,18 +55,6 @@ uv run docflow --sandbox ~/docflow-sandbox scan   # rehearsal: the real archive 
 uv run python scripts/make_sandbox.py ~/docflow-sandbox   # sample PDFs to try it on
 uv run docflow --version
 ```
-
-## Backup
-
-`uv run python manage.py backup` writes a dated, consistent snapshot of the database and your learned rules under `backup.dir`
-(set it in `config/settings.yaml` of your own folder, e.g. `backup:` then `dir: /path/to/backups`; it adds to the shipped settings) and keeps the newest `backup.keep`. It refuses to run if that folder's parent does not exist
-(an unmounted share). `--restore FOLDER` puts one back (stop the service first). `deploy/docflow-backup.timer` runs it nightly.
-
-## Running as a service
-
-`deploy/` holds systemd unit templates (`docflow-web`, `docflow-backup`): adapt the user and the paths, copy them to
-`/etc/systemd/system/`, then `systemctl enable --now docflow-web`. Update: stop the service, `git pull`, `uv sync`,
-`uv run python manage.py migrate`, rebuild the interface, start it. Run `migrate` before the workers start.
 
 ## Development
 

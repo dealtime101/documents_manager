@@ -4,9 +4,7 @@ from . import views as v
 
 urlpatterns = [
     path("auth/me", v.me),
-    path("auth/login", v.login_view),
     path("auth/local", v.local_login),
-    path("auth/logout", v.logout_view),
     path("items", v.items),
     path("items/approve-auto", v.approve_auto),
     path("items/approve-selected", v.approve_selected),

@@ -46,19 +46,9 @@ def me(request):
                      "local": bool(os.environ.get("DOCFLOW_LOCAL_TOKEN"))})  # the desktop application: one user, no log-out
 
 
-class LoginThrottle(SimpleRateThrottle):
-    """10 attempts per minute per client ADDRESS, success or not: slows guessing from one machine to a crawl. It does not slow
-    one attacker who has several addresses against the same account: there is no per-account limit on purpose (on a home
-    network it would let anyone lock the owner out by hammering the user name). The site is for the local network only."""
-    scope = "login"
-
-    def get_cache_key(self, request, view):
-        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
-
-
 class CsrfAlwaysSessionAuthentication(SessionAuthentication):
-    """DRF only checks the CSRF token for an already-authenticated user. Login is the request that is anonymous by
-    nature, so check it here too: otherwise a third-party page could sign the victim in to the attacker's account."""
+    """DRF only checks the CSRF token for an already-authenticated user. The sign-in is the request that is anonymous by
+    nature, so check it here too: otherwise a third-party page could sign the victim in."""
 
     def authenticate(self, request):
         self.enforce_csrf(request)
@@ -68,19 +58,6 @@ class CsrfAlwaysSessionAuthentication(SessionAuthentication):
 @api_view(["POST"])
 @authentication_classes([CsrfAlwaysSessionAuthentication])
 @permission_classes([AllowAny])
-@throttle_classes([LoginThrottle])
-def login_view(request):
-    user = authenticate(request, username=request.data.get("username", ""), password=request.data.get("password", ""))
-    if not user:
-        return err(ValueError("invalid credentials"), status.HTTP_401_UNAUTHORIZED)
-    login(request, user)
-    return Response({"authenticated": True, "username": user.get_username()})
-
-
-@api_view(["POST"])
-@authentication_classes([CsrfAlwaysSessionAuthentication])
-@permission_classes([AllowAny])
-@throttle_classes([LoginThrottle])
 def local_login(request):
     """Desktop application only: it has one user and no password to type. The launcher that started the server knows a random
     token (DOCFLOW_LOCAL_TOKEN) and opens the page with it. Without that variable this endpoint does not exist."""
@@ -96,12 +73,6 @@ def local_login(request):
         user.save()
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     return Response({"authenticated": True, "username": user.get_username()})
-
-
-@api_view(["POST"])
-def logout_view(request):
-    logout(request)
-    return Response({"authenticated": False})
 
 
 @api_view(["GET"])
