@@ -1870,3 +1870,13 @@ def test_the_desktop_launcher_signs_in_with_its_one_time_token_and_nothing_else_
     assert c.post("/api/auth/local", {}, format="json", HTTP_X_CSRFTOKEN=csrf).status_code == 401
     ok = c.post("/api/auth/local", {"token": "s3cret-token-of-this-launch"}, format="json", HTTP_X_CSRFTOKEN=csrf)
     assert ok.status_code == 200 and c.get("/api/auth/me").json()["authenticated"] is True
+
+
+def test_the_release_notes_come_in_english_on_request_and_the_session_says_whether_it_is_the_desktop_application(api, monkeypatch):
+    fr = api.get("/api/changelog").json()
+    en = api.get("/api/changelog", {"lang": "en"}).json()
+    assert [r["version"] for r in en] == [r["version"] for r in fr] and en[0]["sections"][0]["title"] != fr[0]["sections"][0]["title"]
+    monkeypatch.delenv("DOCFLOW_LOCAL_TOKEN", raising=False)
+    assert api.get("/api/auth/me").json()["local"] is False
+    monkeypatch.setenv("DOCFLOW_LOCAL_TOKEN", "t")
+    assert api.get("/api/auth/me").json()["local"] is True

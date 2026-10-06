@@ -17,10 +17,10 @@ function Inline({ text }: { text: string }) {
 
 /** The release notes: CHANGELOG.md, newest version first. */
 export default function Notes() {
-  const { t, msg, date } = useI18n()
+  const { t, msg, date, lang } = useI18n()
   const [releases, setReleases] = useState<Release[] | null>(null)
   const [error, setError] = useState('')
-  useEffect(() => { api.changelog().then(setReleases).catch((e) => setError(errorText(e))) }, [])
+  useEffect(() => { api.changelog(lang).then(setReleases).catch((e) => setError(errorText(e))) }, [lang])  // the notes follow the language
   if (error) return <p role="alert" className="text-rose-700">{msg(error)}</p>
   if (!releases) return <p role="status" className="text-slate-500">{t('common.loading')}</p>
   if (releases.length === 0) return <p className="text-slate-500">{t('notes.none')}</p>

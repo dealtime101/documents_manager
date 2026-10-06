@@ -29,7 +29,8 @@ function Shell() {
   // the raw server text of a failed session check: an outage is not a logout (/auth/me answers 200 for an anonymous visitor)
   const [failure, setFailure] = useState('')
   const [version, setVersion] = useState('')  // the program's version, from the server (written once, in pyproject.toml)
-  const refresh = () => api.me().then((m) => { setAuth(m.authenticated); setVersion(m.version) })
+  const [local, setLocal] = useState(false)  // the desktop application: one user, signed in by the launcher: nothing to log out of
+  const refresh = () => api.me().then((m) => { setAuth(m.authenticated); setVersion(m.version); setLocal(m.local) })
     .catch((e) => setFailure(errorText(e)))
   useEffect(() => {
     // The desktop application opens the page as /?t=<token>: sign in with it, then take it out of the address at once.
@@ -89,9 +90,11 @@ function Shell() {
         </TabsList>
         <div className="flex items-center gap-2">
           <LangSwitch />
-          <Button variant="outline" size="sm" onClick={logout} disabled={loggingOut} aria-busy={loggingOut}>
-            {t(loggingOut ? 'nav.loggingOut' : 'nav.logout')}
-          </Button>
+          {!local && (
+            <Button variant="outline" size="sm" onClick={logout} disabled={loggingOut} aria-busy={loggingOut}>
+              {t(loggingOut ? 'nav.loggingOut' : 'nav.logout')}
+            </Button>
+          )}
         </div>
       </header>
       <div role="alert" className="empty:hidden">

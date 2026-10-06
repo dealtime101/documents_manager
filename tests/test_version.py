@@ -110,3 +110,19 @@ def test_the_product_is_called_documents_manager_where_people_read_its_name():
     assert "<title>Documents Manager</title>" in (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
     assert (ROOT / "README.md").read_text(encoding="utf-8").startswith("# Documents Manager")
     assert (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").startswith("# Documents Manager")
+
+
+def test_the_english_release_notes_list_the_same_versions_with_the_same_dates_as_the_french_ones():
+    # the screen follows the interface language; both files are written by hand, so a version missing from one is caught here
+    from docflow.changelog import parse
+    fr = parse((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
+    en = parse((ROOT / "CHANGELOG.en.md").read_text(encoding="utf-8"))
+    assert [(r["version"], r["date"]) for r in en] == [(r["version"], r["date"]) for r in fr]
+    assert all(r["sections"] for r in en[:2])                       # the two recent versions are described, not just listed
+
+
+def test_the_desktop_application_has_no_log_out_button_and_the_notes_follow_the_language():
+    app = (ROOT / "frontend" / "src" / "App.tsx").read_text(encoding="utf-8")
+    assert "{!local && (" in app and "setLocal(m.local)" in app
+    notes = (ROOT / "frontend" / "src" / "pages" / "Notes.tsx").read_text(encoding="utf-8")
+    assert "api.changelog(lang)" in notes and "[lang]" in notes

@@ -29,7 +29,7 @@ const en = {
   'settings.save': 'Save',
   'settings.saved': 'Settings saved.',
   'settings.helpQuarantine': 'Left empty, duplicates go to a folder in your own settings folder.',
-  'notes.intro': 'What changed in each version, newest first. The notes are written in French.',
+  'notes.intro': 'What changed in each version, newest first.',
   'notes.none': 'No release notes found.',
   'notes.version': 'Version {v}',
   'notes.current': 'Latest',

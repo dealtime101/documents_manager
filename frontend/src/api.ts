@@ -186,7 +186,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 }
 
 export const api = {
-  me: () => call<{ authenticated: boolean; username: string | null; version: string }>('GET', '/api/auth/me'),
+  me: () => call<{ authenticated: boolean; username: string | null; version: string; local: boolean }>('GET', '/api/auth/me'),
   login: (username: string, password: string) => call('POST', '/api/auth/login', { username, password }),
   logout: () => call('POST', '/api/auth/logout'),
   localLogin: (token: string) => call('POST', '/api/auth/local', { token }),  // the desktop launcher's one-time token
@@ -213,7 +213,7 @@ export const api = {
   approveSelected: (ids: number[]) => call<Batch>('POST', '/api/items/approve-selected', { ids }),
   dashboard: () => call<Dashboard>('GET', '/api/dashboard'),
   history: () => call<Operation[]>('GET', '/api/history'),
-  changelog: () => call<Release[]>('GET', '/api/changelog'),
+  changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?lang=${lang}`),
   thresholds: () => call<Thresholds>('GET', '/api/thresholds'),
   settings: () => call<FolderSettings>('GET', '/api/settings'),
   saveSettings: async (values: Omit<FolderSettings, 'configured'>) => {

@@ -5,7 +5,7 @@ from PyInstaller.utils.hooks import collect_all
 
 root = Path(SPECPATH).parent
 datas = [(str(root / "frontend" / "dist"), "frontend/dist"), (str(root / "config"), "config"),
-         (str(root / "CHANGELOG.md"), "."), (str(root / "LICENSE"), ".")]
+         (str(root / "CHANGELOG.md"), "."), (str(root / "CHANGELOG.en.md"), "."), (str(root / "LICENSE"), ".")]
 binaries, hiddenimports = [], []
 for package in ("django", "rest_framework", "pypdfium2", "pypdfium2_raw", "webview", "waitress"):
     d, b, h = collect_all(package)

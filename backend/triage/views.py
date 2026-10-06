@@ -42,7 +42,8 @@ def me(request):
     """Also called on page load: sets the CSRF cookie and says whether the session is open."""
     get_token(request)
     u = request.user if getattr(request.user, "is_authenticated", False) else None
-    return Response({"authenticated": bool(u), "username": u.get_username() if u else None, "version": __version__})
+    return Response({"authenticated": bool(u), "username": u.get_username() if u else None, "version": __version__,
+                     "local": bool(os.environ.get("DOCFLOW_LOCAL_TOKEN"))})  # the desktop application: one user, no log-out
 
 
 class LoginThrottle(SimpleRateThrottle):
@@ -248,11 +249,15 @@ def dashboard(request):
 
 @api_view(["GET"])
 def changelog(request):
-    """The release notes (CHANGELOG.md, the only place they are written), read into releases for the "Release notes" screen."""
-    try:
-        return Response(parse_changelog((settings.BASE_DIR / "CHANGELOG.md").read_text(encoding="utf-8")))
-    except OSError:
-        return Response([])  # a copy without the file: an empty screen, not an error
+    """The release notes, read into releases for the "Release notes" screen: CHANGELOG.en.md for ?lang=en when it exists, else
+    CHANGELOG.md (French, the source). Each file is the only place its language is written."""
+    names = ["CHANGELOG.en.md", "CHANGELOG.md"] if request.query_params.get("lang") == "en" else ["CHANGELOG.md"]
+    for name in names:
+        try:
+            return Response(parse_changelog((settings.BASE_DIR / name).read_text(encoding="utf-8")))
+        except OSError:
+            continue
+    return Response([])  # a copy without the file: an empty screen, not an error
 
 
 @api_view(["GET"])
