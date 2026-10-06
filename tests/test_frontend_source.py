@@ -858,7 +858,7 @@ def test_the_release_notes_have_a_tab_a_route_and_a_screen():
     src = UI.parents[1]
     app = (src / "App.tsx").read_text()
     assert '<TabsTrigger value="notes">{t(\'nav.notes\')}</TabsTrigger>' in app and '<TabsContent value="notes"' in app
-    assert "'notes'" in (src / "route.ts").read_text() and "changelog: () => call<Release[]>('GET', '/api/changelog')" in (src / "api.ts").read_text()
+    assert "'notes'" in (src / "route.ts").read_text() and "changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?lang=${lang}`)" in (src / "api.ts").read_text()
     page = (src / "pages" / "Notes.tsx").read_text()
     assert "dangerouslySetInnerHTML" not in page                     # the text is turned into elements, never injected as HTML
     assert 'role="status"' in page and 'role="alert"' in page        # loading and failure are announced like on the other pages
