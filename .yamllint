@@ -1,0 +1,7 @@
+extends: default
+
+rules:
+  # the rule files hold long regular expressions and the comments that explain them: 80 columns would cut both
+  line-length:
+    max: 140
+    allow-non-breakable-words: true

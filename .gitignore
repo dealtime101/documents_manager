@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.db
+.learn.lock
+storage/*
+!storage/.gitkeep
+
+# What the program learns from your corrections is written in YOUR folder, never here
+config/*_learned.yaml
+config/company_aliases.yaml

@@ -1,0 +1,70 @@
+[project]
+name = "docflow"
+version = "0.3.0"
+description = "Documents Manager : classement local de documents personnels (moteur, interface web, ligne de commande)"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2",
+    "pyyaml",
+    "django>=6.1.1",
+    "djangorestframework>=3.18.1",
+    "gunicorn>=26.2.0",
+    "pypdfium2>=5.14.0",
+]
+
+[project.scripts]
+docflow = "docflow.cli:main"
+
+[dependency-groups]
+dev = [
+    "pymupdf",  # AGPL: ONLY to build test PDFs (images, odd pages). It is not a runtime dependency and ships with nothing.
+    "mypy>=2.4.0",
+    "pytest",
+    "pytest-django>=4.14.0",
+    "types-pyyaml>=6.0.12.20260906",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/docflow"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["tests"]
+DJANGO_SETTINGS_MODULE = "webapp.settings"
+
+[tool.mypy]
+mypy_path = "backend"
+
+[[tool.mypy.overrides]]
+# Django, Django REST framework and pypdfium2.raw ship no type stubs (django-stubs is not a dependency): their imports are "Any", on purpose
+module = ["django.*", "rest_framework.*", "pypdfium2.*"]
+ignore_missing_imports = true
+
+[tool.ruff.lint]
+# What the audit measured with: blind excepts, loop-variable capture, unclosed files, import order, subprocess without `check`...
+select = ["BLE001", "B023", "UP017", "FURB167", "RUF012", "ISC004", "SIM115", "I001", "UP031", "PLW1510", "PLE2502", "FURB157", "RUF059"]
+
+[tool.ruff.lint.per-file-ignores]
+# Django writes `dependencies` and `operations` as plain class attributes in every migration
+"backend/*/migrations/*.py" = ["RUF012"]
+# Django reads `ordering`, `indexes` and `constraints` from the plain class attributes of Meta
+"backend/triage/models.py" = ["RUF012"]
+# One broken file or entry must not end a batch: these catch Exception ON PURPOSE, log or count it, and go on
+"backend/docflow/cli.py" = ["BLE001"]
+"backend/docflow/pipeline.py" = ["BLE001"]
+"backend/triage/services.py" = ["BLE001"]
+"scripts/build_corpus.py" = ["BLE001"]
+"scripts/compare.py" = ["BLE001"]
+"scripts/discover.py" = ["BLE001"]
+# This file LISTS the invisible characters that are refused in a file name (the pattern is checked against the earlier one by a test)
+"backend/docflow/naming.py" = ["PLE2502"]
+# The tests feed the code the very characters it must refuse (a right-to-left override...), catch broad errors to show a 500, run
+# subprocesses whose return code they assert themselves (no `check`), and unpack a whole fixture tuple (`cfg, db, tmp = env`)
+"tests/*.py" = ["PLE2502", "BLE001", "PLW1510", "RUF059"]
+
+[tool.ruff]
+line-length = 140  # the project's own width; the default 88 would re-wrap every long import

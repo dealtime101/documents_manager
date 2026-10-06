@@ -1,0 +1,55 @@
+# Rules used by the TESTS (well-known companies only): not the rules a user starts with.
+---
+Hydro-Quebec:
+  - "hydro-quebec"
+  - "hydro quebec"
+  - "hydroquebec"
+Amazon:
+  - "amazon\\.com\\.ca"
+  - "\\bamazon\\b"
+CroixBleueMedavie:
+  - "croix bleue medavie"
+  - "croix bleue"
+  - "medavie"
+Telus:
+  - "\\btelus\\b"
+Manuvie:
+  - "manuvie"
+  - "manulife"
+Coinbase:
+  - "coinbase"
+RBC:
+  - "\\brbc\\b"
+  - "banque royale"
+BanqueNationale:
+  - "banque nationale"
+Ubisoft:
+  - "ubisoft"
+  - "ubiso[fe]t"        # OCR sometimes reads the final F as E
+Dashlane:
+  - "dashlane"
+NordVPN:
+  - "nord\\s*vpn"
+SAAQ:
+  - "\\bsaaq\\b"
+  - "societe de l'assurance\\s+automobile"
+Steam:
+  - "steampowered"
+  - "valve corporation"
+Beneva:
+  - "\\bbeneva\\b"
+# Desjardins is detected to PREVENT a statement (which lists payments to other issuers) from being taken for one of them.
+Desjardins:
+  - "desjardins"
+HumbleBundle:
+  - "humble\\s*bundle"
+Intact:
+  - "\\bintact\\b"
+LaCapitale:
+  - "la\\s*capitale"
+DesjardinsAssurances:
+  - "desjardins\\s+assurances"
+Videotron:
+  - "videotron"
+HelloFresh:
+  - "hello\\W{0,5}fresh"

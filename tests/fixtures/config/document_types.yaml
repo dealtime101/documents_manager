@@ -1,0 +1,110 @@
+# First match wins: put the most specific first.
+# all: all required | any: at least one | none: none allowed | company: restricted to this company
+# detail: fixed detail | amount: false = no amount in the name | undated: true = date XXXX if absent
+---
+- type: FactureElectriciteMVE
+  company: Hydro-Quebec
+  all: ["facture d'electricite", "versements egaux"]
+- type: FactureElectricite
+  company: Hydro-Quebec
+  all: ["facture d'electricite"]
+- type: CarteAssuranceSante
+  company: CroixBleueMedavie
+  all: ["carte d'identification"]
+  detail: Identification
+  amount: false
+  undated: true
+# Amazon: ORDER date (not billing date); type by product keywords (to be extended);
+# detail_from: item = abbreviated title of the 1st item (confirmation required, never auto).
+- type: FactureNourritureChat
+  company: Amazon
+  all: ["invoice|facture"]
+  any: ["\\bfriskies\\b", "\\bcat food\\b", "nourriture pour chat", "\\blitiere\\b"]
+  date_prefer: order
+  detail_from: item
+- type: FactureNourritureChien
+  company: Amazon
+  all: ["invoice|facture"]
+  any: ["\\bdog chow\\b", "\\bdog food\\b", "nourriture pour chien"]
+  date_prefer: order
+  detail_from: item
+- type: FactureInformatique
+  company: Amazon
+  all: ["invoice|facture"]
+  any: ["\\bhard drive\\b", "disque dur", "\\busb\\b", "\\bssd\\b", "\\bkeyboard\\b", "\\bclavier\\b", "\\bmonitor\\b"]
+  date_prefer: order
+  detail_from: item
+- type: FactureAchat
+  company: Amazon
+  any: ["facture", "invoice"]
+  date_prefer: order
+  detail_from: item
+
+# Desjardins: patterns chosen because they separate the types without overlap in the archive (measured by scripts/benchmark.py)
+- type: ReleveVISA
+  company: Desjardins
+  all: ["solde precedent", "paiement minimum"]
+  amount: false
+  date_mode: month_before     # issued the following month; correct 32/35 in the archive -> confirmation
+- type: ReleveCompte
+  company: Desjardins
+  all: ["releve de compte", "epargne", "folio|transit"]
+  none: ["paiement minimum", "\\breer\\b"]
+  amount: false
+  date_mode: period_month     # "du 1er janvier au 31 janvier 2012" -> 2012-01 ; exact 53/53
+
+- type: ReleveMobilite              # Telus: 20/20 in the archive, no false positive. The device/plan (detail) still has to be entered.
+  company: Telus
+  all: ["mobilit", "releve", "facture"]
+  amount: false
+- type: RemboursementSante          # Manuvie: 8/9 (catches a dental reimbursement) -> confirmation, never auto
+  company: Manuvie
+  all: ["releve", "reglement"]
+  none: ["invalidit"]
+  type_conf: 0.85
+  amount: false
+
+- type: PretPersonnel               # RBC: 12/15 in the archive (the rest = annual statement) -> confirmation
+  company: RBC
+  type_conf: 0.85
+  amount: false
+- type: ReleveBancaire              # Banque Nationale: 8/11 -> confirmation (precision < 80%: 0.80)
+  company: BanqueNationale
+  type_conf: 0.80
+  amount: false
+# Ubisoft: only the types whose keywords never overlap in the archive. T4 and Releve 1 are standard tax forms
+# (date = end of the tax year, always confirmed); the other two have a single example each -> confirmation.
+- type: T4
+  company: Ubisoft
+  all: ["\\bt4\\b|statement of remuneration"]
+  amount: false
+  date_mode: tax_year_end
+- type: Releve1
+  company: Ubisoft
+  all: ["releve 1\\b|\\brl-?1\\b"]
+  amount: false
+  date_mode: tax_year_end
+- type: EvaluationAnnuelle
+  company: Ubisoft
+  all: ["evaluation"]
+  none: ["\\bt4\\b", "releve 1\\b"]
+  type_conf: 0.85
+  amount: false
+- type: ContratTravail
+  company: Ubisoft
+  all: ["contrat de travail|employment agreement"]
+  none: ["\\bt4\\b", "releve 1\\b"]
+  type_conf: 0.85
+  amount: false
+# Generic document NATURE (not the per-document names found in the archive); all confirmation-only (0.85).
+# No rule (one example per type, or documents whose words overlap, so a pattern would be overfitting):
+# NordVPN, SAAQ, and the other Ubisoft types.
+# DEFAULT type of a company (99% of the archive's files have this type): type_conf 0.85 = always confirmed.
+# Companies without a rule here are detected but stay in manual validation (type to be chosen).
+- type: RapportTransactionsCrypto
+  company: Coinbase
+  amount: false
+  type_conf: 0.85
+- type: AbonnementPremium
+  company: Dashlane
+  type_conf: 0.85

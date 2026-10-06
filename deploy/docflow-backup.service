@@ -1,0 +1,15 @@
+[Unit]
+Description=Documents Manager (docflow) - backup of the database and the learned rules
+# The share is mounted by fstab/automount; the command refuses to run (and says so) if it is not there.
+After=network-online.target remote-fs.target
+
+[Service]
+Type=oneshot
+User=docflow
+Group=docflow
+WorkingDirectory=/opt/documents-manager
+Environment=PYTHONPATH=/opt/documents-manager/backend
+Environment=DJANGO_SETTINGS_MODULE=webapp.settings
+ExecStart=/opt/documents-manager/.venv/bin/python manage.py backup
+NoNewPrivileges=true
+PrivateTmp=true

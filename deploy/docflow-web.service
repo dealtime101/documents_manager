@@ -1,0 +1,27 @@
+[Unit]
+Description=Documents Manager (docflow) - local web interface
+After=network-online.target remote-fs.target
+Wants=network-online.target
+# No RequiresMountsFor: unmounting a network share (e.g. to change its password) would stop the site.
+# Adapt User, Group and the paths below to your installation (this file is a template).
+
+[Service]
+User=docflow
+Group=docflow
+WorkingDirectory=/opt/documents-manager
+Environment=PYTHONPATH=/opt/documents-manager/backend
+Environment=DJANGO_SETTINGS_MODULE=webapp.settings
+Environment=DOCFLOW_PORT=8420
+# The names and addresses this site answers to (the Host header) and trusts for CSRF. Add the machine's own name or address
+# (comma separated) to reach the site from another computer, e.g. localhost,127.0.0.1,my-server,192.168.1.20
+Environment=DOCFLOW_HOSTS=localhost,127.0.0.1
+# Large --timeout: "Scan" reads PDFs through OCR synchronously (several minutes for big scans)
+ExecStart=/opt/documents-manager/.venv/bin/gunicorn webapp.wsgi:application --bind 0.0.0.0:8420 --workers 2 --timeout 900
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+# Companies the program recognises. Normalised name: [regexes without accents, case-insensitive].
+# You do not have to write these: correct a document once in the "To file" screen and the program learns it. Write one here
+# only to be sure of a pattern. Example:
+#
+# Acme:
+#   - "acme corp"
+#   - "\\bacme\\b"
+---
+{}

@@ -1,0 +1,64 @@
+# Paths RELATIVE to library_root (= Documents folder). {year} = year of the document.
+# Resolution: Company > Type, else default, else destination. Unknown date + {year} = manual validation.
+# A missing folder (e.g. a new year) is created on first filing.
+# No rule here (Desjardins...): destination to be chosen by hand.
+---
+Hydro-Quebec:
+  default:
+    destination: "Bills/Hydro-Québec/{year}"
+Amazon:
+  default:
+    destination: "Amazon/{year}"
+CroixBleueMedavie:
+  destination: "Assurances/CroixBleueMedavie"   # folder to create: does not exist yet
+Telus:
+  default:
+    destination: "Bills/Telus/{year}"
+Manuvie:
+  default:
+    destination: "Assurances/Manuvie"
+Coinbase:
+  default:
+    destination: "Crypto/{year}"
+RBC:
+  default:
+    destination: "Finances/RBC/{year}"
+BanqueNationale:
+  default:
+    destination: "Finances/Banque Nationale/{year}"
+Ubisoft:
+  default:
+    destination: "Jobs/Ubisoft"
+Dashlane:
+  default:
+    destination: "Bills/Subscriptions"
+NordVPN:
+  default:
+    destination: "Bills/Subscriptions"
+SAAQ:
+  default:
+    destination: "Governments/SAAQ/{year}"
+Steam:
+  default:
+    destination: "Bills/Steam/{year}"
+Beneva:
+  default:
+    destination: "Assurances/Beneva"
+Intact:
+  default:
+    destination: "Assurances/Intact"
+LaCapitale:
+  default:
+    destination: "Assurances/LaCapitale"   # folder to create: does not exist yet
+DesjardinsAssurances:
+  default:
+    destination: "Assurances/Vie"          # where your archive already files DesjardinsAssurances
+HelloFresh:
+  default:
+    destination: "Recipes/HelloFresh"
+Desjardins:
+  ReleveVISA:
+    destination: "Finances/VISA/{year}"
+  default:
+    destination: "Finances/Desjardins/{year}"
+# Likuid, Videotron: detected, no destination (to be chosen by hand).

@@ -1,0 +1,10 @@
+# Document types, tried in order (the first match wins: put the most specific first).
+# all: every phrase required | any: at least one | none: none allowed | company: only for this company
+# detail: fixed detail | amount: false = no amount in the name | undated: true = date XXXX if absent
+# The program also learns types from your corrections. Example:
+#
+# - type: Invoice
+#   company: Acme
+#   all: ["invoice"]
+---
+[]

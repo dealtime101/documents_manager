@@ -1,0 +1,24 @@
+# Settings used by the TESTS. Folders are chosen by the user in the Settings screen, not here.
+---
+inbox: /data/Documents/_Inbox
+extra_inboxes: []
+quarantine: storage/quarantine
+db: storage/docflow.db
+log: storage/logs/docflow.log
+library_root: "/data/Documents"
+
+thresholds:
+  auto: 0.95      # >= : automatic filing
+  confirm: 0.80   # >= : confirmation requested; below: manual validation
+
+ocr:
+  enabled: true
+  languages: "fra+eng"
+  min_chars_per_page: 30   # fewer than this = image page -> OCR
+  min_chars_scanned_page: 200   # a page that is one big image with fewer characters than this (a stamp, a header) is read by OCR too
+  tesseract: "tesseract"   # full path if not in the Windows PATH
+
+ollama:
+  enabled: false           # never without --ollama
+  model: "qwen2.5:3b-instruct-q4_K_M"
+  host: "http://127.0.0.1:11434"   # only localhost is accepted

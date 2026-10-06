@@ -1,0 +1,10 @@
+# Where each company's documents go, as folders RELATIVE to your library folder. {year} = year of the document.
+# Resolution: Company > Type, else default, else destination. Unknown date + {year} = manual validation.
+# A missing folder (a new year, say) is created on the first filing. The program also learns destinations from your corrections.
+# Example:
+#
+# Acme:
+#   default:
+#     destination: "Bills/Acme/{year}"
+---
+{}
