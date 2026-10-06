@@ -56,7 +56,7 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     api.settings().then((s) => {
       setFirst(!s.configured)
-      setV({ inbox: s.configured ? s.inbox : '', library_root: s.configured ? s.library_root : '', quarantine: s.quarantine ?? '', extra: s.extra_inboxes.join('\n') })
+      setV({ inbox: s.configured ? s.inbox : '', library_root: s.configured ? s.library_root : '', quarantine: s.configured ? s.quarantine ?? '' : '', extra: s.extra_inboxes.join('\n') })
     }).catch((e) => setNote({ ok: false, text: errorText(e) }))
   }, [])
   if (!v) return note ? <p role="alert" className="text-rose-700">{msg(note.text)}</p> : <p role="status" className="text-slate-500">{t('common.loading')}</p>

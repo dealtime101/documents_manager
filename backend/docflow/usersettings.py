@@ -55,6 +55,18 @@ def load() -> dict:
     return out
 
 
+def _problem(p: Path) -> str | None:
+    """Why `p` cannot be used as an existing folder, in words that point at the right cause; None when it is a folder."""
+    try:
+        if p.stat().st_mode & 0o170000 == 0o040000:  # a directory
+            return None
+        return f"{p} is not a folder"
+    except PermissionError:
+        return f"Windows refuses access to {p}: connect the network share first (open it once in the file explorer, with the right account)"
+    except OSError:
+        return f"{p} does not exist"
+
+
 def validate(values: dict) -> dict[str, str]:
     """{setting: what is wrong}: empty when the folders can be used. Only the keys given are checked."""
     errors: dict[str, str] = {}
@@ -65,8 +77,8 @@ def validate(values: dict) -> dict[str, str]:
             errors[key] = "a folder is required"
             return None
         p = Path(raw).expanduser()
-        if must_exist and not p.is_dir():
-            errors[key] = f"{p} does not exist or is not a folder"
+        if must_exist and (why := _problem(p)):
+            errors[key] = why
             return None
         return p
 
@@ -80,14 +92,14 @@ def validate(values: dict) -> dict[str, str]:
     if library and not os.access(library, os.W_OK):
         errors.setdefault("library_root", "is not writable")
     for i, extra in enumerate(values.get("extra_inboxes") or []):
-        if not Path(str(extra)).expanduser().is_dir():
-            errors[f"extra_inboxes[{i}]"] = f"{extra} does not exist or is not a folder"
+        if why := _problem(Path(str(extra)).expanduser()):
+            errors[f"extra_inboxes[{i}]"] = why
     return errors
 
 
 def save(values: dict) -> dict:
     """Validate, keep only the folder settings and write them. Nothing is written when something is wrong."""
-    kept = {k: v for k, v in values.items() if k in FOLDER_KEYS}
+    kept = {k: v for k, v in values.items() if k in FOLDER_KEYS and v not in ("", None)}  # an empty field means "the default"
     errors = validate(kept)
     if errors:
         raise InvalidSettings(errors)

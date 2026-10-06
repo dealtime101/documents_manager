@@ -124,3 +124,27 @@ def test_a_users_own_settings_yaml_overrides_section_by_section_it_does_not_repl
     assert s["backup"] == {"keep": 14, "dir": "/somewhere"} or s["backup"].get("dir") == "/somewhere"   # keep (shipped) + dir (user's)
     assert s["ocr"]["languages"] == "eng" and s["ocr"]["enabled"] is True                              # one key changed, the rest kept
     assert s["thresholds"]["auto"] == 0.95
+
+
+def test_a_folder_windows_refuses_is_reported_as_refused_not_as_missing(home, tmp_path, monkeypatch):
+    # an unconnected network share answers "access denied": telling the user it "does not exist" sends them looking in the wrong place
+    from pathlib import Path
+    real_stat = Path.stat
+    refused = tmp_path / "share"
+
+    def stat(self, *a, **k):
+        if self == refused:
+            raise PermissionError(13, "Access is denied")
+        return real_stat(self, *a, **k)
+    monkeypatch.setattr(Path, "stat", stat)
+    errors = usersettings.validate({"inbox": str(refused), "library_root": str(tmp_path / "missing")})
+    assert "refuses access" in errors["inbox"] and "connect" in errors["inbox"]
+    assert "does not exist" in errors["library_root"]
+    (tmp_path / "afile").write_text("x")
+    assert "not a folder" in usersettings.validate({"inbox": str(tmp_path / "afile")})["inbox"]
+
+
+def test_an_empty_optional_field_means_the_default_and_is_not_saved_as_an_error(home, tmp_path):
+    f = _folders(tmp_path)
+    saved = usersettings.save({"inbox": str(f["inbox"]), "library_root": str(f["library"]), "quarantine": "", "extra_inboxes": []})
+    assert "quarantine" not in saved and usersettings.load()["inbox"] == str(f["inbox"])
