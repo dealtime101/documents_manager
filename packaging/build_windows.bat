@@ -10,6 +10,7 @@ pushd frontend
 call npm ci || (popd & goto :fail)
 call npm run build || (popd & goto :fail)
 popd
+powershell -NoProfile -ExecutionPolicy Bypass -File packaging\fetch_tesseract.ps1 || goto :fail
 ".venv-build\Scripts\pyinstaller.exe" --noconfirm --clean --distpath dist --workpath build packaging\documents-manager.spec || goto :fail
 echo.
 echo Built: %CD%\dist\DocumentsManager.exe

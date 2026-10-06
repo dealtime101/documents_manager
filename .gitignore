@@ -9,3 +9,8 @@ storage/*
 # What the program learns from your corrections is written in YOUR folder, never here
 config/*_learned.yaml
 config/company_aliases.yaml
+
+# prepared by packaging/fetch_tesseract.ps1 (downloaded, never committed)
+packaging/tesseract/
+build/
+dist/

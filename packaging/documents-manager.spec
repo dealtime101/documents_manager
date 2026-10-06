@@ -6,6 +6,8 @@ from PyInstaller.utils.hooks import collect_all
 root = Path(SPECPATH).parent
 datas = [(str(root / "frontend" / "dist"), "frontend/dist"), (str(root / "config"), "config"),
          (str(root / "CHANGELOG.md"), "."), (str(root / "CHANGELOG.en.md"), "."), (str(root / "LICENSE"), ".")]
+if (root / "packaging" / "tesseract" / "tesseract.exe").is_file():  # prepared by fetch_tesseract.ps1: the application carries its own OCR
+    datas.append((str(root / "packaging" / "tesseract"), "tesseract"))
 binaries, hiddenimports = [], []
 for package in ("django", "rest_framework", "pypdfium2", "pypdfium2_raw", "webview", "waitress"):
     d, b, h = collect_all(package)
