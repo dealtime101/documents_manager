@@ -78,11 +78,26 @@ def selftest(port: int, token: str) -> dict:
             "interface": "<title>Documents Manager</title>" in page or "Documents Manager" in page}
 
 
+def log_to_file() -> None:
+    """A windowed program has no console (stdout / stderr are None): what it says goes to desktop.log in the user's folder."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    from docflow.usersettings import user_dir
+    user_dir().mkdir(parents=True, exist_ok=True)
+    log = (user_dir() / "desktop.log").open("a", encoding="utf-8", buffering=1)  # kept open for the whole run
+    sys.stdout = sys.stdout or log
+    sys.stderr = sys.stderr or log
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    log_to_file()
+    print(time.strftime("%Y-%m-%d %H:%M:%S"), "starting", argv, flush=True)
     token = prepare_environment()
     port = free_port()
+    print("server starting on port", port, flush=True)
     start_server(port)
+    print("server up", flush=True)
     if "--selftest" in argv:
         print(json.dumps(selftest(port, token)))
         return 0
