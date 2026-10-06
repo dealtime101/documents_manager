@@ -982,3 +982,19 @@ def test_on_windows_tesseract_is_also_looked_for_where_its_installer_puts_it(tmp
     assert extract.find_tesseract(str(fake)) == str(fake)                      # a full path given in the settings is respected
     monkeypatch.setattr(extract.sys, "platform", "linux")
     assert extract.find_tesseract("tesseract") == ""                           # elsewhere: the PATH only
+
+
+def test_a_tesseract_bundled_with_the_application_is_preferred_and_gets_its_own_language_data(tmp_path, monkeypatch):
+    # the packaged application carries tesseract.exe and its tessdata: nothing to install, whatever is (or is not) on the PATH
+    root = tmp_path / "bundle"
+    (root / "tesseract" / "tessdata").mkdir(parents=True)
+    exe = root / "tesseract" / ("tesseract.exe" if extract.sys.platform == "win32" else "tesseract")
+    exe.write_text("x")
+    monkeypatch.setenv("DOCFLOW_ROOT", str(root))
+    monkeypatch.setattr(extract.shutil, "which", lambda name: "/usr/bin/tesseract")           # one on the PATH too: the bundled one wins
+    assert extract.find_tesseract("tesseract") == str(exe)
+    assert extract._env_for(str(exe))["TESSDATA_PREFIX"] == str(root / "tesseract" / "tessdata")
+    assert "TESSDATA_PREFIX" not in extract._env_for("/usr/bin/tesseract") or extract._env_for("/usr/bin/tesseract").get("TESSDATA_PREFIX") != str(root)
+    assert extract._env_for(str(exe))["OMP_THREAD_LIMIT"] == "1"                              # the one-thread rule still applies
+    monkeypatch.setenv("DOCFLOW_ROOT", str(tmp_path / "elsewhere"))
+    assert extract.find_tesseract("tesseract") == "/usr/bin/tesseract"                        # no bundle: the PATH, as before

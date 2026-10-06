@@ -69,7 +69,14 @@ def _dpi_within_budget(page, wanted: int) -> float | None:
     pixels = _page_area(page) * (wanted / 72) ** 2  # 72 points per inch
     dpi = wanted if pixels <= MAX_PIXELS else wanted * (MAX_PIXELS / pixels) ** 0.5
     return dpi if dpi >= MIN_DPI else None
-_ENV = {**os.environ, "OMP_THREAD_LIMIT": "1"}  # 1 thread per Tesseract: parallelism happens between documents
+def _env_for(exe: str) -> dict[str, str]:
+    """The environment of a Tesseract run: one thread each (parallelism happens between documents), and the language data that sits
+    next to a bundled tesseract.exe (the packaged application carries its own, so nothing has to be installed)."""
+    env = {**os.environ, "OMP_THREAD_LIMIT": "1"}
+    tessdata = Path(exe).parent / "tessdata"
+    if Path(exe).is_absolute() and tessdata.is_dir():
+        env["TESSDATA_PREFIX"] = str(tessdata)
+    return env
 
 
 @dataclass
@@ -92,7 +99,7 @@ def ocr_image(png: bytes, tesseract: str, languages: str, timeout: float = OCR_T
         try:
             r = subprocess.run([exe, str(img), "stdout", "-l", languages], capture_output=True, text=True,
                                encoding="utf-8", errors="replace",  # Tesseract writes UTF-8 whatever the locale
-                               timeout=timeout, env=_ENV, check=False)  # the exit code is read just below, not raised
+                               timeout=timeout, env=_env_for(exe), check=False)  # the exit code is read just below, not raised
         except subprocess.TimeoutExpired:
             log.warning("%s timed out after %.0f s on a page (languages %s): the page is not read", exe, timeout, languages)
             return None  # one page that is too slow must not fail the whole document
@@ -115,7 +122,7 @@ def detect_rotation(png: bytes, tesseract: str, timeout: float = OSD_TIMEOUT) ->
         img.write_bytes(png)
         try:
             r = subprocess.run([exe, str(img), "stdout", "--psm", "0", "-l", "osd"], capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=timeout, env=_ENV, check=False)
+                               encoding="utf-8", errors="replace", timeout=timeout, env=_env_for(exe), check=False)
         except subprocess.TimeoutExpired:
             return 0
         except OSError as e:
@@ -187,6 +194,9 @@ def _is_blank(page, text: str) -> bool:
 
 def find_tesseract(name: str) -> str:
     """The full path of Tesseract, "" when there is none: on the PATH, or on Windows where its installer puts it (it does not use PATH)."""
+    bundled = Path(os.environ.get("DOCFLOW_ROOT") or "") / "tesseract" / ("tesseract.exe" if sys.platform == "win32" else "tesseract")
+    if os.environ.get("DOCFLOW_ROOT") and bundled.is_file():  # the one that comes with the packaged application
+        return str(bundled)
     found = shutil.which(name)
     if found or sys.platform != "win32":
         return found or ""
