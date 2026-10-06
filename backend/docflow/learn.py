@@ -1,8 +1,8 @@
 """Learning from corrections: writes to config/*_learned.yaml (never to the hand-written YAML files)."""
-import fcntl
 import os
 import re
 import stat
+import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
@@ -54,8 +54,21 @@ def _locked(cfg: Config):
     """One writer at a time across workers and processes: the read-check-write of a learned file must not interleave,
     or the last writer silently erases the other correction. (flock: POSIX, which is where the service runs.)"""
     cfg.learn_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.learn_dir / ".learn.lock", "a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with open(cfg.learn_dir / ".learn.lock", "a+") as lock:
+        if sys.platform == "win32":
+            import msvcrt
+            lock.write(" ")  # a byte to lock: Windows locks a byte range, not the whole file
+            lock.flush()
+            lock.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)  # waits up to ~10 s, then raises: try again
+                    break
+                except OSError:
+                    continue
+        else:
+            import fcntl
+            fcntl.flock(lock, fcntl.LOCK_EX)
         yield  # released when the file closes
 
 
