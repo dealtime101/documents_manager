@@ -1854,3 +1854,19 @@ def test_the_folder_browser_lists_sub_folders_only_and_only_for_a_signed_in_user
     assert [f for f in got["folders"] if f in ("a", "b", "file.txt")] == ["a", "b"]              # folders, sorted; no files
     assert api.get("/api/folders", {"path": str(tmp_path / "nope")}).status_code == 400
     assert APIClient().get("/api/folders", {"path": str(tmp_path)}).status_code in (401, 403)
+
+
+def test_the_desktop_launcher_signs_in_with_its_one_time_token_and_nothing_else_does(sb, monkeypatch):
+    # the desktop application has one user and no password to type: the launcher that starts the server knows a random token and
+    # opens the page with it; without that token (or without DOCFLOW_LOCAL_TOKEN at all) the endpoint signs nobody in
+    c = APIClient(enforce_csrf_checks=True)
+    c.get("/api/auth/me")
+    csrf = c.cookies["csrftoken"].value
+    monkeypatch.delenv("DOCFLOW_LOCAL_TOKEN", raising=False)
+    assert c.post("/api/auth/local", {"token": "x"}, format="json", HTTP_X_CSRFTOKEN=csrf).status_code == 404          # not a desktop run
+    monkeypatch.setenv("DOCFLOW_LOCAL_TOKEN", "s3cret-token-of-this-launch")
+    bad = c.post("/api/auth/local", {"token": "wrong"}, format="json", HTTP_X_CSRFTOKEN=csrf)
+    assert bad.status_code == 401 and c.get("/api/auth/me").json()["authenticated"] is False
+    assert c.post("/api/auth/local", {}, format="json", HTTP_X_CSRFTOKEN=csrf).status_code == 401
+    ok = c.post("/api/auth/local", {"token": "s3cret-token-of-this-launch"}, format="json", HTTP_X_CSRFTOKEN=csrf)
+    assert ok.status_code == 200 and c.get("/api/auth/me").json()["authenticated"] is True

@@ -189,6 +189,7 @@ export const api = {
   me: () => call<{ authenticated: boolean; username: string | null; version: string }>('GET', '/api/auth/me'),
   login: (username: string, password: string) => call('POST', '/api/auth/login', { username, password }),
   logout: () => call('POST', '/api/auth/logout'),
+  localLogin: (token: string) => call('POST', '/api/auth/local', { token }),  // the desktop launcher's one-time token
   // `total` is the size of the whole queue: larger than rows.length when the server capped the list
   items: async (state = 'pending', group?: Group) => {
     const query = new URLSearchParams({ state })

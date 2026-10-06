@@ -31,7 +31,18 @@ function Shell() {
   const [version, setVersion] = useState('')  // the program's version, from the server (written once, in pyproject.toml)
   const refresh = () => api.me().then((m) => { setAuth(m.authenticated); setVersion(m.version) })
     .catch((e) => setFailure(errorText(e)))
-  useEffect(() => { refresh() }, [])
+  useEffect(() => {
+    // The desktop application opens the page as /?t=<token>: sign in with it, then take it out of the address at once.
+    const token = new URLSearchParams(window.location.search).get('t')
+    const start = async () => {
+      if (token) {
+        try { await api.me(); await api.localLogin(token) } catch { /* wrong token: the normal login page follows */ }
+        window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+      }
+      await refresh()
+    }
+    void start().catch((e) => setFailure(errorText(e)))
+  }, [])
   // a first run (no inbox / library chosen yet) opens the Settings screen, once the user is signed in
   const [checkedSetup, setCheckedSetup] = useState(false)
   useEffect(() => {

@@ -1,9 +1,11 @@
 import logging
+import os
 import re
+import secrets
 from pathlib import Path
 
 from django.conf import settings
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.http import FileResponse
 from django.middleware.csrf import get_token
 from docflow import __version__, usersettings
@@ -71,6 +73,27 @@ def login_view(request):
     if not user:
         return err(ValueError("invalid credentials"), status.HTTP_401_UNAUTHORIZED)
     login(request, user)
+    return Response({"authenticated": True, "username": user.get_username()})
+
+
+@api_view(["POST"])
+@authentication_classes([CsrfAlwaysSessionAuthentication])
+@permission_classes([AllowAny])
+@throttle_classes([LoginThrottle])
+def local_login(request):
+    """Desktop application only: it has one user and no password to type. The launcher that started the server knows a random
+    token (DOCFLOW_LOCAL_TOKEN) and opens the page with it. Without that variable this endpoint does not exist."""
+    expected = os.environ.get("DOCFLOW_LOCAL_TOKEN")
+    if not expected:
+        return err(ValueError("not found"), status.HTTP_404_NOT_FOUND)
+    given = request.data.get("token", "")
+    if not isinstance(given, str) or not secrets.compare_digest(given.encode(), expected.encode()):
+        return err(ValueError("invalid token"), status.HTTP_401_UNAUTHORIZED)
+    user, created = get_user_model().objects.get_or_create(username="local")
+    if created:
+        user.set_unusable_password()
+        user.save()
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     return Response({"authenticated": True, "username": user.get_username()})
 
 

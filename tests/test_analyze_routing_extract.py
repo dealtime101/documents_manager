@@ -968,3 +968,17 @@ def test_tesseract_is_searched_on_the_path_once_and_every_page_gets_the_resolved
     assert extract.extract_text(f).missing_pages == 0
     assert looked_up == ["tesseract"]                       # PATH searched once for the whole document
     assert got == ["/opt/ocr/tesseract"] * 4                # 2 pages x (orientation + OCR), all with the full path
+
+
+def test_on_windows_tesseract_is_also_looked_for_where_its_installer_puts_it(tmp_path, monkeypatch):
+    # the Windows installer does not add Tesseract to the PATH: a freshly installed program must still be found
+    fake = tmp_path / "Tesseract-OCR" / "tesseract.exe"
+    fake.parent.mkdir()
+    fake.write_text("x")
+    monkeypatch.setattr(extract.shutil, "which", lambda name: None)
+    monkeypatch.setattr(extract.sys, "platform", "win32")
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+    assert extract.find_tesseract("tesseract") == str(fake)
+    assert extract.find_tesseract(str(fake)) == str(fake)                      # a full path given in the settings is respected
+    monkeypatch.setattr(extract.sys, "platform", "linux")
+    assert extract.find_tesseract("tesseract") == ""                           # elsewhere: the PATH only

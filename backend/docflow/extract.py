@@ -7,6 +7,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -184,12 +185,24 @@ def _is_blank(page, text: str) -> bool:
             and not _objects(page, pdfium_raw.FPDF_PAGEOBJ_PATH))
 
 
+def find_tesseract(name: str) -> str:
+    """The full path of Tesseract, "" when there is none: on the PATH, or on Windows where its installer puts it (it does not use PATH)."""
+    found = shutil.which(name)
+    if found or sys.platform != "win32":
+        return found or ""
+    for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"), os.environ.get("LOCALAPPDATA")):
+        candidate = Path(base or "") / "Tesseract-OCR" / "tesseract.exe"
+        if base and candidate.is_file():
+            return str(candidate)
+    return ""
+
+
 def extract_text(path: Path, ocr: dict | None = None) -> Extracted:
     ocr = ocr or {}
     min_chars = ocr.get("min_chars_per_page", 30)
     scan_chars = ocr.get("min_chars_scanned_page", 200)  # below this, a page that is one big image is read by OCR too
     parts, used_text, used_ocr, missing_pages = [], False, False, 0
-    tesseract_exe = shutil.which(ocr.get("tesseract", "tesseract")) or ""  # searched on PATH ONCE: the pages get the full path
+    tesseract_exe = find_tesseract(ocr.get("tesseract", "tesseract"))  # searched ONCE: the pages get the full path
     tesseract_found = bool(tesseract_exe)
     with _PDFIUM:
         doc = pdfium.PdfDocument(path)

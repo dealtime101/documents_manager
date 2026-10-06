@@ -10,12 +10,17 @@ dependencies = [
     "djangorestframework>=3.18.1",
     "gunicorn>=26.2.0",
     "pypdfium2>=5.14.0",
+    "waitress>=3.0.2",
 ]
 
 [project.scripts]
 docflow = "docflow.cli:main"
 
 [dependency-groups]
+desktop = [
+    "pyinstaller>=6.22.3",
+    "pywebview>=6.2.1",
+]
 dev = [
     "pymupdf",  # AGPL: ONLY to build test PDFs (images, odd pages). It is not a runtime dependency and ships with nothing.
     "mypy>=2.4.0",
@@ -41,7 +46,7 @@ mypy_path = "backend"
 
 [[tool.mypy.overrides]]
 # Django, Django REST framework and pypdfium2.raw ship no type stubs (django-stubs is not a dependency): their imports are "Any", on purpose
-module = ["django.*", "rest_framework.*", "pypdfium2.*"]
+module = ["django.*", "rest_framework.*", "pypdfium2.*", "waitress.*", "webview.*"]
 ignore_missing_imports = true
 
 [tool.ruff.lint]

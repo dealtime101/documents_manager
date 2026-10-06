@@ -6,12 +6,16 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 from docflow.config import load_config
+from docflow.usersettings import user_dir
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+# The program's own files (interface build, shipped rules, release notes). DOCFLOW_ROOT points at them when the program is packaged
+# into an executable, where they are not next to this file.
+BASE_DIR = Path(os.environ.get("DOCFLOW_ROOT") or Path(__file__).resolve().parents[2])
 SANDBOX = Path(os.environ["DOCFLOW_SANDBOX"]) if os.environ.get("DOCFLOW_SANDBOX") else None
 DOCFLOW = load_config(sandbox=SANDBOX)  # same config as the CLI; sandbox if DOCFLOW_SANDBOX is set
 # What the web app keeps for itself (signing key, rate-limit counters): in the sandbox with its database, never in the real storage
-STATE_DIR = SANDBOX if SANDBOX else BASE_DIR / "storage"
+# The desktop application (DOCFLOW_DESKTOP=1) keeps them in the user's folder: its program folder is read-only.
+STATE_DIR = SANDBOX if SANDBOX else (user_dir() if os.environ.get("DOCFLOW_DESKTOP") else BASE_DIR / "storage")
 
 
 def load_or_create_secret(f: Path) -> str:

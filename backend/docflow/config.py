@@ -123,7 +123,8 @@ def _merged(base: dict, over: dict) -> dict:
 def shipped_dir() -> Path:
     """The configuration that comes with the program (DOCFLOW_CONFIG_DIR, used by the tests, or its own config/ folder)."""
     env = os.environ.get("DOCFLOW_CONFIG_DIR")
-    return Path(env) if env else Path(__file__).resolve().parents[2] / "config"
+    root = Path(os.environ.get("DOCFLOW_ROOT") or Path(__file__).resolve().parents[2])  # DOCFLOW_ROOT: a packaged program
+    return Path(env) if env else root / "config"
 
 
 def sandbox_settings(sb: Path) -> dict:
