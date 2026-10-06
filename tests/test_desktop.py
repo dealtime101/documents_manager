@@ -32,5 +32,6 @@ def test_the_desktop_selftest_starts_the_server_signs_in_and_keeps_every_file_in
     assert run.returncode == 0, run.stdout + run.stderr
     report = json.loads(run.stdout.strip().splitlines()[-1])
     from docflow import __version__
+    assert isinstance(report.pop("ocr"), list)                      # the languages this machine can read (none without Tesseract)
     assert report == {"version": __version__, "signed_in": True, "database_in_user_folder": True, "interface": True}
     assert (tmp_path / "home" / "docflow.db").is_file()

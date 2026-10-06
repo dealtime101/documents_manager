@@ -57,6 +57,21 @@ def start_server(port: int) -> None:
     raise RuntimeError("the local server did not start within 30 seconds")
 
 
+def ocr_languages() -> list[str]:
+    """The OCR languages the application can read (empty when there is no Tesseract): asks the Tesseract it would really use."""
+    import subprocess
+
+    from docflow.extract import _env_for, find_tesseract
+    exe = find_tesseract("tesseract")
+    if not exe:
+        return []
+    try:
+        out = subprocess.run([exe, "--list-langs"], capture_output=True, text=True, timeout=30, env=_env_for(exe), check=False).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return sorted(line.strip() for line in out.splitlines()[1:] if line.strip())
+
+
 def selftest(port: int, token: str) -> dict:
     """What the window would do, without it: open the page, sign in with the token, read the version."""
     import http.cookiejar
@@ -74,7 +89,7 @@ def selftest(port: int, token: str) -> dict:
         signed_in = False
     page = opener.open(f"{base}/", timeout=15).read(400).decode("utf-8", "replace")
     from docflow.usersettings import user_dir
-    return {"version": me["version"], "signed_in": signed_in, "database_in_user_folder": (user_dir() / "docflow.db").is_file(),
+    return {"ocr": ocr_languages(), "version": me["version"], "signed_in": signed_in, "database_in_user_folder": (user_dir() / "docflow.db").is_file(),
             "interface": "<title>Documents Manager</title>" in page or "Documents Manager" in page}
 
 
