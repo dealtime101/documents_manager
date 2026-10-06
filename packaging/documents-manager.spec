@@ -1,7 +1,7 @@
 # PyInstaller recipe: one windowed executable, DocumentsManager.exe. Build it with packaging/build_windows.bat (on Windows).
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
 root = Path(SPECPATH).parent
 datas = [(str(root / "frontend" / "dist"), "frontend/dist"), (str(root / "config"), "config"),
@@ -12,7 +12,10 @@ for package in ("django", "rest_framework", "pypdfium2", "pypdfium2_raw", "webvi
     datas += d
     binaries += b
     hiddenimports += h
-hiddenimports += collect_submodules("triage") + collect_submodules("webapp") + collect_submodules("docflow")
+# our own packages, found on disk (collect_submodules imports them in a separate process that does not see `backend/`)
+for py in (root / "backend").rglob("*.py"):
+    parts = py.relative_to(root / "backend").with_suffix("").parts
+    hiddenimports.append(".".join(parts[:-1] if parts[-1] == "__init__" else parts))
 
 a = Analysis([str(root / "packaging" / "entry.py")], pathex=[str(root / "backend")], binaries=binaries, datas=datas,
              hiddenimports=hiddenimports, excludes=["tkinter", "pytest", "mypy", "pymupdf"])
