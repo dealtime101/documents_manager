@@ -32,11 +32,12 @@ def load_or_create_secret(f: Path) -> str:
                 os.fsync(out.fileno())  # on the disk BEFORE it is published: a power cut must not leave a published empty file
             try:
                 os.link(tmp, f)
-                dir_fd = os.open(f.parent, os.O_RDONLY)
-                try:
-                    os.fsync(dir_fd)  # and the publication itself (the new directory entry) too
-                finally:
-                    os.close(dir_fd)
+                if os.name != "nt":  # Windows cannot open a directory like a file; NTFS journals the entry itself
+                    dir_fd = os.open(f.parent, os.O_RDONLY)
+                    try:
+                        os.fsync(dir_fd)  # and the publication itself (the new directory entry) too
+                    finally:
+                        os.close(dir_fd)
             except FileExistsError:
                 pass  # another process published its key first: use that one
         finally:
