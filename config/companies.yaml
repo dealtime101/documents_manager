@@ -1,9 +1,51 @@
-# Companies the program recognises. Normalised name: [regexes without accents, case-insensitive].
-# You do not have to write these: correct a document once in the "To file" screen and the program learns it. Write one here
-# only to be sure of a pattern. Example:
-#
-# Acme:
-#   - "acme corp"
-#   - "\\bacme\\b"
+# Companies the program recognises out of the box (well-known issuers, mostly Canada and Quebec). Normalised name:
+# [regexes without accents, case-insensitive]. The issuer opens a document: the match nearest the start wins.
+# You do not have to write more: correct a document once in the "To file" screen and the program learns it. To change
+# this list, copy this file to your data folder (config/companies.yaml): your copy REPLACES this one.
+# Patterns avoid common words on purpose ("apple", "bell", "td" alone would match recipes and letters).
 ---
-{}
+# shopping and online services
+Amazon: ["\\bamazon\\.(?:ca|com)\\b", "\\bamazon\\b"]
+Apple: ["\\bapple\\s+(?:inc|canada|store)\\b", "\\bitunes\\b", "\\bapp\\s+store\\b"]
+Google: ["\\bgoogle\\s+(?:llc|canada|play|cloud|workspace|one)\\b"]
+Microsoft: ["\\bmicrosoft\\b"]
+Netflix: ["\\bnetflix\\b"]
+Spotify: ["\\bspotify\\b"]
+Uber: ["\\buber\\s+(?:canada|technologies|eats)\\b", "\\buber\\s+b\\.?v\\b"]
+PayPal: ["\\bpaypal\\b"]
+Shopify: ["\\bshopify\\b"]
+HelloFresh: ["hello\\s*fresh"]
+IKEA: ["\\bikea\\b"]
+Walmart: ["\\bwal-?mart\\b"]
+Costco: ["\\bcostco\\b"]
+CanadianTire: ["canadian\\s+tire", "canadiantire\\.ca"]
+HomeDepot: ["home\\s+depot"]
+Renaud-Bray: ["renaud-?\\s*bray"]
+# telecom and utilities
+Hydro-Quebec: ["hydro-?\\s*quebec"]
+Energir: ["\\benergir\\b"]
+Videotron: ["\\bvid[eé]otron\\b", "\\bvideotron\\b"]
+Bell: ["\\bbell\\s+(?:canada|mobilit[ey]|aliant)\\b", "\\bbell\\.ca\\b"]
+Rogers: ["\\brogers\\s+(?:communications|wireless)\\b", "\\brogers\\.com\\b"]
+Telus: ["\\btelus\\b"]
+Fido: ["\\bfido\\s+(?:solutions|mobile)\\b", "\\bfido\\.ca\\b"]
+Koodo: ["\\bkoodo\\b"]
+Fizz: ["\\bfizz\\.ca\\b", "\\bfizz\\s+mobile\\b"]
+# banks and insurance
+Desjardins: ["\\bdesjardins\\b"]
+RBC: ["banque\\s+royale", "royal\\s+bank\\s+of\\s+canada", "\\brbc\\s+(?:banque|royal|insurance|assurance)\\b"]
+TD: ["banque\\s+td", "\\btd\\s+canada\\s+trust\\b", "toronto-?\\s*dominion"]
+BMO: ["banque\\s+de\\s+montreal", "bank\\s+of\\s+montreal", "\\bbmo\\s+(?:banque|bank)\\b"]
+CIBC: ["\\bcibc\\b"]
+Scotiabank: ["\\bscotiabank\\b", "banque\\s+scotia"]
+BanqueNationale: ["banque\\s+nationale", "national\\s+bank\\s+of\\s+canada"]
+Intact: ["assurance\\s+intact", "intact\\s+(?:insurance|assurance)"]
+Belairdirect: ["\\bbelair\\s*direct\\b"]
+LaCapitale: ["\\bla\\s+capitale\\b"]
+# government
+RevenuQuebec: ["revenu\\s+qu[eé]bec"]
+ARC-CRA: ["agence\\s+du\\s+revenu\\s+du\\s+canada", "canada\\s+revenue\\s+agency"]
+ServiceCanada: ["service\\s+canada"]
+SAAQ: ["\\bsaaq\\b", "soci[eé]t[eé]\\s+de\\s+l.assurance\\s+automobile"]
+RAMQ: ["\\bramq\\b", "r[eé]gie\\s+de\\s+l.assurance\\s+maladie"]
+PosteCanada: ["postes?\\s+canada", "canada\\s+post"]

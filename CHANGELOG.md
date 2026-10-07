@@ -4,6 +4,15 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.5.0] - 2026-10-07
+
+### Ajouté
+- **Sociétés connues livrées avec le programme** : une quarantaine d'émetteurs courants (Amazon, Apple, Netflix, HelloFresh,
+  Hydro-Québec, Vidéotron, Bell, Desjardins, banques, assureurs, ministères et organismes du Québec et du Canada…) sont reconnus
+  dès la première utilisation, sans rien apprendre. Les motifs évitent les mots courants (« apple », « bell » seuls). Pour
+  changer la liste, copier `config/companies.yaml` dans votre dossier de données : votre copie remplace celle livrée. Ce que le
+  programme apprend de vos corrections s'y ajoute comme avant.
+
 ## [0.4.3] - 2026-10-06
 
 ### Corrigé

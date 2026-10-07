@@ -98,13 +98,13 @@ def test_the_users_own_rule_files_and_learned_rules_live_in_their_folder_not_in_
 
 
 def test_a_fresh_install_starts_empty_in_the_users_folder_and_says_it_is_not_configured(home, monkeypatch):
-    # what ships with the program is generic: no company, no destination, no folder of the author's
+    # what ships with the program is generic: well-known public companies only, no destination, no folder of the author's
     from pathlib import Path
 
     from docflow.analyze import RuleBasedAnalyzer
     monkeypatch.setenv("DOCFLOW_CONFIG_DIR", str(Path(__file__).resolve().parents[1] / "config"))
     cfg = load_config()
-    assert cfg.companies == {} and cfg.types == [] and cfg.routing == {}
+    assert "Amazon" in cfg.companies and cfg.types == [] and cfg.routing == {}
     assert cfg.configured is False                                                      # the first-run screen is due
     assert Path(cfg.settings["inbox"]).parent == home and Path(cfg.settings["db"]).parent == home    # nothing outside the user's folder
     assert cfg.settings["thresholds"]["auto"] == 0.95

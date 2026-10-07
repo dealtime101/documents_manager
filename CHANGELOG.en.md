@@ -3,6 +3,15 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.5.0] - 2026-10-07
+
+### Added
+- **Well-known companies ship with the program**: about forty common issuers (Amazon, Apple, Netflix, HelloFresh, Hydro-Québec,
+  Vidéotron, Bell, Desjardins, banks, insurers, Quebec and Canadian government bodies…) are recognised from the first run,
+  with nothing to learn. The patterns avoid common words ("apple" or "bell" alone). To change the list, copy
+  `config/companies.yaml` into your data folder: your copy replaces the shipped one. What the program learns from your
+  corrections is added on top, as before.
+
 ## [0.4.3] - 2026-10-06
 
 ### Fixed
