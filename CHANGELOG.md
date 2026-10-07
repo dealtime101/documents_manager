@@ -4,6 +4,14 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.8.0] - 2026-10-07
+
+### Ajouté
+- **Bibliothèque : le programme apprend de vos corrections**, comme dans « À classer ». En appliquant le formulaire d'un PDF, la
+  société (retenue par son nom quand le texte le contient), le type par défaut de cette société et le dossier (s'il a été saisi ;
+  l'année devient `{year}`) sont retenus s'ils diffèrent de ce que les règles auraient proposé. Le message dit ce qui a été
+  retenu. Un échec d'apprentissage n'annule jamais le classement.
+
 ## [0.7.0] - 2026-10-07
 
 ### Ajouté

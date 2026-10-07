@@ -10,8 +10,10 @@ import time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from docflow import learn
 from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.extract import extract_text
+from docflow.fields import header_line
 from docflow.naming import build_filename, sanitize, strip_accents
 from docflow.pipeline import _link_or_rename, _unique
 from docflow.routing import fill, route, safe_join
@@ -225,6 +227,36 @@ def plan(rel: str, fields: dict | None, rel_dir: str = "", final_name: str = "")
     return {**out, "current_dir": here, "current_name": p.name}
 
 
+def _learn(p: Path, out: dict, typed_dir: bool) -> list[dict]:
+    """What the human decided becomes a rule, as in "To file": the company (by its name in the text), the type of that company, and
+    the folder when it was typed. Only what the rules would not already have proposed is kept. A failure here never undoes the
+    re-filing: the file is already where the human wants it."""
+    c = s.cfg()
+    f = out["fields"]
+    company, doc_type = f["company"], f["document_type"]
+    if not company:
+        return []
+    learned: list[dict] = []
+    try:
+        item = Item.objects.filter(result_path=str(p)).first()
+        stored = item.fulltext.text if item and hasattr(item, "fulltext") else ""
+        text = stored or extract_text(p, c.settings.get("ocr")).text
+        guess = RuleBasedAnalyzer(c).analyze(text)
+        if guess.company != company and learn.learn_company(c, company, header_line(text), text):
+            learned.append({"kind": "company", "value": company, "company": company})
+        if doc_type and guess.document_type != doc_type and learn.learn_type(c, company, doc_type):
+            learned.append({"kind": "type", "value": doc_type, "company": company})
+        if typed_dir and out["rel_dir"]:
+            parts = out["rel_dir"].split("/")
+            if f["date"][:4].isdigit() and parts[-1] == f["date"][:4]:
+                parts[-1] = "{year}"
+            if learn.learn_route(c, company, "/".join(parts)):
+                learned.append({"kind": "route", "value": "/".join(parts), "company": company})
+    except Exception as e:
+        s.log.warning("library: nothing learned from %s: %s: %s", p.name, type(e).__name__, e)
+    return learned
+
+
 def apply(rel: str, fields: dict, rel_dir: str = "", final_name: str = "") -> dict:
     root, p = _entry(rel)
     out = plan(rel, fields, rel_dir, final_name)
@@ -233,8 +265,9 @@ def apply(rel: str, fields: dict, rel_dir: str = "", final_name: str = "") -> di
     folder = safe_join(root, out["rel_dir"])
     if (root / TRASH) in (folder, *folder.parents):
         raise s.ApiError("use Delete to put something in the trash")
+    learned = _learn(p, out, bool(rel_dir.strip("/\\ ")))  # BEFORE the move: the text is looked up by the file's current path
     folder.mkdir(parents=True, exist_ok=True)
     dst = folder / out["final_name"]
     if dst != p:
         _move(p, dst)
-    return {"path": _rel(root, dst)}
+    return {"path": _rel(root, dst), "learned": learned}

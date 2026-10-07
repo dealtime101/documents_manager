@@ -3,6 +3,14 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.8.0] - 2026-10-07
+
+### Added
+- **Library: the program learns from your corrections**, as in "To file". When you apply a PDF's form, the company (kept by its
+  name when the text contains it), that company's default type and the folder (if typed; the year becomes `{year}`) are
+  remembered if they differ from what the rules would have proposed. The message says what was remembered. A learning failure
+  never undoes the filing.
+
 ## [0.7.0] - 2026-10-07
 
 ### Added

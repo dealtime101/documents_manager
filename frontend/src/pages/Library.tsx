@@ -102,7 +102,8 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
     setBusy(true)
     try {
       const r = await api.libraryApply(file, form, relDir, finalName)
-      setNote({ ok: true, text: t('library.filed', { path: r.path }) })
+      const learned = r.learned.map((l) => t(`learned.${l.kind}`, { v: l.value, c: l.company })).join('; ')
+      setNote({ ok: true, text: t('library.filed', { path: r.path }) + (learned ? ` ${t('queue.learned', { list: learned })}` : '') })
       onFiled(r.path)
     } catch (e) { setProblem(errorText(e)) } finally { setBusy(false) }
   }

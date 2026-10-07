@@ -242,7 +242,7 @@ export const api = {
   libraryPlan: (path: string, fields?: LibraryFields, rel_dir = '', final_name = '') =>
     call<LibraryPlan>('POST', '/api/library/plan', { path, fields, rel_dir, final_name }),
   libraryApply: (path: string, fields: LibraryFields, rel_dir = '', final_name = '') =>
-    call<{ path: string }>('POST', '/api/library/apply', { path, fields, rel_dir, final_name }),
+    call<{ path: string; learned: Learned[] }>('POST', '/api/library/apply', { path, fields, rel_dir, final_name }),
   libraryFileUrl: (path: string) => `/api/library/file?${new URLSearchParams({ path })}`,
   undo: (id: number) => call<{ restored: string }>('POST', `/api/history/${id}/undo`),
   destinations: () => call<string[]>('GET', '/api/destinations'),

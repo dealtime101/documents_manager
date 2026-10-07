@@ -1927,6 +1927,23 @@ def test_the_explorer_never_changes_the_library_root_the_trash_or_anything_outsi
     assert post(api, "folder", parent="..", name="x").status_code == 400
 
 
+def test_refiling_a_library_pdf_teaches_the_program_the_company_the_type_and_the_typed_folder(api, lib, settings):
+    from docflow.analyze import RuleBasedAnalyzer
+    pdf(lib / "scan002.pdf", GARAGE)
+    assert post(api, "plan", path="scan002.pdf").json()["fields"]["company"] == ""            # unknown before
+    fields = {"company": "GarageTremblay", "document_type": "Entretien", "date": "2025/03/05", "detail": "", "amount": "80", "currency": "CAD"}
+    done = post(api, "apply", path="scan002.pdf", fields=fields, rel_dir="Cars/Entretiens/2025").json()
+    assert done["path"].startswith("Cars/Entretiens/2025/2025-03-05 - GarageTremblay - Entretien")
+    assert [(x["kind"], x["value"]) for x in done["learned"]] == [
+        ("company", "GarageTremblay"), ("type", "Entretien"), ("route", "Cars/Entretiens/{year}")]
+    again = RuleBasedAnalyzer(settings.DOCFLOW).analyze("\n".join(GARAGE))                     # the next document is recognised
+    assert again.company == "GarageTremblay" and again.document_type == "Entretien"
+    pdf(lib / "scan003.pdf", GARAGE)
+    assert post(api, "plan", path="scan003.pdf").json()["fields"]["company"] == "GarageTremblay"
+    same = post(api, "apply", path="scan003.pdf", fields={**fields, "date": "2025-03-06"}).json()   # nothing new to learn, no typed folder
+    assert same["learned"] == []
+
+
 def test_a_library_pdf_is_read_and_proposed_then_refiled_under_its_new_name_and_folder(api, lib):
     pdf(lib / "scan001.pdf", HYDRO)
     proposed = post(api, "plan", path="scan001.pdf").json()
