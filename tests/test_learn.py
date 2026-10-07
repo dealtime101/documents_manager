@@ -191,6 +191,13 @@ def test_learn_company_writes_alias_and_next_analysis_uses_it(tmp_path):
     assert "GarageTremblay" in load_config(sandbox=tmp_path).companies
 
 
+def test_a_company_named_in_the_text_is_learned_by_its_name_not_by_the_title_line(tmp_path):
+    cfg = cfg_in(tmp_path)
+    text = "Pâtes au boeuf style taco\nHelloFresh\nPour 2 personnes"
+    assert learn_company(cfg, "HelloFresh", header_line(text), text) is True
+    assert RuleBasedAnalyzer(cfg).analyze("Poulet crémeux\nPowered by HELLO FRESH\n4 portions").company == "HelloFresh"
+
+
 def test_learn_company_is_idempotent_and_refuses_junk(tmp_path):
     cfg = cfg_in(tmp_path)
     assert learn_company(cfg, "X", "garage tremblay") is True

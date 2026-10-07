@@ -4,6 +4,13 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.4.3] - 2026-10-06
+
+### Corrigé
+- **Apprentissage d'une société** : quand le document contient le nom de la société (ex. « HelloFresh »), c'est ce nom qui est
+  retenu comme règle, et non plus la première ligne du document (le titre d'une recette ou d'une lettre, différent à chaque fois).
+  La société est alors proposée sur les documents suivants.
+
 ## [0.4.2] - 2026-10-06
 
 ### Corrigé

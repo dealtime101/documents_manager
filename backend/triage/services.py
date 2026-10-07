@@ -364,7 +364,8 @@ def _learn(it: Item) -> list[dict]:
         return []
     c, new, old, learned = cfg(), it.analysis, it.original, []
     company = new.get("company")
-    if company and company != old.get("company") and learn.learn_company(c, company, it.header):
+    stored = ItemText.objects.filter(item=it).values_list("text", flat=True).first() or ""
+    if company and company != old.get("company") and learn.learn_company(c, company, it.header, stored):
         learned.append({"kind": "company", "value": company, "company": company})
     if company and new.get("document_type") and new["document_type"] != old.get("document_type") \
             and learn.learn_type(c, company, new["document_type"]):

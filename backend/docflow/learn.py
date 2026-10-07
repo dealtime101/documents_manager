@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 import yaml
 
 from .config import Config
+from .fields import norm
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,59}$")
 
@@ -79,9 +80,17 @@ def _pattern(header: str) -> str | None:
     return r"\s+".join(re.escape(w) for w in h.split())
 
 
-def learn_company(cfg: Config, company: str, header: str) -> bool:
+def _name_pattern(company: str, text: str) -> str | None:
+    """The company's own name as a pattern ("HelloFresh" -> hello\\s*fresh) when the document really contains it: far more
+    reusable than the first line, which for a recipe or a letter is its title."""
+    words = re.findall(r"[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])", company)
+    pat = r"\s*".join(re.escape(w.lower()) for w in words)
+    return pat if len(pat) >= 4 and re.search(pat, norm(text).lower()) else None
+
+
+def learn_company(cfg: Config, company: str, header: str, text: str = "") -> bool:
     """"garage tremblay & fils" corrected to GarageTremblay -> alias. False if nothing useful to remember."""
-    pat = _pattern(header)
+    pat = (text and _name_pattern(company, text)) or _pattern(header)
     if not pat or not NAME_RE.match(company or ""):
         return False
     if pat in cfg.companies.get(company, []):

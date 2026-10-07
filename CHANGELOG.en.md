@@ -3,6 +3,13 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.4.3] - 2026-10-06
+
+### Fixed
+- **Learning a company**: when the document contains the company's name (e.g. "HelloFresh"), that name is kept as the rule, no
+  longer the first line of the document (the title of a recipe or a letter, different every time). The company is then proposed
+  on the next documents.
+
 ## [0.4.2] - 2026-10-06
 
 ### Fixed
