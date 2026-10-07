@@ -61,12 +61,13 @@ def ocr_languages() -> list[str]:
     """The OCR languages the application can read (empty when there is no Tesseract): asks the Tesseract it would really use."""
     import subprocess
 
-    from docflow.extract import _env_for, find_tesseract
+    from docflow.extract import NO_WINDOW, _env_for, find_tesseract
     exe = find_tesseract("tesseract")
     if not exe:
         return []
     try:
-        out = subprocess.run([exe, "--list-langs"], capture_output=True, text=True, timeout=30, env=_env_for(exe), check=False).stdout
+        out = subprocess.run([exe, "--list-langs"], capture_output=True, text=True, timeout=30, env=_env_for(exe), check=False,
+                             creationflags=NO_WINDOW).stdout
     except (OSError, subprocess.SubprocessError):
         return []
     return sorted(line.strip() for line in out.splitlines()[1:] if line.strip())

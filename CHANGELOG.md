@@ -4,6 +4,14 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.4.2] - 2026-10-06
+
+### Corrigé
+- Windows : un scan n'ouvre plus une fenêtre de console par page lue par l'OCR.
+
+### Modifié
+- Le scan affiche une barre de progression (en plus du compteur sur le bouton).
+
 ## [0.4.1] - 2026-10-06
 
 ### Corrigé

@@ -201,6 +201,9 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
             {t('queue.approveAuto', { n: autoCount })}
           </Button>
         </div>
+        {job?.state === 'running' && job.total > 0 && (
+          <progress className="h-2 w-full" max={job.total} value={job.done} aria-label={t('queue.scanning', { done: job.done, total: job.total })} />
+        )}
         <div className="flex flex-wrap items-end gap-2 text-xs">
           <label className="flex flex-col gap-0.5">{t('queue.minConfidence')}
             <Input type="number" min={0} max={100} step={5} value={minConf} className="h-7 w-20"

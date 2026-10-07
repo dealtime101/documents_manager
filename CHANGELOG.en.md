@@ -3,6 +3,14 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.4.2] - 2026-10-06
+
+### Fixed
+- Windows: a scan no longer opens a console window for every page read by OCR.
+
+### Changed
+- The scan shows a progress bar (besides the counter on the button).
+
 ## [0.4.1] - 2026-10-06
 
 ### Fixed
