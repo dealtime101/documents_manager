@@ -20,7 +20,7 @@ from django.utils import timezone
 from docflow import learn
 from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.db import DB
-from docflow.extract import extract_text
+from docflow.extract import extract_text, find_tesseract
 from docflow.naming import build_filename, sanitize
 from docflow.pipeline import Proposal, apply, propose, sha256_file
 from docflow.pipeline import undo as engine_undo
@@ -119,6 +119,8 @@ def scan(job: ScanJob | None = None) -> dict:
         if any(r in p.parents for r in live) and not p.exists():
             it.state, it.resolved_at = Item.REMOVED, timezone.now()
             it.save()
+    if find_tesseract(c.settings.get("ocr", {}).get("tesseract", "tesseract")):  # OCR works now: what was queued without it is read again
+        Item.objects.filter(state=Item.PENDING, extraction="ocr_unavailable").update(state=Item.REMOVED, resolved_at=timezone.now())
     todo, skipped = [], 0
     owner: dict[str, Path] = {}
     hashed: dict[Path, tuple[str, int, int]] = {}  # file -> (sha, size, mtime_ns), taken ONCE here and given to propose()

@@ -3,6 +3,12 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.4.1] - 2026-10-06
+
+### Fixed
+- Documents queued while OCR was unavailable are read again at the next scan, once Tesseract is found (the "OCR is unavailable"
+  message stayed on them because an unchanged file was not read again).
+
 ## [0.4.0] - 2026-10-06
 
 ### Added

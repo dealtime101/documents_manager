@@ -4,6 +4,12 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.4.1] - 2026-10-06
+
+### Corrigé
+- Les documents mis en file quand l'OCR n'était pas disponible sont relus au scan suivant, une fois Tesseract trouvé (le message
+  « OCR indisponible » restait sur eux, car un fichier inchangé n'était pas relu).
+
 ## [0.4.0] - 2026-10-06
 
 ### Ajouté

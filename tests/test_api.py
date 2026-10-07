@@ -421,6 +421,18 @@ def test_a_changed_file_is_read_again_and_replaces_its_stale_item(api, sb, hash_
     assert states == ["pending", "removed"]
 
 
+def test_items_queued_without_ocr_are_read_again_once_tesseract_is_found(api, sb, monkeypatch):
+    from triage import services
+    pdf(sb / "inbox" / "doc.pdf", HYDRO)
+    api.post("/api/scan")
+    Item.objects.update(extraction="ocr_unavailable")             # queued while there was no OCR
+    monkeypatch.setattr(services, "find_tesseract", lambda name: "")
+    assert api.post("/api/scan").json()["created"] == 0           # still none: left alone
+    monkeypatch.setattr(services, "find_tesseract", lambda name: "/bin/tesseract")
+    assert api.post("/api/scan").json()["created"] == 1           # found now: read again
+    assert sorted(Item.objects.values_list("state", flat=True)) == ["pending", "removed"]
+
+
 def test_items_queued_before_the_stamp_existed_are_stamped_by_one_read_then_left_alone(api, sb, hash_calls):
     f = pdf(sb / "inbox" / "old.pdf", HYDRO)
     api.post("/api/scan")
