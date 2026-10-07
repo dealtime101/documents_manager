@@ -3,6 +3,13 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.5.1] - 2026-10-07
+
+### Changed
+- **Hand-typed date**: "2026/02/24", "2026.02.24", "2026 02 24" or "2026/2/4" are converted automatically to "2026-02-24"
+  (or "2026-02-04") instead of being refused. Only the year-first order is read (never DD/MM or MM/DD, which are ambiguous);
+  a date that does not exist is still refused.
+
 ## [0.5.0] - 2026-10-07
 
 ### Added

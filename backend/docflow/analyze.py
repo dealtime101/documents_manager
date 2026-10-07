@@ -21,7 +21,7 @@ from .fields import (
     norm,
     parse_number,
 )
-from .naming import token, valid_date
+from .naming import normalize_date, token, valid_date
 
 LLM_CAP = 0.94  # an LLM answer never reaches the auto-filing threshold
 
@@ -46,6 +46,11 @@ class Analysis(BaseModel):
     check_detail: bool = False  # detail inferred from the text (not fixed): its score counts toward the overall score
     conf: dict[str, float] = Field(default_factory=dict)
     analyzer: str = "rules"
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _loose_date(cls, v):
+        return normalize_date(v)
 
     @field_validator("date")
     @classmethod

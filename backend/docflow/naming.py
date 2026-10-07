@@ -22,6 +22,18 @@ CURRENCY_RE = re.compile(r"[A-Z]{3}")
 EXT_RE = re.compile(r"\.[A-Za-z0-9]{1,10}")
 
 
+_LOOSE_DATE = re.compile(r"([0-9]{4})(?:[/. ]+([0-9]{1,2})(?:[/. ]+([0-9]{1,2}))?)?")  # 2026/2/4, 2026.02.24, 2026 02 24, 2026/02
+
+
+def normalize_date(s):
+    """What a person types, as the canonical form: "2026/02/24" -> "2026-02-24", "2026/2/4" -> "2026-02-04", "2026.02" -> "2026-02".
+    Anything else is returned unchanged (valid_date then decides); only the year-first order is read, never DD/MM or MM/DD."""
+    if not isinstance(s, str):
+        return s
+    m = _LOOSE_DATE.fullmatch(s)  # no strip: text around a date is still refused, as for the canonical form
+    return "-".join([m[1], *(f"{int(p):02d}" for p in m.groups()[1:] if p)]) if m else s
+
+
 def valid_date(s: str) -> bool:
     """One of the four forms (YYYY-MM-DD, YYYY-MM, YYYY, XXXX) AND a date that exists: month 1-12, a day that exists in that
     month (leap years included), year 1900-2100. Used for anything typed or answered by a model; automatic detection in a

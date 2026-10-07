@@ -935,6 +935,14 @@ def test_editing_another_field_does_not_silently_validate_the_guessed_detail(api
     assert after_detail["conf"]["detail"] == 1.0 and after_detail["confidence"] >= 0.95    # explicitly confirmed
 
 
+def test_a_date_typed_with_slashes_is_saved_as_yyyy_mm_dd(api, sb):
+    pdf(sb / "inbox" / "g.pdf", GARAGE)
+    api.post("/api/scan")
+    i = api.get("/api/items").json()[0]["id"]
+    r = api.patch(f"/api/items/{i}", {"date": "2026/02/24"}, format="json")
+    assert r.status_code == 200 and r.json()["date"] == "2026-02-24"
+
+
 def test_edit_rejects_bad_input_and_path_tricks(api, sb):
     pdf(sb / "inbox" / "g.pdf", GARAGE)
     api.post("/api/scan")

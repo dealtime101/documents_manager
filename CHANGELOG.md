@@ -4,6 +4,13 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.5.1] - 2026-10-07
+
+### Modifié
+- **Date saisie à la main** : « 2026/02/24 », « 2026.02.24 », « 2026 02 24 » ou « 2026/2/4 » sont convertis automatiquement en
+  « 2026-02-24 » (ou « 2026-02-04 ») au lieu d'être refusés. Seul l'ordre année en premier est lu (jamais JJ/MM ou MM/JJ,
+  ambigus) ; une date qui n'existe pas reste refusée.
+
 ## [0.5.0] - 2026-10-07
 
 ### Ajouté

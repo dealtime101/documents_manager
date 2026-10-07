@@ -135,6 +135,23 @@ def test_a_date_that_does_not_exist_is_refused_everywhere(date):
     assert answer.date == "XXXX" and answer.conf["date"] == 0.0                # a model's impossible date is dropped
 
 
+@pytest.mark.parametrize("typed,canonical", [
+    ("2026/02/24", "2026-02-24"), ("2012/10/31", "2012-10-31"), ("2026/2/4", "2026-02-04"), ("2026.02.24", "2026-02-24"),
+    ("2026 02 24", "2026-02-24"), ("2026/02", "2026-02"), ("2026.2", "2026-02"), ("2026", "2026"),
+    ("2026-02-24", "2026-02-24"), ("XXXX", "XXXX"),
+])
+def test_a_date_typed_with_slashes_dots_or_spaces_becomes_yyyy_mm_dd(typed, canonical):
+    from docflow.analyze import Analysis
+    assert Analysis(date=typed).date == canonical
+
+
+@pytest.mark.parametrize("typed", ["24/02/2026", "2026/13/01", "2026/02/30", "2026/02/24/05", "yesterday", "2026/2/4x"])
+def test_a_typed_date_that_is_not_year_first_or_does_not_exist_is_still_refused(typed):
+    from docflow.analyze import Analysis
+    with pytest.raises(ValueError):
+        Analysis(date=typed)
+
+
 @pytest.mark.parametrize("date", ["2024-02-29", "2000-02-29", "1900-12-31", "1900", "1900-01", "2100-12-31", "2100", "2024-12",
                                   "2025-10-07", "1975-06-15", "XXXX"])
 def test_real_dates_including_leap_days_and_old_documents_are_accepted(date):
