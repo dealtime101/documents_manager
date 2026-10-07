@@ -105,6 +105,10 @@ export interface FolderSettings {
   extra_inboxes: string[]
 }
 export interface FolderListing { path: string; parent: string; folders: string[] }
+export interface LibraryHit { name: string; path: string; folder: string; is_dir: boolean; size: number; modified: number }
+/** The fields of the "classify" form of a library PDF (all text; amount '' = none). */
+export interface LibraryFields { company: string; document_type: string; date: string; detail: string; amount: string; currency: string }
+export interface LibraryPlan { fields: LibraryFields; final_name: string; rel_dir: string; current_dir: string; current_name: string }
 /** A folder of the library (paths are relative to the library, with `/`). */
 export interface LibraryListing {
   path: string; parent: string; is_root: boolean; folders: string[]; truncated: boolean
@@ -229,6 +233,16 @@ export const api = {
   },
   folders: (path?: string) => call<FolderListing>('GET', `/api/folders${path ? `?${new URLSearchParams({ path })}` : ''}`),
   library: (path = '') => call<LibraryListing>('GET', `/api/library?${new URLSearchParams({ path })}`),
+  librarySearch: (q: string) => call<{ hits: LibraryHit[]; truncated: boolean }>('GET', `/api/library/search?${new URLSearchParams({ q })}`),
+  libraryNewFolder: (parent: string, name: string) => call<{ path: string }>('POST', '/api/library/folder', { parent, name }),
+  libraryRename: (path: string, name: string) => call<{ path: string }>('POST', '/api/library/rename', { path, name }),
+  libraryMove: (path: string, to: string) => call<{ path: string }>('POST', '/api/library/move', { path, to }),
+  libraryDelete: (path: string) => call<{ path: string | null; permanent: boolean }>('POST', '/api/library/delete', { path }),
+  /** Without `fields` the server reads the document and proposes them; with them it only computes the name and folder. */
+  libraryPlan: (path: string, fields?: LibraryFields, rel_dir = '', final_name = '') =>
+    call<LibraryPlan>('POST', '/api/library/plan', { path, fields, rel_dir, final_name }),
+  libraryApply: (path: string, fields: LibraryFields, rel_dir = '', final_name = '') =>
+    call<{ path: string }>('POST', '/api/library/apply', { path, fields, rel_dir, final_name }),
   libraryFileUrl: (path: string) => `/api/library/file?${new URLSearchParams({ path })}`,
   undo: (id: number) => call<{ restored: string }>('POST', `/api/history/${id}/undo`),
   destinations: () => call<string[]>('GET', '/api/destinations'),

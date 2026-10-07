@@ -1871,3 +1871,73 @@ def test_a_library_pdf_is_shown_inline_and_any_other_file_is_only_a_download(api
 def test_the_library_explorer_says_so_when_the_library_does_not_exist(api, sb):
     r = api.get("/api/library")
     assert r.status_code == 400 and "library folder does not exist" in r.json()["detail"]
+
+
+def post(api, action, **body):
+    return api.post(f"/api/library/{action}", body, format="json")
+
+
+def test_the_library_search_finds_folders_and_files_by_name_ignoring_case_and_accents(api, lib):
+    (lib / "Voitures").mkdir()
+    (lib / "Voitures" / "Entretien Hydro.pdf").write_bytes(b"%PDF-1.4")
+    hits = api.get("/api/library/search", {"q": "HYDRO"}).json()
+    assert {h["path"] for h in hits["hits"]} == {"Bills/Hydro", "Bills/Hydro/2025-01-01 - Hydro.pdf", "Voitures/Entretien Hydro.pdf"}
+    assert [h["is_dir"] for h in hits["hits"] if h["path"] == "Bills/Hydro"] == [True]
+    assert {h["path"] for h in api.get("/api/library/search", {"q": "vOITURÉS"}).json()["hits"]} == {"Voitures"}
+    assert api.get("/api/library/search", {"q": "h"}).status_code == 400            # too short to mean anything
+
+
+def test_a_folder_can_be_created_renamed_moved_and_deleted_and_nothing_is_replaced(api, lib):
+    assert post(api, "folder", parent="Bills", name="Eau").json() == {"path": "Bills/Eau"} and (lib / "Bills" / "Eau").is_dir()
+    assert post(api, "folder", parent="Bills", name="Eau").status_code == 400          # already there
+    for bad in ("a/b", "..", "CON", "", "x:y"):
+        assert post(api, "folder", parent="Bills", name=bad).status_code == 400, bad
+    assert post(api, "rename", path="Bills/Eau", name="Water").json() == {"path": "Bills/Water"}
+    assert post(api, "rename", path="Bills/Water", name="Hydro").status_code == 400    # would replace a folder
+    assert post(api, "move", path="Bills/Water", to="").json() == {"path": "Water"} and (lib / "Water").is_dir()
+    assert post(api, "move", path="Bills", to="Bills/Hydro").status_code == 400        # a folder into itself
+    r = post(api, "delete", path="Water").json()
+    assert r == {"path": "_Trash/Water", "permanent": False} and (lib / "_Trash" / "Water").is_dir() and not (lib / "Water").exists()
+    assert post(api, "delete", path="_Trash/Water").json() == {"path": None, "permanent": True}
+    assert not (lib / "_Trash" / "Water").exists()
+
+
+def test_a_file_can_be_renamed_moved_and_deleted_and_its_filed_item_follows_it(api, lib):
+    old = lib / "top.pdf"
+    Item.objects.create(source_path="/inbox/top.pdf", sha256="a" * 64, result_path=str(old), state="approved", engine_status="auto")
+    assert post(api, "rename", path="top.pdf", name="renamed.pdf").json() == {"path": "renamed.pdf"}
+    assert post(api, "rename", path="renamed.pdf", name="renamed.txt").status_code == 400     # the type of a file stays
+    assert post(api, "move", path="renamed.pdf", to="Bills/Hydro").json() == {"path": "Bills/Hydro/renamed.pdf"}
+    assert Item.objects.get().result_path == str(lib / "Bills" / "Hydro" / "renamed.pdf")
+    (lib / "Bills" / "renamed.pdf").write_bytes(b"other")
+    assert post(api, "move", path="Bills/renamed.pdf", to="Bills/Hydro").status_code == 400   # never replaces
+    assert (lib / "Bills" / "Hydro" / "renamed.pdf").read_bytes() == b"%PDF-1.4 top"
+    assert post(api, "delete", path="Bills/Hydro/renamed.pdf").json()["path"] == "_Trash/renamed.pdf"
+    assert post(api, "delete", path="Bills/renamed.pdf").json()["path"] == "_Trash/renamed (2).pdf"   # same name in the trash: kept both
+
+
+@pytest.mark.parametrize("path", ["", ".", "..", "/etc", "Bills/../..", "_Trash"])
+def test_the_explorer_never_changes_the_library_root_the_trash_or_anything_outside(api, lib, path):
+    (lib / "_Trash").mkdir()
+    for name, body in (("rename", {"name": "x"}), ("move", {"to": "Bills"}), ("delete", {})):
+        assert post(api, name, path=path, **body).status_code == 400, (name, path)
+    assert (lib / "Bills").is_dir() and (lib / "_Trash").is_dir() and (lib.parent / "secret.txt").exists()
+    assert post(api, "move", path="top.pdf", to="..").status_code == 400
+    assert post(api, "move", path="top.pdf", to="_Trash").status_code == 400                  # only Delete fills the trash
+    assert post(api, "folder", parent="..", name="x").status_code == 400
+
+
+def test_a_library_pdf_is_read_and_proposed_then_refiled_under_its_new_name_and_folder(api, lib):
+    pdf(lib / "scan001.pdf", HYDRO)
+    proposed = post(api, "plan", path="scan001.pdf").json()
+    assert proposed["fields"]["company"] == "Hydro-Quebec" and proposed["fields"]["date"] == "2025-10-07"
+    assert proposed["final_name"].startswith("2025-10-07 - Hydro-Quebec - ") and proposed["current_name"] == "scan001.pdf"
+    typed = post(api, "plan", path="scan001.pdf", fields={**proposed["fields"], "date": "2025/10/08"}).json()   # typed: slashes accepted
+    assert typed["fields"]["date"] == "2025-10-08" and typed["final_name"].startswith("2025-10-08 - ")
+    done = post(api, "apply", path="scan001.pdf", fields=typed["fields"], rel_dir="Bills/Hydro/2025").json()
+    assert done["path"] == f"Bills/Hydro/2025/{typed['final_name']}"
+    assert (lib / done["path"]).is_file() and not (lib / "scan001.pdf").exists()
+    assert post(api, "apply", path=done["path"], fields=typed["fields"], rel_dir="../out").status_code == 400
+    assert post(api, "apply", path=done["path"], fields=typed["fields"], rel_dir="_Trash").status_code == 400
+    assert post(api, "plan", path="top.pdf", fields={"company": "X", "document_type": "Y", "date": "nope"}).status_code == 400
+    assert post(api, "plan", path="Bills/notes.txt").status_code == 400                        # only PDFs are classified

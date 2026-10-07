@@ -22,6 +22,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
+from . import library as lib
 from . import services as s
 from .models import Item
 
@@ -118,6 +119,63 @@ def library(request):
         return Response(s.library_list(request.query_params.get("path", "")))
     except s.ApiError as e:
         return err(e)
+
+
+@api_view(["GET"])
+def library_search(request):
+    try:
+        return Response(lib.search(request.query_params.get("q", "")))
+    except s.ApiError as e:
+        return err(e)
+
+
+def _library_action(request, call):
+    """One POST of the explorer: the body names the folder or file by its path inside the library, never by an absolute path."""
+    try:
+        return Response(call(request.data))
+    except s.ApiError as e:
+        return err(e)
+
+
+def _text(data, key: str) -> str:
+    v = data.get(key, "")
+    return v if isinstance(v, str) else ""
+
+
+@api_view(["POST"])
+def library_folder(request):
+    return _library_action(request, lambda d: lib.make_folder(_text(d, "parent"), _text(d, "name")))
+
+
+@api_view(["POST"])
+def library_rename(request):
+    return _library_action(request, lambda d: lib.rename(_text(d, "path"), _text(d, "name")))
+
+
+@api_view(["POST"])
+def library_move(request):
+    return _library_action(request, lambda d: lib.move(_text(d, "path"), _text(d, "to")))
+
+
+@api_view(["POST"])
+def library_delete(request):
+    return _library_action(request, lambda d: lib.delete(_text(d, "path")))
+
+
+@api_view(["POST"])
+def library_plan(request):
+    def call(d):
+        fields = d.get("fields")
+        return lib.plan(_text(d, "path"), fields if isinstance(fields, dict) else None, _text(d, "rel_dir"), _text(d, "final_name"))
+    return _library_action(request, call)
+
+
+@api_view(["POST"])
+def library_apply(request):
+    def call(d):
+        fields = d.get("fields")
+        return lib.apply(_text(d, "path"), fields if isinstance(fields, dict) else {}, _text(d, "rel_dir"), _text(d, "final_name"))
+    return _library_action(request, call)
 
 
 @api_view(["GET"])

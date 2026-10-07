@@ -4,6 +4,24 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.7.0] - 2026-10-07
+
+### Ajouté
+- **Bibliothèque : recherche par nom** dans tous les dossiers (majuscules et accents ignorés) ; un clic sur un résultat ouvre son
+  dossier.
+- **Bibliothèque : dossiers** : créer, renommer, déplacer et supprimer un dossier.
+- **Bibliothèque : fichiers** : renommer, déplacer et supprimer un fichier.
+- **Bibliothèque : formulaire de classement** à droite d'un PDF (comme « À classer ») : « Lire le document et proposer » lit le
+  document (OCR si c'est un scan) et propose société, type, date, détail et montant ; on corrige, le nom et le dossier sont
+  recalculés, et « Appliquer » renomme et déplace le fichier. Une date saisie « 2026/02/24 » est acceptée.
+- **Supprimer met dans `_Trash`** (à la racine de la bibliothèque) : on peut le ressortir en le déplaçant ; seul ce qui est déjà
+  dans `_Trash` est supprimé définitivement (après confirmation). Rien n'est jamais remplacé : un nom déjà pris est refusé.
+  Impossible de sortir de la bibliothèque, ni de modifier sa racine ou `_Trash` lui-même. Un document déjà classé dont le
+  fichier est renommé ou déplacé garde son lien « Ouvrir le document ».
+
+### Modifié
+- Le menu du haut passe à la ligne quand il est trop large, au lieu d'afficher des flèches de défilement.
+
 ## [0.6.0] - 2026-10-07
 
 ### Ajouté

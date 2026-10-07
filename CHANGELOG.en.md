@@ -3,6 +3,22 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.7.0] - 2026-10-07
+
+### Added
+- **Library: search by name** in every folder (case and accents ignored); a click on a result opens its folder.
+- **Library: folders**: create, rename, move and delete a folder.
+- **Library: files**: rename, move and delete a file.
+- **Library: classify form** beside a PDF (like "To file"): "Read the document and propose" reads the document (OCR if it is a
+  scan) and proposes company, type, date, detail and amount; you correct them, the name and folder are recomputed, and "Apply"
+  renames and moves the file. A date typed "2026/02/24" is accepted.
+- **Delete puts in `_Trash`** (at the library's root): move it out to put it back; only what is already in `_Trash` is deleted
+  for good (after a confirmation). Nothing is ever replaced: a name already taken is refused. It cannot leave the library, nor
+  change its root or `_Trash` itself. A document already filed whose file is renamed or moved keeps its "Open document" link.
+
+### Changed
+- The top menu wraps onto a second line when too wide, instead of showing scroll arrows.
+
 ## [0.6.0] - 2026-10-07
 
 ### Added

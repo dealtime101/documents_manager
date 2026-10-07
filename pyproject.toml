@@ -1,6 +1,6 @@
 [project]
 name = "docflow"
-version = "0.6.0"
+version = "0.7.0"
 description = "Documents Manager : classement local de documents personnels (moteur, interface web, ligne de commande)"
 requires-python = ">=3.12"
 dependencies = [
@@ -61,6 +61,7 @@ select = ["BLE001", "B023", "UP017", "FURB167", "RUF012", "ISC004", "SIM115", "I
 "backend/docflow/cli.py" = ["BLE001"]
 "backend/docflow/pipeline.py" = ["BLE001"]
 "backend/triage/services.py" = ["BLE001"]
+"backend/triage/library.py" = ["BLE001"]
 "scripts/build_corpus.py" = ["BLE001"]
 "scripts/compare.py" = ["BLE001"]
 "scripts/discover.py" = ["BLE001"]
