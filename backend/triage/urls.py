@@ -23,6 +23,8 @@ urlpatterns = [
     path("thresholds", v.thresholds),
     path("settings", v.folder_settings),
     path("folders", v.folders),
+    path("library", v.library),
+    path("library/file", v.library_file),
     path("history", v.history),
     path("history/<int:op_id>/undo", v.undo),
     path("destinations", v.destinations),

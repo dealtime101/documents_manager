@@ -1816,3 +1816,58 @@ def test_the_release_notes_come_in_english_on_request_and_the_session_says_wheth
     assert api.get("/api/auth/me").json()["local"] is False
     monkeypatch.setenv("DOCFLOW_LOCAL_TOKEN", "t")
     assert api.get("/api/auth/me").json()["local"] is True
+
+
+# ------------------------------------------------------------------ library explorer
+@pytest.fixture
+def lib(sb):
+    root = sb / "library"
+    (root / "Bills" / "Hydro").mkdir(parents=True)
+    (root / "Bills" / "Hydro" / "2025-01-01 - Hydro.pdf").write_bytes(b"%PDF-1.4 hydro")
+    (root / "Bills" / "notes.txt").write_text("<script>alert(1)</script>")
+    (root / ".hidden").mkdir()
+    (root / "top.pdf").write_bytes(b"%PDF-1.4 top")
+    (sb / "secret.txt").write_text("outside the library")
+    return root
+
+
+def test_the_library_explorer_lists_folders_and_files_and_walks_up_and_down(api, lib):
+    top = api.get("/api/library").json()
+    assert top["path"] == "" and top["is_root"] and top["folders"] == ["Bills"]          # the dot folder is hidden
+    assert [f["name"] for f in top["files"]] == ["top.pdf"] and top["files"][0]["size"] == len(b"%PDF-1.4 top")
+    bills = api.get("/api/library", {"path": "Bills"}).json()
+    assert bills["path"] == "Bills" and bills["parent"] == "" and bills["folders"] == ["Hydro"]
+    hydro = api.get("/api/library", {"path": "Bills/Hydro"}).json()
+    assert hydro["parent"] == "Bills" and [f["name"] for f in hydro["files"]] == ["2025-01-01 - Hydro.pdf"]
+
+
+@pytest.mark.parametrize("rel", ["..", "../", "Bills/../..", "/etc", "C:/Windows", "..\\..", "Bills/../../secret.txt"])
+def test_the_library_explorer_never_leaves_the_library(api, lib, rel):
+    assert api.get("/api/library", {"path": rel}).status_code == 400
+    assert api.get("/api/library/file", {"path": rel}).status_code == 404
+
+
+def test_a_symlink_out_of_the_library_is_refused(api, lib, sb):
+    link = lib / "out"
+    try:
+        link.symlink_to(sb, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks are not available here")
+    assert api.get("/api/library", {"path": "out"}).status_code == 400
+    assert api.get("/api/library/file", {"path": "out/secret.txt"}).status_code == 404
+
+
+def test_a_library_pdf_is_shown_inline_and_any_other_file_is_only_a_download(api, lib):
+    pdf_response = api.get("/api/library/file", {"path": "Bills/Hydro/2025-01-01 - Hydro.pdf"})
+    assert pdf_response.status_code == 200 and pdf_response["Content-Type"] == "application/pdf"
+    assert pdf_response["Content-Disposition"].startswith("inline") and b"".join(pdf_response.streaming_content) == b"%PDF-1.4 hydro"
+    txt = api.get("/api/library/file", {"path": "Bills/notes.txt"})
+    assert txt["Content-Disposition"].startswith("attachment") and txt["Content-Type"] == "application/octet-stream"
+    assert txt["X-Content-Type-Options"] == "nosniff"
+    assert api.get("/api/library/file", {"path": "Bills"}).status_code == 404            # a folder is not a file
+    assert api.get("/api/library/file", {"path": "nope.pdf"}).status_code == 404
+
+
+def test_the_library_explorer_says_so_when_the_library_does_not_exist(api, sb):
+    r = api.get("/api/library")
+    assert r.status_code == 400 and "library folder does not exist" in r.json()["detail"]

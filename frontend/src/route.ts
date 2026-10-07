@@ -1,9 +1,9 @@
 import type { Group } from '@/api'
 
-export type Page = 'dashboard' | 'queue' | 'history' | 'search' | 'rules' | 'settings' | 'notes'
+export type Page = 'dashboard' | 'queue' | 'library' | 'history' | 'search' | 'rules' | 'settings' | 'notes'
 export type Route = { page: Page; group: Group | null }
 
-const PAGES: Page[] = ['dashboard', 'queue', 'history', 'search', 'rules', 'settings', 'notes']
+const PAGES: Page[] = ['dashboard', 'queue', 'library', 'history', 'search', 'rules', 'settings', 'notes']
 const GROUPS: Group[] = ['auto', 'needs_validation', 'duplicates', 'errors']
 
 /** `#history`, `#queue`, `#queue/duplicates` (also `#/history`): anything else is the whole queue, the page's default. */

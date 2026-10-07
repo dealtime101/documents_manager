@@ -3,6 +3,14 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.6.0] - 2026-10-07
+
+### Added
+- **"Library" tab**: a file explorer for the Library folder. Walk down the folders (breadcrumb, parent folder, refresh), see the
+  size and date of each file, and a click on a PDF shows it on the right (or in a new tab). Read only: nothing is moved, renamed
+  or deleted. It cannot leave the library (`..`, absolute path, symbolic link); a file that is not a PDF is only offered as a
+  download.
+
 ## [0.5.1] - 2026-10-07
 
 ### Changed

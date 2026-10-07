@@ -105,6 +105,11 @@ export interface FolderSettings {
   extra_inboxes: string[]
 }
 export interface FolderListing { path: string; parent: string; folders: string[] }
+/** A folder of the library (paths are relative to the library, with `/`). */
+export interface LibraryListing {
+  path: string; parent: string; is_root: boolean; folders: string[]; truncated: boolean
+  files: { name: string; size: number; modified: number }[]
+}
 /** A refused save: `errors` names the setting and says what is wrong with it. */
 export class SettingsRefused extends Error {
   errors: Record<string, string>
@@ -223,6 +228,8 @@ export const api = {
     return data as FolderSettings
   },
   folders: (path?: string) => call<FolderListing>('GET', `/api/folders${path ? `?${new URLSearchParams({ path })}` : ''}`),
+  library: (path = '') => call<LibraryListing>('GET', `/api/library?${new URLSearchParams({ path })}`),
+  libraryFileUrl: (path: string) => `/api/library/file?${new URLSearchParams({ path })}`,
   undo: (id: number) => call<{ restored: string }>('POST', `/api/history/${id}/undo`),
   destinations: () => call<string[]>('GET', '/api/destinations'),
   vocabulary: () => call<{ companies: string[]; types: string[] }>('GET', '/api/vocabulary'),

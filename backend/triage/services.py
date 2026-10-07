@@ -287,6 +287,55 @@ def pdf_path(it: Item) -> Path:
     return p
 
 
+# ------------------------------------------------------------------ library explorer (read-only)
+LIBRARY_LIST_MAX = 5000  # entries of ONE folder: a very large folder is cut, and the answer says so
+
+
+def _library_target(rel: str) -> tuple[Path, Path]:
+    """(library root, the folder or file `rel` names inside it). `rel` can never leave the root (.., absolute path, symlink out)."""
+    root = cfg().path("library_root").resolve()
+    if not root.is_dir():
+        raise ApiError("the library folder does not exist: choose it in Settings")
+    try:
+        return root, (safe_join(root, rel) if rel.strip("/\\ ") else root)
+    except ValueError as e:
+        raise ApiError("folder refused") from e
+
+
+def library_list(rel: str) -> dict:
+    """The sub-folders and files of a library folder. Read only: nothing here moves, renames or deletes."""
+    root, folder = _library_target(rel)
+    folders: list[str] = []
+    files: list[dict] = []
+    truncated = False
+    try:
+        entries = sorted((x for x in folder.iterdir() if not x.name.startswith(".")), key=lambda x: x.name.lower())
+    except OSError as e:
+        raise ApiError("the folder cannot be read") from e
+    for entry in entries:
+        if len(folders) + len(files) >= LIBRARY_LIST_MAX:
+            truncated = True
+            break
+        try:
+            if entry.is_dir():
+                folders.append(entry.name)
+            elif entry.is_file():
+                st = entry.stat()
+                files.append({"name": entry.name, "size": st.st_size, "modified": int(st.st_mtime)})
+        except OSError:  # one unreadable entry (a broken link, a vanished file) must not hide the others
+            continue
+    here = "" if folder == root else folder.relative_to(root).as_posix()
+    parent = "" if folder == root or folder.parent == root else folder.parent.relative_to(root).as_posix()
+    return {"path": here, "parent": parent, "is_root": folder == root, "folders": folders, "files": files, "truncated": truncated}
+
+
+def library_file(rel: str) -> Path:
+    _, p = _library_target(rel)
+    if not p.is_file():
+        raise ApiError("file not found")
+    return p
+
+
 # ------------------------------------------------------------------ editing
 def edit(it: Item, data: dict) -> Item:
     if it.state != Item.PENDING:

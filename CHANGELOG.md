@@ -4,6 +4,14 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.6.0] - 2026-10-07
+
+### Ajouté
+- **Onglet « Bibliothèque »** : un explorateur de fichiers du dossier Bibliothèque. On descend dans les dossiers (fil d'Ariane,
+  dossier parent, actualiser), on voit la taille et la date de chaque fichier, et un clic sur un PDF l'affiche à droite (ou dans
+  un nouvel onglet). Lecture seule : rien n'est déplacé, renommé ni supprimé. Impossible de sortir de la bibliothèque (`..`,
+  chemin absolu, lien symbolique) ; un fichier qui n'est pas un PDF n'est proposé qu'en téléchargement.
+
 ## [0.5.1] - 2026-10-07
 
 ### Modifié

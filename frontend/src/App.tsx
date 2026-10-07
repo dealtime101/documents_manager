@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { I18nProvider, LangSwitch, useI18n } from '@/i18n'
 import Dashboard, { type Target } from '@/pages/Dashboard'
 import History from '@/pages/History'
+import Library from '@/pages/Library'
 import Notes from '@/pages/Notes'
 import Settings from '@/pages/Settings'
 import Rules from '@/pages/Rules'
@@ -71,6 +72,7 @@ function Shell() {
         <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="dashboard">{t('nav.dashboard')}</TabsTrigger>
           <TabsTrigger value="queue">{t('nav.queue')}</TabsTrigger>
+          <TabsTrigger value="library">{t('nav.library')}</TabsTrigger>
           <TabsTrigger value="history">{t('nav.history')}</TabsTrigger>
           <TabsTrigger value="search">{t('nav.search')}</TabsTrigger>
           <TabsTrigger value="rules">{t('nav.rules')}</TabsTrigger>
@@ -84,6 +86,7 @@ function Shell() {
       {/* text-base: the panel's own text-sm would shrink every page */}
       <TabsContent value="dashboard" className="text-base"><Dashboard open={open} /></TabsContent>
       <TabsContent value="queue" className="text-base"><Queue group={group} onShowAll={() => go({ page: 'queue', group: null })} /></TabsContent>
+      <TabsContent value="library" className="text-base"><Library /></TabsContent>
       <TabsContent value="history" className="text-base"><History /></TabsContent>
       <TabsContent value="search" className="text-base"><Search /></TabsContent>
       <TabsContent value="rules" className="text-base"><Rules /></TabsContent>

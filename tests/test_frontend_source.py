@@ -304,6 +304,18 @@ def test_the_dashboard_shows_the_accuracy_card_with_the_observation_worded_as_on
     assert source.count("This is an observation, not a guarantee") == 1 and source.count("pas une garantie") == 1
 
 
+def test_the_library_explorer_is_a_read_only_page_with_its_own_tab_and_encoded_paths():
+    got = _node_route("({ read: m.parseHash('#library'), write: m.toHash({ page: 'library', group: null }) })")
+    assert got["read"] == {"page": "library", "group": None} and got["write"] == "#library"
+    src = UI.parents[1]
+    page = (src / "pages" / "Library.tsx").read_text()
+    assert "api.library(path)" in page and "dangerouslySetInnerHTML" not in page
+    assert set(re.findall(r"api\.(\w+)", page)) == {"library", "libraryFileUrl"}          # browsing only: nothing is moved or removed
+    api = (src / "api.ts").read_text()
+    assert "new URLSearchParams({ path })" in api                                          # the path is encoded, not concatenated
+    assert '<TabsTrigger value="library">' in (src / "App.tsx").read_text()
+
+
 def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html():
     got = _node_route("({ search: m.parseHash('#search'), write: m.toHash({ page: 'search', group: null }) })")
     assert got["search"] == {"page": "search", "group": None} and got["write"] == "#search"

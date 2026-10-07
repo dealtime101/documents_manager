@@ -112,6 +112,33 @@ def item_detail(request, pk):
         return err(e)
 
 
+@api_view(["GET"])
+def library(request):
+    try:
+        return Response(s.library_list(request.query_params.get("path", "")))
+    except s.ApiError as e:
+        return err(e)
+
+
+@api_view(["GET"])
+def library_file(request):
+    """A file of the library, for the explorer: a PDF is shown inline, anything else is only offered for download (a page
+    served inline from here would run with the application's own session)."""
+    try:
+        path = s.library_file(request.query_params.get("path", ""))
+        fh = path.open("rb")  # handed to FileResponse, which closes it once sent
+    except s.ApiError as e:
+        return err(e, status.HTTP_404_NOT_FOUND)
+    except OSError as e:
+        log.warning("library file unavailable: %s", e)
+        return err(ValueError("file unavailable"), status.HTTP_404_NOT_FOUND)
+    pdf = path.suffix.lower() == ".pdf"
+    response = FileResponse(fh, content_type="application/pdf" if pdf else "application/octet-stream",
+                            as_attachment=not pdf, filename=path.name)
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @api_view(["POST"])
 def item_action(request, pk, action):
     try:
