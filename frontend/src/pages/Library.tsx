@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, errorText, type LibraryFields, type LibraryHit, type LibraryListing, type LibraryPlan } from '@/api'
-import { Field, Notice } from '@/components/Bits'
+import { Field, NameInput, Notice } from '@/components/Bits'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
@@ -9,6 +9,7 @@ const TRASH = '_Trash'
 const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name)
 const dirOf = (path: string) => path.split('/').slice(0, -1).join('/')
 const baseOf = (path: string) => path.split('/').pop() ?? path
+const extOf = (path: string) => { const n = baseOf(path); const i = n.lastIndexOf('.'); return i > 0 ? n.slice(i) : '' }
 const isPdf = (name: string) => name.toLowerCase().endsWith('.pdf')
 const inTrash = (path: string) => path === TRASH || path.startsWith(`${TRASH}/`)
 const EMPTY: LibraryFields = { company: '', document_type: '', date: 'XXXX', detail: '', amount: '', currency: 'CAD' }
@@ -20,13 +21,17 @@ function size(bytes: number): string {
 }
 
 /** One line of text to type (a new name), shown where it is needed: the browser's own prompt() is not reliable in a desktop window. */
-function AskName({ label, initial, onOk, onCancel }: { label: string; initial: string; onOk: (v: string) => void; onCancel: () => void }) {
+function AskName({ label, initial, ext = '', onOk, onCancel }: { label: string; initial: string; ext?: string; onOk: (v: string) => void; onCancel: () => void }) {
   const { t } = useI18n()
-  const [v, setV] = useState(initial)
-  const submit = (e: FormEvent) => { e.preventDefault(); onOk(v.trim()) }
+  const [v, setV] = useState(ext && initial.toLowerCase().endsWith(ext.toLowerCase()) ? initial.slice(0, -ext.length) : initial)  // a file's extension is fixed
+  const submit = (e: FormEvent) => { e.preventDefault(); onOk(v.trim() + ext) }
   return (
     <form onSubmit={submit} className="flex flex-wrap items-end gap-2 rounded-md border bg-slate-50 p-2">
-      <div className="min-w-0 flex-1"><Field label={label}><Input autoFocus value={v} onChange={(e) => setV(e.target.value)} /></Field></div>
+      <div className="min-w-0 flex-1">
+        <Field label={label}>
+          <NameInput ext={ext} value={v + ext} onChange={(full) => setV(ext ? full.slice(0, -ext.length) : full)} />
+        </Field>
+      </div>
       <Button type="submit" size="sm" disabled={!v.trim()}>{t('library.ok')}</Button>
       <Button type="button" size="sm" variant="outline" onClick={onCancel}>{t('library.cancel')}</Button>
     </form>
@@ -128,7 +133,7 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
           <Input list="lib-dirs" value={relDir} placeholder={plan?.rel_dir ?? ''} onChange={(e) => { setRelDir(e.target.value); setTouched(true) }} />
         </Field>
         <Field label={t('field.fileName')}>
-          <Input value={finalName} placeholder={plan?.final_name ?? ''} onChange={(e) => { setFinalName(e.target.value); setTouched(true) }} />
+          <NameInput value={finalName} placeholder={plan?.final_name ?? ''} onChange={(v) => { setFinalName(v); setTouched(true) }} />
         </Field>
       </fieldset>
       {problem && <p role="alert" className="text-sm text-rose-700"><span aria-hidden="true">✕ </span>{msg(problem)}</p>}
@@ -294,7 +299,7 @@ export default function Library() {
                 <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => remove(file)}>{t(inTrash(file) ? 'library.deleteForever' : 'library.delete')}</Button>
               </div>
             </div>
-            {ask === 'renameFile' && <AskName label={t('library.newName')} initial={baseOf(file)} onCancel={() => setAsk(null)}
+            {ask === 'renameFile' && <AskName label={t('library.newName')} initial={baseOf(file)} ext={extOf(file)} onCancel={() => setAsk(null)}
               onOk={(v) => void act(async () => { const r = await api.libraryRename(file, v); setFile(r.path); return t('library.renamed', { name: v }) })} />}
             {moving === 'file' && <MovePicker from={file} onCancel={() => setMoving(null)}
               onPick={(to) => void act(async () => { const r = await api.libraryMove(file, to); go(dirOf(r.path), r.path); return t('library.moved', { path: r.path }) })} />}

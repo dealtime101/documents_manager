@@ -304,6 +304,17 @@ def test_the_dashboard_shows_the_accuracy_card_with_the_observation_worded_as_on
     assert source.count("This is an observation, not a guarantee") == 1 and source.count("pas une garantie") == 1
 
 
+def test_a_file_name_is_typed_without_its_pdf_extension_which_is_fixed_and_greyed():
+    src = UI.parents[1]
+    bits = (src / "components" / "Bits.tsx").read_text()
+    assert "export function NameInput" in bits and 'aria-hidden="true" className="flex select-none' in bits and "text-slate-500" in bits
+    assert "stem + ext" in bits and "toLowerCase().endsWith(ext.toLowerCase())" in bits       # a typed ".pdf" is not doubled
+    for page in ("Queue.tsx", "Library.tsx"):
+        text = (src / "pages" / page).read_text()
+        assert "<NameInput" in text, page
+    assert "onChange={set('final_name')}" not in (src / "pages" / "Queue.tsx").read_text()      # no plain text field for the name any more
+
+
 def test_the_library_explorer_page_asks_before_deleting_and_only_calls_its_own_endpoints():
     got = _node_route("({ read: m.parseHash('#library'), write: m.toHash({ page: 'library', group: null }) })")
     assert got["read"] == {"page": "library", "group": None} and got["write"] == "#library"

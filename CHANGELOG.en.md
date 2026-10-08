@@ -3,6 +3,13 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.8.1] - 2026-10-07
+
+### Changed
+- **File name typed without ".pdf"**: the extension is shown greyed to the right of the field, not editable, and added by the
+  program ("To file", the Library form, and renaming a Library file). A ".pdf" typed anyway is not doubled. The message "the
+  name must end with .pdf" no longer comes up.
+
 ## [0.8.0] - 2026-10-07
 
 ### Added

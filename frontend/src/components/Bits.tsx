@@ -1,5 +1,6 @@
 import { cloneElement, useId, useRef, type ReactElement } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useI18n, type AskKey } from '@/i18n'
 import type { Item, Thresholds } from '@/api'
@@ -12,6 +13,21 @@ export function Field({ label, children }: { label: string; children: ReactEleme
     <div>
       <Label htmlFor={id}>{label}</Label>
       {cloneElement(children, { id })}
+    </div>
+  )
+}
+
+/** A file name typed WITHOUT its extension: the extension is fixed, shown greyed beside the field, and added by the program.
+ *  `value` and `onChange` carry the full name ("" while nothing is typed, which means "automatic" where that applies). */
+export function NameInput({ value, onChange, ext = '.pdf', placeholder = '', id }: {
+  value: string; onChange: (full: string) => void; ext?: string; placeholder?: string; id?: string
+}) {
+  const strip = (v: string) => (ext && v.toLowerCase().endsWith(ext.toLowerCase()) ? v.slice(0, -ext.length) : v)  // a typed ".pdf" is not doubled
+  return (
+    <div className="flex items-stretch">
+      <Input id={id} className="rounded-r-none" value={strip(value)} placeholder={strip(placeholder)}
+        onChange={(e) => { const stem = strip(e.target.value); onChange(stem ? stem + ext : '') }} />
+      {ext && <span aria-hidden="true" className="flex select-none items-center rounded-r-md border border-l-0 bg-slate-100 px-2 text-slate-500">{ext}</span>}
     </div>
   )
 }

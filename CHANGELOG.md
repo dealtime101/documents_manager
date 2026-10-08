@@ -4,6 +4,13 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.8.1] - 2026-10-07
+
+### Modifié
+- **Nom de fichier saisi sans « .pdf »** : l'extension est affichée en gris à droite du champ, non modifiable, et ajoutée par le
+  programme (« À classer », formulaire de la Bibliothèque, et renommage d'un fichier de la Bibliothèque). Un « .pdf » tapé quand
+  même n'est pas doublé. Fini le message « le nom doit se terminer par .pdf ».
+
 ## [0.8.0] - 2026-10-07
 
 ### Ajouté

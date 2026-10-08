@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, DEFAULT_THRESHOLDS, errorText, type Batch, type Group, type Item, type Learned, type ScanJob, type Thresholds } from '@/api'
-import { Confidence, Field, Notice, StatusBadge } from '@/components/Bits'
+import { Confidence, Field, NameInput, Notice, StatusBadge } from '@/components/Bits'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n, type AskKey } from '@/i18n'
@@ -281,7 +281,9 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
               <Field label={t('field.currency')}><Input value={form.currency} maxLength={3} onChange={set('currency')} /></Field>
             </div>
             <Field label={t('field.folder')}><Input list="dirs" value={form.rel_dir} onChange={set('rel_dir')} /></Field>
-            <Field label={t('field.fileName')}><Input value={form.final_name} onChange={set('final_name')} /></Field>
+            <Field label={t('field.fileName')}>
+              <NameInput value={form.final_name} onChange={(v) => setForm((f) => (f ? { ...f, final_name: v } : f))} />
+            </Field>
             </fieldset>
 
             <div className="flex flex-wrap gap-2 pt-1">

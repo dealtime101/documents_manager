@@ -1,6 +1,6 @@
 [project]
 name = "docflow"
-version = "0.8.0"
+version = "0.8.1"
 description = "Documents Manager : classement local de documents personnels (moteur, interface web, ligne de commande)"
 requires-python = ">=3.12"
 dependencies = [
