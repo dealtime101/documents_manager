@@ -897,6 +897,17 @@ def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
         assert "'rules.forgetPatternLabel'" in block and "{pattern}" in block.split("'rules.forgetPatternLabel'")[1].split("\n")[0]
 
 
+def test_enter_in_the_destination_field_saves_like_the_button_and_nothing_else_submits():
+    # DOC534.258: the destination had to be saved with a click on the button
+    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
+    row = rules[rules.index("const unchanged"):rules.index("{forgetButton('route', r.company)}")]
+    assert "<form " in row and "onSubmit={(e) => { e.preventDefault(); if (!busy && !unchanged) void saveRoute(r.company, value.trim()) }}" in row
+    assert '<Button type="submit" size="sm" disabled={busy || unchanged}>' in row                    # the one submit button; disabled = no Enter save
+    assert "onClick={() => saveRoute" not in rules                                                   # one way to save, not two
+    forget = rules[rules.index("const forgetButton"):rules.index("const section")]
+    assert '<Button type="button"' in forget                                                         # in a form, Forget must not submit it
+
+
 def test_a_saved_destination_stays_on_screen_until_the_rules_are_reloaded():
     # DOC474.86: the draft was dropped right after the save, so the field showed the OLD destination until load() ended (and for
     # good if the reload failed)
@@ -914,7 +925,9 @@ def test_a_saved_destination_stays_on_screen_until_the_rules_are_reloaded():
 def test_a_route_destination_is_trimmed_before_it_is_compared_and_sent():
     # DOC474.87: only the "empty" test trimmed; " Bills/Hydro " was sent as typed, and a change of spaces alone counted as an edit
     rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    assert "disabled={busy || value.trim() === r.destination || !value.trim()} onClick={() => saveRoute(r.company, value.trim())}" in rules
+    # (DOC534.258: the same two things, now behind a form: `unchanged` compares the trimmed value, and the submit sends the trimmed value)
+    assert "const unchanged = value.trim() === r.destination || !value.trim()" in rules
+    assert "void saveRoute(r.company, value.trim())" in rules and "disabled={busy || unchanged}" in rules
 
 
 def test_a_failed_reload_after_a_change_keeps_the_rules_and_the_success_message_on_screen():

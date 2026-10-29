@@ -67,7 +67,7 @@ export default function Rules() {
     [reloadError, note, msg])
   const filed = (n: number) => <span className="text-xs text-slate-500">{t('rules.filed', { n })}</span>
   const forgetButton = (kind: Kind, company: string, pattern?: string) => (
-    <Button variant="outline" size="sm" disabled={busy} aria-label={pattern ? t('rules.forgetPatternLabel', { company, pattern }) : t('rules.forgetLabel', { company })}
+    <Button type="button" variant="outline" size="sm" disabled={busy} aria-label={pattern ? t('rules.forgetPatternLabel', { company, pattern }) : t('rules.forgetLabel', { company })}
       onClick={() => forget(kind, company, pattern)}>{t('rules.forget')}</Button>
   )
   const section = (title: string, help: string, empty: boolean, rows: React.ReactNode) => (
@@ -114,17 +114,19 @@ export default function Rules() {
       )))}
       {section(t('rules.routes'), t('rules.routesHelp'), rules.routes.length === 0, rules.routes.map((r) => {
         const value = drafts[r.company] ?? r.destination
+        const unchanged = value.trim() === r.destination || !value.trim()  // nothing to save: neither the button nor Enter does it
         return (
           <div key={r.company} className="space-y-1 rounded-md border p-2">
             <div className="flex items-center justify-between gap-2"><strong>{r.company}</strong>{filed(r.filed)}</div>
-            <div className="flex flex-wrap items-center gap-2">
+            {/* a form, so that Enter in the field saves like the button does (a disabled submit button blocks it too) */}
+            <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (!busy && !unchanged) void saveRoute(r.company, value.trim()) }}>
               <Input className="min-w-48 flex-1" value={value} aria-label={t('rules.destinationOf', { company: r.company })}
                 onChange={(e) => { const next = e.target.value; setDrafts((d) => ({ ...d, [r.company]: next })) }} />
-              <Button size="sm" disabled={busy || value.trim() === r.destination || !value.trim()} onClick={() => saveRoute(r.company, value.trim())}>
+              <Button type="submit" size="sm" disabled={busy || unchanged}>
                 {t('rules.save')}
               </Button>
               {forgetButton('route', r.company)}
-            </div>
+            </form>
           </div>
         )
       }))}
