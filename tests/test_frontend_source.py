@@ -582,6 +582,27 @@ def test_saving_the_settings_goes_through_request_so_a_lost_network_is_a_transla
     assert "e.status === 400" in save and "throw new SettingsRefused(errors)" in save and save.rstrip().endswith("},")
 
 
+def test_saving_the_settings_behaves_the_same_whatever_goes_wrong_with_the_answer():
+    # DOC534.93 (and .92), run for real: an HTML page with status 200 (captive portal), a lost network and a refusal
+    setup = """
+      globalThis.document = { cookie: '' }
+      let mode = ''
+      globalThis.fetch = async () => {
+        if (mode === 'down') throw new TypeError('Failed to fetch')
+        if (mode === 'html') return { ok: true, status: 200, json: async () => { throw new SyntaxError('<html>') }, headers: { get: () => null } }
+        return { ok: false, status: 400, json: async () => ({ detail: 'x', errors: { inbox: 'does not exist' } }), headers: { get: () => null } }
+      }
+      globalThis.setMode = (m) => { mode = m }
+    """
+    got = _node_route("""(async () => {
+      const outcome = async (mode) => { setMode(mode); try { await m.api.saveSettings({}); return 'saved' } catch (e) { return [e.constructor.name, e.message, e.errors ?? null] } }
+      return { down: await outcome('down'), html: await outcome('html'), refused: await outcome('refused') }
+    })()""", module="api", setup=setup)
+    assert got["down"][:2] == ["ApiError", "Network error: the server cannot be reached."]          # not a raw TypeError
+    assert got["html"][0] == "ApiError" and "unexpected response" in got["html"][1]                  # not `undefined` typed as the settings
+    assert got["refused"] == ["SettingsRefused", "does not exist", {"inbox": "does not exist"}]      # the refusal still names the setting
+
+
 def test_the_dashboard_comment_says_the_today_tile_opens_the_unfiltered_history():
     # DOC474.79: "each tile opens exactly what it counts" was not true of the "Filed today" tile
     page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text()
