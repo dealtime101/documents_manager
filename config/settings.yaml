@@ -11,6 +11,7 @@ ocr:
   min_chars_per_page: 30        # fewer than this = image page -> OCR
   min_chars_scanned_page: 200   # a page that is one big image with fewer characters than this (a stamp, a header) is read by OCR too
   tesseract: "tesseract"        # full path if not in the PATH
+  searchable_pdf: false         # true = a scan read by OCR is filed with its text as an invisible layer (searchable in the explorer)
 
 ollama:
   enabled: false                # never without --ollama

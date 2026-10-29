@@ -370,3 +370,82 @@ def extract_text(path: Path, ocr: dict | None = None) -> Extracted:
               "ocr_disabled" if missing_pages and not ocr.get("enabled", True) else
               "ocr_unavailable" if missing_pages else "text")
     return Extracted("\n".join(parts), method, n, missing_pages)
+
+
+def ocr_text_layer(png: bytes, tesseract: str, languages: str, timeout: float = OCR_TIMEOUT) -> bytes | None:
+    """DOC534.7: a PDF of the same size as the picture that holds only the recognised text, invisible (Tesseract's `textonly_pdf`).
+    None if tesseract is not found or fails. Nothing is sent over the network: local binary."""
+    exe = shutil.which(tesseract)
+    if not exe:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        img = Path(d) / "p.png"
+        img.write_bytes(png)
+        try:
+            r = subprocess.run([exe, str(img), str(Path(d) / "out"), "-l", languages, "-c", "textonly_pdf=1", "pdf"],
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                               env=_env_for(exe), check=False, creationflags=NO_WINDOW)  # the exit code is read just below
+        except subprocess.TimeoutExpired:
+            log.warning("%s timed out after %.0f s making a text layer: the page is left as it is", exe, timeout)
+            return None
+        except OSError as e:
+            log.warning("could not run %s: %s", exe, e)
+            return None
+        out = Path(d) / "out.pdf"
+        if r.returncode != 0 or not out.is_file():
+            log.warning("%s failed making a text layer (exit code %s): %s", exe, r.returncode, " ".join(r.stderr.split())[:300])
+            return None
+        return out.read_bytes()
+
+
+def searchable_pdf(data: bytes, ocr: dict) -> bytes:
+    """DOC534.7: the same PDF with the text that OCR recognises on its image pages added as an invisible layer, so that the Windows
+    explorer and any PDF reader can search and copy it. The pages are not redrawn: the text is laid over them. Pages that already
+    have their text, blank pages and pages that cannot be read are left alone, and so is the whole file when nothing is added
+    (`data` itself is returned). Never raises for a page OCR cannot read.
+    ponytail: a page that carries its own /Rotate is skipped (the text would have to be turned with it); add when scanners need it."""
+    exe = find_tesseract(ocr.get("tesseract", "tesseract"))
+    if not exe or not ocr.get("enabled", True):
+        return data
+    min_chars, scan_chars = ocr.get("min_chars_per_page", 30), ocr.get("min_chars_scanned_page", 200)
+    with _PDFIUM:
+        doc = pdfium.PdfDocument(data)
+        n = len(doc)
+    added = 0
+    try:
+        for index in range(n):
+            with _PDFIUM:
+                page = doc[index]
+                t = _page_text(page).strip()
+                dpi = _dpi_within_budget(page, 300)
+                needs_text = (len(t) < min_chars or _scan_with_small_text(page, len(t), scan_chars)) and not _is_blank(page, t)
+                image = _render(page, round(dpi)) if needs_text and dpi is not None and page.get_rotation() == 0 else None
+            if image is None:
+                continue
+            layer = ocr_text_layer(_png_of(image), exe, ocr.get("languages", "fra+eng"))
+            if layer is None:
+                continue
+            with _PDFIUM:
+                try:
+                    text_doc = pdfium.PdfDocument(layer)
+                    try:
+                        width, height = page.get_size()
+                        text_width, text_height = text_doc[0].get_size()
+                        overlay = text_doc.page_as_xobject(0, doc).as_pageobject()
+                        overlay.set_matrix(pdfium.PdfMatrix().scale(width / text_width, height / text_height))
+                        page.insert_obj(overlay)
+                        page.gen_content()
+                        added += 1
+                    finally:
+                        text_doc.close()
+                except pdfium.PdfiumError as e:  # deliberately narrow: only PDFium's own refusal of THIS page's layer
+                    log.warning("page %s keeps no text layer: %s", index + 1, e)
+        if not added:
+            return data
+        with _PDFIUM:
+            out = io.BytesIO()
+            doc.save(out)
+            return out.getvalue()
+    finally:
+        with _PDFIUM:
+            doc.close()

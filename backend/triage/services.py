@@ -421,7 +421,7 @@ def _engine_proposal(it: Item) -> Proposal:
     return Proposal(Path(it.source_path), it.sha256, status=it.engine_status,
                     analysis=Analysis.model_validate(it.analysis) if it.analysis else None,
                     final_name=it.final_name or None, rel_dir=it.rel_dir or None, confidence=it.confidence,
-                    header=it.header)
+                    header=it.header, extraction=it.extraction)
 
 
 def _learn(it: Item) -> list[dict]:

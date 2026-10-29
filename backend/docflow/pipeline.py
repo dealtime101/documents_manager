@@ -12,7 +12,7 @@ from pathlib import Path
 from .analyze import Analysis, DocumentAnalyzer
 from .config import Config
 from .db import DB, now
-from .extract import extract_text, image_to_pdf, is_image
+from .extract import extract_text, image_to_pdf, is_image, searchable_pdf
 from .fields import header_line
 from .naming import FORBIDDEN, build_filename
 from .routing import fill, route, safe_join, type_destination_unusable, unknown_placeholder
@@ -295,14 +295,25 @@ def _write_unique(wanted: Path, data: bytes) -> Path:
     raise FileExistsError(wanted)
 
 
-def _file_picture(src: Path, wanted: Path, sha: str, kept_dir: Path) -> tuple[Path, Path, str]:
-    """DOC534.6: a picture is filed as a PDF. The PDF is written at `wanted` (first free name), then the ORIGINAL is moved aside to
-    `kept_dir/<its SHA-256><its extension>`, so that the undo can give it back. Returns (the PDF, where the original is, the PDF's
-    SHA-256). The picture is read ONCE: the bytes that were hashed are the bytes that are converted."""
+def _converted(src: Path, sha: str, ocr: dict, with_text: bool) -> bytes | None:
+    """DOC534.6, DOC534.7: the PDF to file INSTEAD of `src`, or None when `src` is filed as it is. A picture becomes a PDF; a scan that
+    was read by OCR gets the recognised text as an invisible layer when `with_text` (the `ocr.searchable_pdf` setting), so that the
+    explorer and any reader can search and copy it. The file is read ONCE: the bytes that were hashed are the bytes converted."""
+    if not (is_image(src) or with_text):
+        return None
     data = src.read_bytes()
     if hashlib.sha256(data).hexdigest() != sha:  # the file changed after it was analysed
         raise OSError(f"checksum mismatch: {src} changed since it was analysed")
-    pdf = image_to_pdf(data)
+    pdf = image_to_pdf(data) if is_image(src) else data
+    if with_text:
+        pdf = searchable_pdf(pdf, ocr)
+    return None if pdf == data else pdf
+
+
+def _file_converted(src: Path, wanted: Path, sha: str, kept_dir: Path, pdf: bytes) -> tuple[Path, Path, str]:
+    """The `pdf` made from `src` is written at `wanted` (first free name), then the ORIGINAL is moved aside to
+    `kept_dir/<its SHA-256><its extension>`, so that the undo can give it back. Returns (the PDF, where the original is, the PDF's
+    SHA-256)."""
     dst = _write_unique(wanted, pdf)
     kept = kept_dir / f"{sha}{src.suffix.lower()}"
     try:
@@ -358,9 +369,11 @@ def apply(p: Proposal, cfg: Config, db: DB, final_name: str | None = None, sourc
     wanted = safe_join(cfg.path("library_root"), p.rel_dir) / name
     if len(str(wanted)) + len(" (999)") > MAX_PATH:  # room for a collision suffix
         raise ValueError(f"path too long ({len(str(wanted))} chars)")
-    picture = is_image(p.source)
-    if picture:
-        dst, kept, pdf_sha = _file_picture(p.source, wanted, p.sha256, cfg.path("quarantine") / "originals")
+    ocr = cfg.settings.get("ocr") or {}
+    with_text = ocr.get("searchable_pdf") is True and ocr.get("enabled", True) and p.extraction in ("ocr", "mixed")
+    pdf = _converted(p.source, p.sha256, ocr, bool(with_text))
+    if pdf is not None:
+        dst, kept, pdf_sha = _file_converted(p.source, wanted, p.sha256, cfg.path("quarantine") / "originals", pdf)
     else:
         dst = _move_unique(p.source, wanted, p.sha256)
     doc = None
@@ -371,12 +384,12 @@ def apply(p: Proposal, cfg: Config, db: DB, final_name: str | None = None, sourc
             document_date=a.date, amount=str(a.amount) if a.amount is not None else None, currency=a.currency,
             invoice_number=a.invoice_number, confidence=p.confidence, source=source, processed_at=now(),
             status="classified")
-        if picture:
+        if pdf is not None:
             db.add_op(doc, "convert", str(p.source), str(dst), json.dumps({"kept": str(kept), "pdf_sha": pdf_sha}))
         else:
             db.add_op(doc, "move", str(p.source), str(dst))
     except Exception:  # no trace in the history = no undo: put the file back instead of orphaning it
-        if picture:
+        if pdf is not None:
             _unfile_picture(p.source, kept, dst, p.sha256)
         else:
             _put_back(p.source, dst, p.sha256)

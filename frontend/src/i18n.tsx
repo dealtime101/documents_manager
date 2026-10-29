@@ -227,7 +227,7 @@ const en = {
   'hist.none': 'No operations yet.',
   'op.move': 'move',
   'op.quarantine': 'quarantine',
-  'op.convert': 'picture filed as PDF',
+  'op.convert': 'filed as a new PDF',
 } as const
 
 export type Key = keyof typeof en
@@ -459,7 +459,7 @@ const fr: Record<Key, string> = {
   'hist.none': "Aucune opération pour l'instant.",
   'op.move': 'déplacement',
   'op.quarantine': 'quarantaine',
-  'op.convert': 'image classée en PDF',
+  'op.convert': 'classé en nouveau PDF',
 }
 
 // Messages produced by the server are in English; exact texts and "prefix: detail" texts are translated here.

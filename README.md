@@ -3,8 +3,10 @@
 Local, private filing of personal documents. Drop PDFs or photos (JPEG, PNG, WebP, TIFF, BMP; HEIC where `pillow-heif` is installed,
 see below) in a folder: Documents Manager reads them (text layer, or local OCR for scans and photos), proposes a name and a
 destination folder, and files them when you approve. A photo is filed as a one-page PDF; the original picture is kept in the
-`originals` folder of the quarantine, and **History** → undo gives it back. Everything stays on your machine: no document
-leaves it, no cloud service is used (Ollama on `localhost` is an optional extra).
+`originals` folder of the quarantine, and **History** → undo gives it back. With `ocr: searchable_pdf: true` in
+`config/settings.yaml`, a scan read by OCR is filed with its text as an invisible layer (searchable in the Windows explorer), the
+same way. Everything stays on your machine: no document leaves it, no cloud service is used (Ollama on `localhost` is an optional
+extra).
 
 - **To file**: a PDF preview, the proposed company / type / date / amount, a score per field, corrections, batch approval.
 - **Learns from your corrections**: correct a document once and the company, type and destination are remembered.
