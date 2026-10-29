@@ -74,8 +74,9 @@ function MovePicker({ from, onPick, onCancel }: { from: string; onPick: (to: str
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>{t('library.cancel')}</Button>
       </div>
       <ul className="max-h-40 overflow-auto">
-        {list?.folders.filter((f) => join(at, f) !== from && join(at, f) !== TRASH).map((f) => (
-          <li key={f}><button type="button" className="w-full rounded px-1 py-0.5 text-left hover:bg-slate-200" onClick={() => setAt(join(at, f))}>📁 {f}</button></li>
+        {/* the paths come from the folder the list was read FOR (list.path), not from `at`, which already names the next one while it loads */}
+        {list?.folders.filter((f) => join(list.path, f) !== from && join(list.path, f) !== TRASH).map((f) => (
+          <li key={f}><button type="button" className="w-full rounded px-1 py-0.5 text-left hover:bg-slate-200" onClick={() => setAt(join(list.path, f))}>📁 {f}</button></li>
         ))}
       </ul>
     </div>

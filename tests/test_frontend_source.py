@@ -390,6 +390,14 @@ def test_a_proposal_for_a_library_file_does_not_start_a_second_plan_request_for_
     assert "setPlan(null); setPlanned('')" in effect                                        # a failed plan is asked again for the same inputs
 
 
+def test_the_move_picker_builds_paths_from_the_folder_its_list_was_read_for():
+    # DOC534.69: while the next folder loaded (or after a failure) the old list was joined with the NEW path: a click led nowhere
+    page = (UI.parents[1] / "pages" / "Library.tsx").read_text()
+    picker = page[page.index("function MovePicker"):page.index("function Classify")]
+    assert "join(at, f)" not in picker and picker.count("join(list.path, f)") == 3
+    assert "onClick={() => setAt(join(list.path, f))}" in picker
+
+
 def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html():
     got = _node_route("({ search: m.parseHash('#search'), write: m.toHash({ page: 'search', group: null }) })")
     assert got["search"] == {"page": "search", "group": None} and got["write"] == "#search"
