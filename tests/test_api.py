@@ -1067,6 +1067,10 @@ def test_edit_rejects_bad_input_and_path_tricks(api, sb):
     r = api.patch(f"/api/items/{i}", {"company": "../../x", "document_type": "A/B", "final_name": "a/../b.pdf"},
                   format="json").json()
     assert "/" not in r["company"] and ".." not in r["company"] and "/" not in r["final_name"]
+    # DOC534.191: the other two fields sent are checked too, exactly. The separators go, so ".." left inside a name ("a..b.pdf") is no
+    # longer a path component and cannot climb out of the folder
+    assert (r["document_type"], r["final_name"]) == ("AB", "a..b.pdf")
+    assert ".." not in r["final_name"].replace("/", "\\").split("\\")
 
 
 def test_approve_requires_complete_proposal(api, sb):
