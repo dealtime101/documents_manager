@@ -339,6 +339,14 @@ def test_file_names_and_folders_are_cut_on_both_separators():
     assert got["mixed"] == ["x.pdf", "C:/In"] and got["bare"] == ["c.pdf", ""] and got["root"] == ["c.pdf", "/"]
 
 
+def test_a_folder_written_with_a_trailing_separator_still_has_its_name():
+    # DOC534.179: '/home/u/projet/' came back whole, the last segment being empty
+    got = _node_route("""({ posix: m.baseName('/home/u/projet/'), windows: m.baseName('D:\\\\data\\\\'), several: m.baseName('/a/b//'),
+      mixed: m.baseName('C:/In\\\\sub/'), root: [m.baseName('/'), m.baseName('//'), m.baseName('')] })""", module="paths")
+    assert got["posix"] == "projet" and got["windows"] == "data" and got["several"] == "b" and got["mixed"] == "sub"
+    assert got["root"] == ["/", "//", ""]                                         # nothing left to name: the path itself, as before
+
+
 def test_field_keeps_an_id_the_caller_gave_its_input():
     source = BITS.read_text()
     assert "children.props.id ?? generated" in source                        # the caller's id wins over the generated one

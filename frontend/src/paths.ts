@@ -1,5 +1,6 @@
-/** The file name of a path as the server wrote it: POSIX ('/') or Windows ('\') separators. */
-export const baseName = (path: string) => path.split(/[\\/]/).pop() || path
+/** The file name of a path as the server wrote it: POSIX ('/') or Windows ('\') separators. A trailing separator is not a name:
+ *  '/home/u/projet/' is 'projet'; the path itself comes back only when nothing else is left (the root '/', 'C:\'... as written). */
+export const baseName = (path: string) => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path
 
 /** The folder part of a path, with either separator ('' when the path has none). */
 export const dirName = (path: string) => {
