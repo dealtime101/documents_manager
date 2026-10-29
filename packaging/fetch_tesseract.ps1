@@ -56,5 +56,9 @@ foreach ($lang in $blobIds.Keys) {
   $blob = Get-GitBlobId $target
   if ($blob -ne $blobIds[$lang]) { Remove-Item $target; throw "$lang.traineddata does not match the pinned file: expected $($blobIds[$lang]), got $blob" }
 }
-Copy-Item (Join-Path $install "doc\LICENSE") (Join-Path $out "LICENSE-Tesseract.txt") -ErrorAction SilentlyContinue
+# The licence texts travel with the binaries (Apache-2.0 asks for them): every LICENSE*/NOTICE* file of the install's doc\ folder is
+# copied, and a package without any is a failure, not a silent omission.
+$licences = @(Get-ChildItem -Path (Join-Path $install "doc") -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^(LICENSE|LICENCE|NOTICE|COPYING)' })
+if ($licences.Count -eq 0) { throw "No LICENSE/NOTICE file in $(Join-Path $install 'doc'): Tesseract must not be redistributed without its licence text." }
+foreach ($file in $licences) { Copy-Item $file.FullName (Join-Path $out ("LICENSE-Tesseract-" + $file.Name + ".txt")) }
 Write-Host "Prepared $out"

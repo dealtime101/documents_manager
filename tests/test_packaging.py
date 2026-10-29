@@ -41,6 +41,14 @@ def test_a_failed_tesseract_install_stops_the_script_with_its_own_message():
     assert script.index("has no tesseract.exe", run) < script.index("Copy-Item (Join-Path $install \"tesseract.exe\")")
 
 
+def test_a_tesseract_package_without_a_licence_text_is_a_failure_not_a_silent_omission():
+    # DOC534.156: Copy-Item ... -ErrorAction SilentlyContinue let the package go out with no licence at all
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    assert 'LICENSE-Tesseract.txt") -ErrorAction' not in script
+    assert "if ($licences.Count -eq 0) { throw " in script
+    assert script.index("if ($licences.Count -eq 0) { throw ") < script.index("foreach ($file in $licences)") < script.index('Write-Host "Prepared')
+
+
 def test_the_tesseract_script_does_not_promise_that_nothing_stays_installed():
     # DOC534.155: the header said nothing is left on the machine, but the NSIS installer is run and never uninstalled
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
