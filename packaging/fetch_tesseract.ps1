@@ -6,6 +6,7 @@
 param([string]$From = "",  # an existing Tesseract folder to copy from (skips the installer; language files that are the pinned ones are taken from it, the others are downloaded)
       [string]$Sha256 = "")  # the SHA-256 the installer must have, while none is pinned below
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"  # Windows PowerShell 5.1 draws the progress bar of Invoke-WebRequest so slowly that a 50 MB download takes minutes
 $root = Split-Path -Parent $PSScriptRoot
 $out = Join-Path $root "packaging\tesseract"
 # "Already prepared" means EVERYTHING is there: a run that stopped after copying tesseract.exe must start again, not count as done

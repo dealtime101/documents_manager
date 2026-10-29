@@ -41,6 +41,13 @@ def test_a_failed_tesseract_install_stops_the_script_with_its_own_message():
     assert script.index("has no tesseract.exe", run) < script.index("Copy-Item (Join-Path $install \"tesseract.exe\")")
 
 
+def test_the_progress_bar_is_off_before_the_first_download():
+    # DOC534.158: on Windows PowerShell 5.1 the progress bar of Invoke-WebRequest makes a big download many times slower
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    assert '$ProgressPreference = "SilentlyContinue"' in script
+    assert script.index('$ProgressPreference = "SilentlyContinue"') < script.index("Invoke-WebRequest")
+
+
 def test_from_takes_the_pinned_language_files_it_already_holds_and_downloads_only_the_others():
     # DOC534.157: -From claimed to skip the download, yet the three language files were always fetched, so an offline build failed
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
