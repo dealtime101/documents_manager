@@ -29,7 +29,23 @@ if (-not $install) {
 New-Item -ItemType Directory -Force -Path (Join-Path $out "tessdata") | Out-Null
 Copy-Item (Join-Path $install "tesseract.exe") $out
 Copy-Item (Join-Path $install "*.dll") $out
-foreach ($lang in "eng", "osd") { Copy-Item (Join-Path $install "tessdata\$lang.traineddata") (Join-Path $out "tessdata") }
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/tesseract-ocr/tessdata_best/raw/main/fra.traineddata" -OutFile (Join-Path $out "tessdata\fra.traineddata")
+# The language data: ALL of it from one pinned commit of tessdata_best (tag 4.1.0), not the installer's mix and not the moving main
+# branch, and each file checked against its git blob id (GitHub's contents API gives it: GET /repos/tesseract-ocr/tessdata_best/contents/<file>?ref=<commit>).
+$tessdataCommit = "e2aad9b983032bb1beff9133104a67cdbb87ca4d"
+$blobIds = @{ eng = "176dc3220de7db34d3b3aecbfa42043a6038348b"; osd = "527457ca8f8fe1fda7c2f88bce3c0e4be12be9d0"; fra = "f73e7dec0669dbac6443d8f83054b8b2a3146729" }
+function Get-GitBlobId([string]$path) {
+  $bytes = [IO.File]::ReadAllBytes($path)
+  $header = [Text.Encoding]::ASCII.GetBytes("blob $($bytes.Length)" + [char]0)
+  $sha1 = [Security.Cryptography.SHA1]::Create()
+  $sha1.TransformBlock($header, 0, $header.Length, $null, 0) | Out-Null
+  $sha1.TransformFinalBlock($bytes, 0, $bytes.Length) | Out-Null
+  return (($sha1.Hash | ForEach-Object { $_.ToString("x2") }) -join "")
+}
+foreach ($lang in $blobIds.Keys) {
+  $target = Join-Path $out "tessdata\$lang.traineddata"
+  Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/$tessdataCommit/$lang.traineddata" -OutFile $target
+  $blob = Get-GitBlobId $target
+  if ($blob -ne $blobIds[$lang]) { Remove-Item $target; throw "$lang.traineddata does not match the pinned file: expected $($blobIds[$lang]), got $blob" }
+}
 Copy-Item (Join-Path $install "doc\LICENSE") (Join-Path $out "LICENSE-Tesseract.txt") -ErrorAction SilentlyContinue
 Write-Host "Prepared $out"
