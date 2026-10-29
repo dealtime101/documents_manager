@@ -251,6 +251,14 @@ def _llm_amount(v) -> Decimal | None:
 MAX_ANSWER_BYTES = 1 << 20  # 1 MB: the model answers one small JSON object; a larger answer is a fault, not something to keep in memory
 
 
+def _compact(text: str) -> str:
+    """The text without the empty space OCR leaves (runs of blanks, empty lines): that space would use up the budget of the excerpt.
+    Accents stay: the model reads them, unlike the rules (norm())."""
+    text = re.sub("[ \t" + chr(0xA0) + chr(0x202F) + "]+", " ", text)       # blanks, no-break and narrow no-break spaces included
+    text = re.sub(r" ?\n ?", "\n", text)                       # no blank at the edge of a line
+    return re.sub(r"\n{3,}", "\n\n", text).strip()             # at most one empty line in a row
+
+
 def _excerpt(text: str, limit: int) -> str:
     """What is sent to the model: the whole text if it fits, else its beginning AND its end (the issuer opens a document, the
     total closes it) with a mark where the middle was left out, in at most `limit` characters."""
@@ -276,7 +284,7 @@ class OllamaAnalyzer:
     def prompt_for(self, text: str) -> str:
         """The instructions, then the document as one delimited block. A closing tag written inside the text is defused, so the
         text cannot end the block and speak as if it were the instructions that follow."""
-        body = _CLOSING_TAG.sub(lambda _m: "<\\/document>", _excerpt(text, self.max_chars))  # any case, any spacing
+        body = _CLOSING_TAG.sub(lambda _m: "<\\/document>", _excerpt(_compact(text), self.max_chars))  # any case, any spacing
         return f"{self.PROMPT}<document>\n{body}\n</document>"
 
     def __init__(self, model: str, host: str = "http://127.0.0.1:11434", max_chars: int = 6000, types: list[dict] | None = None):
