@@ -207,7 +207,7 @@ def _plan_from(fields: dict, rel_dir: str, final_name: str) -> dict:
         raise s.ApiError(f"value rejected: {e}") from None
     name = dest = ""
     if final_name:
-        name = sanitize(final_name)
+        name = _clean_name(final_name)  # a typed name that needs cleaning is refused, not filed under another name than the one validated
         if not name.lower().endswith(".pdf"):
             raise s.ApiError("the name must end with .pdf")
     elif a.company and a.document_type:

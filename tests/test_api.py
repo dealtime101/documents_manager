@@ -2095,6 +2095,16 @@ def test_an_amount_typed_the_usual_way_is_read_when_a_library_pdf_is_planned(api
     assert plan.status_code == 200 and f"{shown}$" in plan.json()["final_name"], plan.content
 
 
+@pytest.mark.parametrize("typed", ["a:b.pdf", "x?y.pdf", "con.pdf", "..pdf.", "nom/sous.pdf"])
+def test_a_typed_final_name_that_would_have_to_be_cleaned_is_refused_not_changed_in_silence(api, lib, typed):
+    # DOC534.103: the name filed was not the one the person typed and saw ("a:b.pdf" became "ab.pdf")
+    fields = {"company": "Acme", "document_type": "Facture", "date": "2025-03-05", "detail": "", "amount": "80", "currency": "CAD"}
+    refused = post(api, "plan", path="top.pdf", fields=fields, final_name=typed)
+    assert refused.status_code == 400 and refused.json()["detail"] == "invalid name"
+    assert post(api, "plan", path="top.pdf", fields=fields, final_name="Ma facture.pdf").json()["final_name"] == "Ma facture.pdf"
+    assert post(api, "plan", path="top.pdf", fields=fields, final_name="  Ma facture.pdf ").json()["final_name"] == "Ma facture.pdf"   # blanks at the edge only
+
+
 @pytest.mark.parametrize("typed", ["abc", "12,3456", "1,2,3", "$$", "12 euros"])
 def test_an_amount_that_cannot_be_read_is_refused_with_a_plain_message(api, lib, typed):
     fields = {"company": "Acme", "document_type": "Facture", "date": "2025-03-05", "detail": "", "amount": typed, "currency": "CAD"}
