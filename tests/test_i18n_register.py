@@ -91,6 +91,15 @@ def test_the_texts_name_the_inbox_the_way_the_settings_do_and_never_a_fixed_fold
     assert "'dash.srcInbox': 'Inbox'" in en
 
 
+def test_the_count_of_accepted_documents_has_a_singular_and_a_plural_in_both_languages():
+    # DOC534.64: one key '{n} acceptés sur {total}' gave "1 acceptés sur 1"
+    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
+    assert "'acc.untouchedCount':" not in src                                       # no form without a number agreement
+    assert "'acc.untouchedCount.one': '{n} accepté sur {total}'" in fr and "'acc.untouchedCount.other': '{n} acceptés sur {total}'" in fr
+    assert "'acc.untouchedCount.one'" in en and "'acc.untouchedCount.other'" in en
+
+
 def test_without_a_saved_choice_the_language_follows_the_browser_and_a_saved_choice_wins():
     # DOC474.28: a fr-CA browser got the English interface until the switch was used by hand (and again in a private window)
     src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text()
@@ -142,7 +151,7 @@ def test_the_counters_of_the_months_and_the_bands_come_from_translated_messages(
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
     i18n, accuracy = (root / "i18n.tsx").read_text(), (root / "components" / "Accuracy.tsx").read_text()
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
-    assert "'acc.untouchedCount': '{n} accepted of {total}'" in en and "'acc.untouchedCount': '{n} acceptés sur {total}'" in fr
+    assert "'acc.untouchedCount.other': '{n} accepted of {total}'" in en and "'acc.untouchedCount.other': '{n} acceptés sur {total}'" in fr
     assert "'acc.band': '{band}%'" in en and "'acc.band': '{band} %'" in fr            # French: a (narrow, no-break) space before %
     assert "`${m.untouched} / ${m.total}`" not in accuracy and "`${b.untouched} / ${b.total}`" not in accuracy
     assert "`${b.band} %`" not in accuracy
