@@ -20,6 +20,7 @@ export default function Dashboard({ open }: { open: (target: Target) => void }) 
   const [stale, setStale] = useState(false)  // the last background refresh failed: the numbers on screen are the previous ones
   const alive = useRef(true)
   const latest = useRef(0)  // the number of the newest request: the visibility refresh can overlap the scheduled one
+  const shown = useRef(false)  // numbers are on screen: only then can a failed background refresh be "quiet"
   // quiet = a background refresh: if it fails the numbers already on screen stay (the "updated at" line shows their age)
   const fetchNow = useCallback(async (quiet: boolean) => {
     const mine = ++latest.current
@@ -27,12 +28,12 @@ export default function Dashboard({ open }: { open: (target: Target) => void }) 
       const fresh = await api.dashboard()
       if (!alive.current) return
       if (mine !== latest.current) return  // a newer request started meanwhile: this answer is older, never let it win
-      setD(fresh); setUpdatedAt(new Date()); setErr(''); setStale(false)
+      setD(fresh); setUpdatedAt(new Date()); setErr(''); setStale(false); shown.current = true
     } catch (e) {
       // errorText: the ApiError's own message (msg() can translate it), never "Error: ..." and never a raw exception text
       if (alive.current && mine === latest.current) {
-        if (quiet) setStale(true)  // keep the numbers, but say they are old (a banner under the "updated at" line)
-        else setErr(errorText(e))
+        if (quiet && shown.current) setStale(true)  // keep the numbers, but say they are old (a banner under the "updated at" line)
+        else setErr(errorText(e))  // nothing on screen yet (the first load failed, a quiet one took its place): say it, with Retry
       }
     }
   }, [])

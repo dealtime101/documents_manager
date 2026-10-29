@@ -81,6 +81,14 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_a_failed_background_refresh_is_quiet_only_when_numbers_are_already_on_screen():
+    # DOC534.118: the tab became visible during the first load, the quiet request replaced it and failed: "Loading" for ever, no error
+    page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text()
+    assert "const shown = useRef(false)" in page and "shown.current = true" in page
+    assert "if (quiet && shown.current) setStale(true)" in page and "else setErr(errorText(e))" in page
+    assert page.index("shown.current = true") < page.index("if (quiet && shown.current)")
+
+
 def test_the_launcher_token_stays_in_the_address_while_the_server_cannot_be_reached_and_retry_signs_in_again():
     # DOC534.34: the token was removed from the URL even when the sign-in failed for lack of a network answer, and "Retry" only
     # re-checked the session: the user stayed "not signed in" until the desktop application was started again
@@ -913,7 +921,7 @@ def test_the_dashboard_counters_are_announced_when_they_change_not_on_every_refr
 def test_a_failed_background_refresh_of_the_dashboard_says_the_figures_may_be_old():
     # DOC474.237: after a failed quiet refresh the old numbers stayed with no sign but a discreet time
     dash = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text()
-    assert "if (quiet) setStale(true)" in dash and "setStale(false)" in dash          # set on a failed refresh, cleared on a good one
+    assert "if (quiet && shown.current) setStale(true)" in dash and "setStale(false)" in dash         # set on a failed refresh, cleared on a good one
     assert """{stale && <p role="alert\"""" in dash and "t('dash.stale')" in dash
 
 
