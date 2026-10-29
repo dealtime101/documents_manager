@@ -29,6 +29,23 @@ def load_script(name: str):
     return module
 
 
+def agpl_imports(source: str) -> set[str]:
+    """The AGPL PDF library (PyMuPDF, imported as `pymupdf`, or `fitz` as it long was) that a module imports or names in an
+    import_module() call, whatever the case: the top-level names found."""
+    import ast
+    found = set()
+    for node in ast.walk(ast.parse(source)):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names = [node.module]
+        elif isinstance(node, ast.Call) and getattr(node.func, "attr", getattr(node.func, "id", "")) in {"import_module", "__import__"}:
+            names = [a.value for a in node.args[:1] if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+        found.update(n.split(".")[0].lower() for n in names)
+    return found & {"pymupdf", "fitz"}
+
+
 def make_pdf(path: Path, text: str) -> None:
     doc = pymupdf.open()
     doc.new_page().insert_text((72, 72), text)
@@ -1524,7 +1541,14 @@ def test_make_sandbox_writes_complete_readable_pdfs_without_any_pdf_library(tmp_
     assert got.pages == 1 and got.method == "text"
     assert "Facture d'électricité (Hydro-Québec)" in got.text and "Total 26,43 $" in got.text
     assert extract_text(tmp_path / "b.pdf").pages == 1
-    assert "pymupdf" not in (Path(sandbox.__file__).read_text(encoding="utf-8"))   # the product ships no AGPL library
+    # the product ships no AGPL library (DOC534.203: read from the imports, under both names PyMuPDF has had: pymupdf and fitz)
+    assert not agpl_imports(Path(sandbox.__file__).read_text(encoding="utf-8"))
+    assert agpl_imports("import fitz") == {"fitz"} and agpl_imports("from PyMuPDF import x\nimport os.path as p") == {"pymupdf"}
+    assert agpl_imports("import a.b, FITZ.sub") == {"fitz"} and agpl_imports("import importlib\nimportlib.import_module('fitz')") == {"fitz"}
+    shipped = list((SCRIPTS.parent / "backend").rglob("*.py")) + [SCRIPTS.parent / "manage.py"]
+    assert {p.name: agpl_imports(p.read_text(encoding="utf-8")) for p in shipped if agpl_imports(p.read_text(encoding="utf-8"))} == {}
+    spec = (SCRIPTS.parent / "packaging" / "documents-manager.spec").read_text(encoding="utf-8")
+    assert '"pymupdf"' in spec and '"fitz"' in spec                                 # and the executable is built without either
 
 
 def test_compare_checks_the_currency_written_in_the_sample_name(tmp_path, capsys):
