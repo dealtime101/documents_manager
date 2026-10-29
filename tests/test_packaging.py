@@ -110,6 +110,19 @@ def test_the_front_end_lockfile_resolves_the_versions_that_fix_the_advisories_it
     assert version("8.3.10") > version("8.3.5") and version("4.6.7") >= version("4.6.6")         # the comparison is numeric, not textual
 
 
+def test_uv_lock_resolves_the_python_versions_that_fix_the_advisories_it_once_had():
+    # DOC534.576 and DOC534.700: osv-scanner and trivy named setuptools 84.0.0 and djangorestframework 3.18.1 in uv.lock
+    import re
+    lock = (PACKAGING.parent / "uv.lock").read_text(encoding="utf-8")
+    locked = dict(re.findall(r'^name = "([^"]+)"\nversion = "([^"]+)"', lock, flags=re.MULTILINE))
+
+    def version(text):
+        return tuple(int(part) for part in text.split(".")[:3])
+    at_least = {"setuptools": "84.2.1", "djangorestframework": "3.18.3"}
+    behind = {name: locked[name] for name, floor in at_least.items() if version(locked[name]) < version(floor)}
+    assert behind == {}, behind
+
+
 def test_the_tesseract_work_folder_is_assigned_once_where_it_is_used():
     # DOC534.263: it was set before the `if` and again inside it, the same way; only the inner one is read
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
