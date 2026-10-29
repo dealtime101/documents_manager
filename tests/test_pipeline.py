@@ -794,6 +794,33 @@ def test_a_cross_device_copy_that_fails_midway_leaves_no_partial_file_in_the_lib
     assert not [x for x in (tmp / "lib").rglob("*") if x.is_file()]  # and no partial copy was left behind
 
 
+def test_a_cross_device_copy_is_removed_when_the_original_cannot_be_deleted(env, monkeypatch):
+    # DOC534.22: the verified copy stayed in the library with no record while the original stayed too: the next run filed a "(2)"
+    import errno
+
+    from docflow import pipeline
+    cfg, db, tmp = env
+    f = mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO)
+    p = propose(f, cfg, db, RuleBasedAnalyzer(cfg))
+    cross = lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device"))  # noqa: E731
+    monkeypatch.setattr(pipeline.os, "rename", cross)
+    monkeypatch.setattr(pipeline.os, "link", cross)
+    real_unlink = Path.unlink
+
+    def locked(self, *a, **k):
+        if self == f:
+            raise PermissionError(errno.EACCES, "locked by another program")
+        return real_unlink(self, *a, **k)
+    monkeypatch.setattr(Path, "unlink", locked)
+    with pytest.raises(PermissionError):
+        apply(p, cfg, db)
+    assert f.exists()                                                    # the original stays
+    assert not [x for x in (tmp / "lib").rglob("*") if x.is_file()]      # and so no orphan copy in the library
+    monkeypatch.setattr(Path, "unlink", real_unlink)
+    dst = apply(p, cfg, db)                                              # the retry gets the wanted name
+    assert "(2)" not in dst.name and not f.exists()
+
+
 def test_a_retry_after_a_failed_cross_device_copy_gets_the_wanted_name_not_a_suffix(env, monkeypatch):
     # DOC474.218: the truncated leftover used to be taken for a legitimate collision, so the retry was filed as "(2)"
     import errno

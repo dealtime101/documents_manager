@@ -213,7 +213,11 @@ def _move_verified(src: Path, dst: Path, sha: str) -> None:
         except BaseException:
             dst.unlink(missing_ok=True)
             raise
-        src.unlink()
+        try:
+            src.unlink()
+        except BaseException:  # locked, or no right on the source folder: the original stays, so the copy must not stay unrecorded
+            dst.unlink(missing_ok=True)
+            raise
         return
     if sha256_file(dst) != sha:  # the file changed after it was analysed: undo the move
         os.rename(dst, src)
