@@ -1216,6 +1216,23 @@ def test_the_yaml_rule_files_pass_the_projects_yamllint_line_length():
     assert too_long == []
 
 
+def test_the_markdown_files_pass_the_projects_markdownlint_line_length():
+    """DOC534.277: markdownlint's MD013 expects 80 columns by default; the project states its own limit (.markdownlint.jsonc), the width
+    of its other tools, and the notes respect it. Like markdownlint, a line is allowed to run over when what goes past the limit is a
+    single word (a link, a path) that could not be broken."""
+    import re
+    root = Path(__file__).resolve().parents[1]
+    config = (root / ".markdownlint.jsonc").read_text(encoding="utf-8")
+    limit = int(re.search(r'"MD013":\s*\{\s*"line_length":\s*(\d+)', config).group(1))
+    assert 100 <= limit <= 160
+    too_long = []
+    for name in ("README.md", "CHANGELOG.md", "CHANGELOG.en.md", "frontend/README.md"):
+        for number, line in enumerate((root / name).read_text(encoding="utf-8").splitlines(), 1):
+            if len(line) > limit and " " in line[limit - 1:]:                      # the overflow holds a space: it could have been wrapped
+                too_long.append((name, number, len(line)))
+    assert too_long == []
+
+
 def test_llm_eval_finishes_when_the_model_answers_without_a_date(tmp_path, monkeypatch, capsys):
     # DOC474.112 / .262 claimed `{a.date:<10}` raises on None. It cannot: an answer without a date is read as "XXXX" by
     # parse_llm_json and Analysis.date is a str. This guards that invariant, which the script's formatting relies on.

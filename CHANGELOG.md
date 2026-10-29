@@ -105,8 +105,8 @@ Préparation d'une diffusion publique sous licence MIT.
   bibliothèque confondues, quarantaine dans la bibliothèque). Ils sont enregistrés dans le dossier de l'utilisateur, pas dans
   celui du programme. À la première utilisation, cet écran s'ouvre tout seul.
 - **Règles de l'utilisateur hors du programme** : ce qu'il écrit ou que le programme apprend vit dans son propre dossier
-  (`%LOCALAPPDATA%\DocFlow` sous Windows, `~/.config/docflow` ailleurs). La configuration livrée est vide : plus aucune société, destination ni
-  dossier de l'auteur.
+  (`%LOCALAPPDATA%\DocFlow` sous Windows, `~/.config/docflow` ailleurs). La configuration livrée est vide : plus aucune société, destination
+  ni dossier de l'auteur.
 
 - **Notes de version en anglais et en français** : l'écran suit la langue de l'interface (`CHANGELOG.en.md` et `CHANGELOG.md`).
 
