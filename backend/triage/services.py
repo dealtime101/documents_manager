@@ -186,8 +186,10 @@ def scan(job: ScanJob | None = None) -> dict:
                 f, p = fut.result()
                 # A copy is flagged whatever the order in which results arrive: either an item from an EARLIER scan has
                 # the same content, or a file that sorts before it in THIS batch does.
-                earlier = Item.objects.filter(sha256=p.sha256, state=Item.PENDING).exclude(source_path__in=batch).exists()
-                if p.status != "duplicate" and (earlier or owner.get(p.sha256) not in (None, f)):
+                # A file that could not be read has no SHA (""): it is the same as nothing, not as the other unreadable files.
+                same = Item.objects.filter(sha256=p.sha256, state=Item.PENDING).exclude(source_path__in=batch)
+                earlier = bool(p.sha256) and same.exists()
+                if p.status != "duplicate" and p.sha256 and (earlier or owner.get(p.sha256) not in (None, f)):
                     p.status = "duplicate"  # same content as another file already in the queue
                     p.notes.append("Identical to another file in the queue (SHA-256).")
                 a = p.analysis.model_dump(mode="json") if p.analysis else None

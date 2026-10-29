@@ -741,6 +741,29 @@ def test_one_unreadable_file_does_not_abort_the_scan(api, sb, monkeypatch):
     assert api.post("/api/scan").json()["created"] == 0                    # and a rescan does not pile up duplicates
 
 
+def test_several_unreadable_files_are_errors_not_duplicates_of_each_other(api, sb, monkeypatch):
+    # DOC534.16: an unreadable file has no SHA (""): the second one matched the first one's pending item and was filed as a "duplicate"
+    from docflow import pipeline
+    from triage import services
+    real = pipeline.sha256_file
+
+    def locked(path):
+        if path.name.startswith("locked"):
+            raise PermissionError("locked by another program")
+        return real(path)
+
+    monkeypatch.setattr(services, "sha256_file", locked)
+    monkeypatch.setattr(pipeline, "sha256_file", locked)
+    pdf(sb / "inbox" / "locked1.pdf", HYDRO)
+    pdf(sb / "inbox" / "locked2.pdf", ["Lettre fine", "Le 3 mai 2025"])
+    api.post("/api/scan")                                                   # the first one is now a pending item with no SHA
+    pdf(sb / "inbox" / "locked3.pdf", ["Une autre lettre", "Le 4 mai 2025"])
+    api.post("/api/scan")                                                   # the third meets that item from an EARLIER scan
+    rows = {r["filename"]: r for r in api.get("/api/items").json()}
+    assert {n: rows[n]["status"] for n in ("locked1.pdf", "locked2.pdf", "locked3.pdf")} == {
+        "locked1.pdf": "error", "locked2.pdf": "error", "locked3.pdf": "error"}
+
+
 def test_the_database_itself_allows_only_one_running_scan_and_one_pending_item_per_file(sb):
     from django.db import IntegrityError, transaction
     from triage.models import ScanJob
