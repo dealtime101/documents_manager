@@ -95,6 +95,21 @@ def test_the_windows_build_checks_the_python_version_and_remakes_an_old_build_ve
     assert interpreter < old_venv < script.index("rmdir /s /q .venv-build") < script.index("%PY% -m venv .venv-build")
 
 
+def test_the_front_end_lockfile_resolves_the_versions_that_fix_the_advisories_it_once_had():
+    # DOC534.569 and following: osv-scanner and trivy named these packages in package-lock.json; `npm audit fix` raised them
+    import json
+
+    def version(text):
+        return tuple(int(part) for part in text.split("-")[0].split(".")[:3])
+    packages = json.loads((PACKAGING.parent / "frontend" / "package-lock.json").read_text(encoding="utf-8"))["packages"]
+    at_least = {"vite": "8.3.5", "zod": "4.6.6", "undici": "7.30.1", "fast-uri": "3.1.9", "ip-address": "10.7.5"}
+    found = {name: packages.get(f"node_modules/{name}", {}).get("version") for name in at_least}
+    behind = {name: found[name] for name, floor in at_least.items() if found[name] and version(found[name]) < version(floor)}
+    assert behind == {}, behind
+    assert "node_modules/body-parser" not in packages and "node_modules/qs" not in packages     # the express tree is no longer pulled in
+    assert version("8.3.10") > version("8.3.5") and version("4.6.7") >= version("4.6.6")         # the comparison is numeric, not textual
+
+
 def test_the_tesseract_work_folder_is_assigned_once_where_it_is_used():
     # DOC534.263: it was set before the `if` and again inside it, the same way; only the inner one is read
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
