@@ -29,6 +29,22 @@ def load_script(name: str):
     return module
 
 
+def python_path(*folders: Path) -> str:
+    """A PYTHONPATH for a child process: the folders with the separator of the system (':' or ';'), then the one the environment
+    already had, which is kept, not replaced (DOC534.204)."""
+    return os.pathsep.join([*map(str, folders), *filter(None, [os.environ.get("PYTHONPATH")])])
+
+
+def test_the_pythonpath_of_a_child_uses_the_separator_of_the_system_and_keeps_the_existing_one(monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", "/already/there")
+    assert python_path(Path("/a"), Path("/b")).split(os.pathsep) == [str(Path("/a")), str(Path("/b")), "/already/there"]
+    monkeypatch.delenv("PYTHONPATH")
+    assert python_path(Path("/a")) == str(Path("/a"))                                   # nothing to keep: just the folders
+    source = Path(__file__).read_text(encoding="utf-8")
+    key = '"PYTHONPATH": '                                                              # (built, so that this line is not its own match)
+    assert source.count(key + "python_path(") >= 8 and (key + "str(") not in source and (key + 'f"') not in source
+
+
 def agpl_imports(source: str) -> set[str]:
     """The AGPL PDF library (PyMuPDF, imported as `pymupdf`, or `fitz` as it long was) that a module imports or names in an
     import_module() call, whatever the case: the top-level names found."""
@@ -251,7 +267,7 @@ def test_build_corpus_without_arguments_prints_the_usage_and_keeps_its_command_l
     import os
     import subprocess
     import sys
-    env = {**os.environ, "PYTHONPATH": str(SCRIPTS.parent / "backend")}
+    env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend")}
     script = str(SCRIPTS / "build_corpus.py")
     bare = subprocess.run([sys.executable, script], capture_output=True, text=True, env=env)
     assert bare.returncode == 2 and "usage:" in bare.stderr and "FOLDER" in bare.stderr and "CACHE" in bare.stderr
@@ -331,7 +347,7 @@ def test_discover_help_and_usage_errors_work_when_the_configuration_is_broken(tm
     broken = tmp_path / "config"
     broken.mkdir()
     (broken / "companies.yaml").write_text("- not\n- a mapping\n", encoding="utf-8")
-    env = {**os.environ, "DOCFLOW_CONFIG_DIR": str(broken), "PYTHONPATH": str(SCRIPTS.parent / "backend")}
+    env = {**os.environ, "DOCFLOW_CONFIG_DIR": str(broken), "PYTHONPATH": python_path(SCRIPTS.parent / "backend")}
     script = str(SCRIPTS / "discover.py")
     helped = subprocess.run([sys.executable, script, "--help"], env=env, capture_output=True, text=True, timeout=60)
     assert helped.returncode == 0 and "usage:" in helped.stdout and "Traceback" not in helped.stderr
@@ -376,7 +392,7 @@ def test_discover_takes_the_group_limit_from_the_command_line(tmp_path):
     import sys
     for i, word in enumerate(["Garage Tremblay", "Boutique Lavoie", "Clinique Roy"]):
         make_pdf(tmp_path / f"{i}.pdf", f"{word} et Fils inconnu")
-    env = {**os.environ, "PYTHONPATH": str(SCRIPTS.parent / "backend")}
+    env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend")}
     run = subprocess.run([sys.executable, str(SCRIPTS / "discover.py"), str(tmp_path), "--limit", "1"],
                          capture_output=True, text=True, env=env)
     assert run.returncode == 0 and "... 2 more groups (2 files) not shown" in run.stdout
@@ -388,7 +404,7 @@ def test_discover_refuses_a_folder_that_does_not_exist_instead_of_reporting_zero
     import os
     import subprocess
     import sys
-    env = {**os.environ, "PYTHONPATH": str(SCRIPTS.parent / "backend")}
+    env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend")}
     typo = tmp_path / "scanz"
     run = subprocess.run([sys.executable, str(SCRIPTS / "discover.py"), str(typo)], capture_output=True, text=True, env=env)
     assert run.returncode == 2 and "not a folder" in run.stderr and str(typo) in run.stderr and run.stdout == ""
@@ -441,7 +457,7 @@ def test_compare_without_arguments_prints_the_usage_and_keeps_its_command_line(t
     import os
     import subprocess
     import sys
-    env = {**os.environ, "PYTHONPATH": str(SCRIPTS.parent / "backend")}
+    env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend")}
     script = str(SCRIPTS / "compare.py")
     bare = subprocess.run([sys.executable, script], capture_output=True, text=True, env=env)
     assert bare.returncode == 2 and "usage:" in bare.stderr and "SAMPLE_FOLDER" in bare.stderr
@@ -1522,7 +1538,7 @@ def test_discover_refuses_a_limit_that_is_not_a_positive_whole_number(tmp_path, 
     # DOC474.115: --limit -1 listed every group but the last and said "1 more groups"; 0 listed none, with no error
     import os
     import subprocess
-    env = {**os.environ, "PYTHONPATH": str(SCRIPTS.parent / "backend")}
+    env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend")}
     script = str(SCRIPTS / "discover.py")
     run = subprocess.run([sys.executable, script, str(tmp_path), "--limit", bad], capture_output=True, text=True, env=env)
     assert run.returncode == 2 and "--limit" in run.stderr and "Traceback" not in run.stderr, (bad, run.stderr)
@@ -1576,7 +1592,7 @@ def test_llm_eval_refuses_a_sample_size_that_is_not_a_positive_whole_number_with
     if bad.lstrip("-").isdigit():
         with pytest.raises(ValueError, match="at least 1"):
             llm_eval.main(tmp_path, "fake-model", int(bad))
-    env = {**os.environ, "PYTHONPATH": f"{SCRIPTS.parent / 'backend'}:{SCRIPTS}"}
+    env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend", SCRIPTS)}
     run = subprocess.run([sys.executable, str(SCRIPTS / "llm_eval.py"), str(tmp_path), "fake-model", bad], capture_output=True, text=True, env=env)
     assert run.returncode == 2 and "Traceback" not in run.stderr and "N" in run.stderr and "whole number" in run.stderr, run.stderr
 
@@ -1586,7 +1602,7 @@ def test_llm_eval_with_the_wrong_number_of_arguments_prints_the_usage_not_a_trac
     # DOC534.146: without its three arguments the script ended in an IndexError traceback instead of the usage it declares
     import os
     import subprocess
-    env = {**os.environ, "PYTHONPATH": f"{SCRIPTS.parent / 'backend'}:{SCRIPTS}"}
+    env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend", SCRIPTS)}
     run = subprocess.run([sys.executable, str(SCRIPTS / "llm_eval.py"), *extra], capture_output=True, text=True, env=env, timeout=60)
     assert run.returncode == 2 and "Traceback" not in run.stderr and "IndexError" not in run.stderr
     assert run.stderr.strip().startswith("usage: PYTHONPATH=backend uv run python scripts/llm_eval.py CACHE MODEL N"), run.stderr
