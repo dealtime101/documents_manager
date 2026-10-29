@@ -86,7 +86,7 @@ def test_the_title_of_the_document_follows_the_page_shown():
     import re
     app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
     route = (UI.parents[1] / "route.ts").read_text(encoding="utf-8")
-    pages = re.search(r"export type Page = ([^\n]+)", route).group(1)
+    pages = re.search(r"const PAGES = (\[[^\]]+\])", route).group(1)                             # (the list the type is read from)
     names = dict(re.findall(r"(\w+): 'nav\.(\w+)'", app[app.index("const PAGE_NAME"):app.index("const MAX_SETUP_TRIES")]))
     assert set(names) == set(re.findall(r"'(\w+)'", pages)) and all(k == v for k, v in names.items())   # every page has its own name
     assert "document.title = `${t(PAGE_NAME[page])} \\u00b7 ${t('app.title')}`" in app and "}, [page, t])" in app
@@ -895,6 +895,19 @@ def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
     for block in (en, fr):
         assert "'rules.forgetPatternLabel'" in block and "{pattern}" in block.split("'rules.forgetPatternLabel'")[1].split("\n")[0]
+
+
+def test_the_pages_are_listed_once_and_the_page_type_is_read_from_the_list():
+    # DOC534.264: the type and the array were written twice; a page in the type but not in the array compiled and could not be reached
+    route = (UI.parents[1] / "route.ts").read_text(encoding="utf-8")
+    assert "export type Page = (typeof PAGES)[number]" in route and "export type Page = '" not in route
+    assert "const PAGES: Page[]" not in route and "] as const" in route
+    got = _node_route("""({ every: ['dashboard', 'queue', 'library', 'history', 'search', 'rules', 'settings', 'notes']
+                             .map((p) => m.parseHash('#' + p).page), unknown: m.parseHash('#nope').page })""")
+    assert got == {"every": ["dashboard", "queue", "library", "history", "search", "rules", "settings", "notes"], "unknown": "queue"}
+    app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")                                   # the tabs of the screen: the same pages
+    tabs = set(re.findall(r'<TabsTrigger value="(\w+)">', app))
+    assert tabs == set(got["every"]), tabs
 
 
 def test_the_card_does_not_repeat_for_the_small_size_a_rule_it_has_for_every_size():

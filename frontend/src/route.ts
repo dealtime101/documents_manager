@@ -1,9 +1,10 @@
 import type { Group } from '@/api'
 
-export type Page = 'dashboard' | 'queue' | 'library' | 'history' | 'search' | 'rules' | 'settings' | 'notes'
+// the pages are written once: the type is read from the list, so a page added to the type is in the list (and reachable by URL)
+const PAGES = ['dashboard', 'queue', 'library', 'history', 'search', 'rules', 'settings', 'notes'] as const
+export type Page = (typeof PAGES)[number]
 export type Route = { page: Page; group: Group | null }
 
-const PAGES: Page[] = ['dashboard', 'queue', 'library', 'history', 'search', 'rules', 'settings', 'notes']
 // `satisfies Record<Group, true>` makes the compiler refuse this table when a group is added to (or removed from) the Group type
 // in api.ts, instead of parseHash rejecting the new group in silence
 const GROUP_KEYS = { auto: true, needs_validation: true, duplicates: true, errors: true } satisfies Record<Group, true>
