@@ -6,6 +6,11 @@ from django.urls import include, path, re_path
 from django.views.static import serve
 
 
+# what a browser asks for as a file (scripts, styles, maps, images, fonts, manifests, text): a missing one is a 404, never the app
+FILE_EXTENSIONS = frozenset({".js", ".mjs", ".css", ".map", ".json", ".html", ".txt", ".xml", ".webmanifest", ".svg", ".png", ".jpg", ".jpeg",
+                             ".gif", ".webp", ".avif", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".wasm", ".pdf"})
+
+
 def spa(request, rest=""):
     """Serve the built React interface (frontend/dist); an unknown PAGE falls back to index.html, an unknown FILE is a 404."""
     index = settings.FRONTEND_DIST / "index.html"
@@ -19,7 +24,9 @@ def spa(request, rest=""):
         else:  # index.html by name, favicon...: no hash in the name, so ask again each time (a 304 when unchanged)
             response["Cache-Control"] = "no-cache"
         return response
-    if PurePosixPath(rest).suffix:  # app.js, logo.svg...: a stale hashed bundle must not come back as HTML with a 200
+    # app.js, logo.svg...: a stale hashed bundle must not come back as HTML with a 200. A page whose last segment merely holds a dot
+    # (/releases/v1.2, /users/jean.dupont) is still a page: only the extensions of real files, and anything under assets/, are refused.
+    if rest.startswith("assets/") or PurePosixPath(rest).suffix.lower() in FILE_EXTENSIONS:
         raise Http404("No such file")
     response = FileResponse(index.open("rb"), content_type="text/html")  # FileResponse closes the file once it is sent
     response["Cache-Control"] = "no-cache"  # the page names the current bundles: fetch it again each time (it is tiny)

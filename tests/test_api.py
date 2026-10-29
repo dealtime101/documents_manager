@@ -71,6 +71,11 @@ def test_a_missing_asset_is_a_404_not_the_app_with_a_200(sb, settings, tmp_path)
     for route in ("/", "/queue", "/history", "/queue/some-id", "/v1.2/release"):      # pages (even with a dot mid-path) keep the app
         r = c.get(route)
         assert r.status_code == 200 and b"app" in b"".join(r.streaming_content), route
+    # DOC534.159: a dot in the LAST segment does not make a file of a page; an unknown file under assets/ and any known extension do
+    for route in ("/releases/v1.2", "/users/jean.dupont", "/docs/report.v2"):
+        r = c.get(route)
+        assert r.status_code == 200 and b"app" in b"".join(r.streaming_content), route
+    assert c.get("/assets/chunk-old").status_code == 404 and c.get("/a/B.PNG").status_code == 404
 
 
 def test_hashed_assets_are_cached_for_good_and_the_page_that_names_them_is_always_revalidated(sb, settings, tmp_path):
