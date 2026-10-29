@@ -68,9 +68,15 @@ def route(routing: dict, company: str | None, doc_type: str | None) -> str | Non
 
 
 def unknown_placeholder(rel: str) -> str | None:
-    """The first {...} of a destination that is not {year} (the only one that exists), else None. Left alone it would become a
-    folder named literally '{month}', and the documents would pile up there with no sign of the mistake."""
-    return next((p for p in re.findall(r"\{[^{}]*\}", rel) if p != "{year}"), None)
+    """The first {...} of a destination that is not {year} (the only one that exists), or the part holding a brace that is not
+    closed or not opened, else None. Left alone it would become a folder named literally '{month}' or '{year', and the documents
+    would pile up there with no sign of the mistake."""
+    other = next((p for p in re.findall(r"\{[^{}]*\}", rel) if p != "{year}"), None)
+    if other:
+        return other
+    # a brace that closes nothing or opens nothing ("Factures/{year", "year}/x"): left alone it is a folder named literally like that
+    stray = re.search(r"[^/\\]*[{}][^/\\]*", rel.replace("{year}", ""))
+    return stray.group(0) if stray else None
 
 
 def fill(rel: str, date: str) -> str | None:

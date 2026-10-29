@@ -967,6 +967,23 @@ def test_the_note_says_when_a_configured_type_has_an_unusable_destination(tmp_pa
     assert resolve_destination(cfg, Analysis(date="2025-10-07", company="Zzz", document_type="Facture"))[2] == ["No destination rule."]
 
 
+@pytest.mark.parametrize("rel,wrong", [("Factures/{year", "{year"), ("year}/x", "year}"), ("A/{year}/{year", "{year"), ("a}b/c", "a}b"),
+                                       ("{", "{"), ("{year}x}", "x}"), ("Factures/{Year}", "{Year}")])
+def test_a_brace_that_closes_nothing_or_opens_nothing_is_a_mistake_in_the_destination(rel, wrong, tmp_path):
+    # DOC534.138: "Factures/{year" passed the check and became a folder named literally "{year"
+    from docflow.analyze import Analysis
+    from docflow.config import load_config
+    from docflow.pipeline import resolve_destination
+    from docflow.routing import fill, unknown_placeholder
+    assert unknown_placeholder(rel) == wrong and fill(rel, "2025-10-07") is None
+    cfg = load_config(sandbox=tmp_path)
+    cfg.routing = {"Acme": {"default": {"destination": rel}}}
+    got = resolve_destination(cfg, Analysis(date="2025-10-07", company="Acme", document_type="Facture"))
+    assert got[0] is None and got[2] == [f"The destination uses a placeholder that does not exist: {wrong}"]    # said, not filed there
+    for fine in ("Factures/{year}", "{year}/{year}", "Factures", "Cars/Entretien-{year}"):
+        assert unknown_placeholder(fine) is None
+
+
 def test_an_unusable_default_destination_is_reported_as_a_configuration_mistake_not_as_no_rule(tmp_path):
     # DOC534.137: with a type that is not in the table, a default with an empty destination was passed over and the note said "No rule"
     from docflow.analyze import Analysis
