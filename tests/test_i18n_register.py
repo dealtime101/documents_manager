@@ -21,13 +21,18 @@ SECOND_PERSON = re.compile(
     r"|\w+-en\b", re.IGNORECASE)
 
 
+PAIR = re.compile(r"^\s*(?:'([^']+)'|\"([^\"]+)\"):\s*(?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\")\s*,?\s*$", re.MULTILINE)
+
+
+def _values(start: str, end: str) -> list[tuple[str, str]]:
+    """(key, text) of every `'key': 'text'` line of i18n.tsx between two markers: one reader for both languages (DOC534.273)."""
+    source = I18N.read_text(encoding="utf-8")
+    return [(a or b, c or d) for a, b, c, d in PAIR.findall(source[source.index(start):source.index(end)])]
+
+
 def french_values() -> list[tuple[str, str]]:
     """(key, text) of every French string: the `fr` dictionary and the translated server messages."""
-    source = I18N.read_text(encoding="utf-8")
-    block = source[source.index("const fr"):source.index("const fill")]
-    pairs = re.findall(r"^\s*(?:'([^']+)'|\"([^\"]+)\"):\s*(?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\")\s*,?\s*$",
-                       block, re.MULTILINE)
-    return [(a or b, c or d) for a, b, c, d in pairs]
+    return _values("const fr", "const fill")
 
 
 KEY_AT_TABLE_LEVEL = re.compile(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", re.MULTILINE)
@@ -43,6 +48,17 @@ def keys_the_extraction_missed(block: str, extracted: list[tuple[str, str]]) -> 
 
 def table_block(source: str, start: str, end: str) -> str:
     return source[source.index(start):source.index(end)]
+
+
+def test_the_extraction_and_the_path_of_i18n_are_written_once_in_this_file():
+    # DOC534.273: english_values() copied french_values()'s regular expression, and each test rebuilt the path of i18n.tsx
+    source = Path(__file__).read_text(encoding="utf-8")
+    key_part = "(?:'([^']+)" + "'|"                                                       # (built in two, so that this line is not a match itself)
+    assert source.count(key_part) == 1
+    path_part = '"frontend" / "src" / ' + '"i18n.tsx"'                                    # (built in two, like key_part)
+    assert source.count(path_part) == 1                                                   # the I18N constant, nowhere else
+    assert source.count('"i18n.' + 'tsx")') == 0
+    assert dict(french_values())["queue.scan"] and dict(english_values())["queue.scan"]   # and both languages still read through it
 
 
 def test_every_key_of_the_translation_tables_has_its_text_read():
@@ -76,11 +92,7 @@ def test_french_interface_text_never_addresses_the_user_in_the_second_person():
 
 
 def english_values() -> list[tuple[str, str]]:
-    source = I18N.read_text(encoding="utf-8")
-    block = source[source.index("const en = {"):source.index("export type Key")]
-    pairs = re.findall(r"^\s*(?:'([^']+)'|\"([^\"]+)\"):\s*(?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\")\s*,?\s*$",
-                       block, re.MULTILINE)
-    return [(a or b, c or d) for a, b, c, d in pairs]
+    return _values("const en = {", "export type Key")
 
 
 def test_a_counted_message_has_a_singular_and_a_plural_text_in_both_languages_and_no_plural_marks():
@@ -153,7 +165,7 @@ def test_every_reason_the_settings_screen_can_be_refused_with_has_a_french_text_
     # DOC534.123: the field errors of the server were shown as they came, in English, whatever the language of the screen
     root = Path(__file__).resolve().parents[1]
     server = (root / "backend" / "docflow" / "usersettings.py").read_text(encoding="utf-8")
-    i18n = (root / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    i18n = I18N.read_text(encoding="utf-8")
     from conftest import fr_messages_table
     table = fr_messages_table(i18n)
     keys = {a or b for a, b in re.findall(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", table, re.MULTILINE)}
@@ -181,7 +193,7 @@ def test_the_texts_name_the_inbox_the_way_the_settings_do_and_never_a_fixed_fold
 def test_file_sizes_use_the_units_and_the_number_format_of_the_language():
     # DOC534.68: the library showed "B", "KB", "MB" and a point decimal in French
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
-    src, page = (root / "i18n.tsx").read_text(encoding="utf-8"), (root / "pages" / "Library.tsx").read_text(encoding="utf-8")
+    src, page = I18N.read_text(encoding="utf-8"), (root / "pages" / "Library.tsx").read_text(encoding="utf-8")
     en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
     assert [f"'size.{k}': '{v}'" in en for k, v in (("b", "B"), ("kb", "KB"), ("mb", "MB"))] == [True] * 3
     assert [f"'size.{k}': '{v}'" in fr for k, v in (("b", "o"), ("kb", "Ko"), ("mb", "Mo"))] == [True] * 3
@@ -212,7 +224,7 @@ def test_without_a_saved_choice_the_language_follows_the_browser_and_a_saved_cho
 def test_the_accuracy_summary_has_a_singular_form_chosen_by_the_total():
     # DOC474.29: "1 of 1 filed documents were accepted" with a single filed document
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
-    src = (root / "i18n.tsx").read_text(encoding="utf-8")
+    src = I18N.read_text(encoding="utf-8")
     en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
     for block in (en, fr):
         assert "'acc.summary.one'" in block and "'acc.summary.other'" in block and "'acc.summary':" not in block
@@ -235,7 +247,7 @@ def test_the_api_error_reader_takes_every_kind_of_quote():
 def test_every_error_message_written_in_api_ts_has_a_french_translation():
     # DOC474.59 claimed the client's error messages stay in English: they go through msg(), which needs an entry for each
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
-    api, i18n = (root / "api.ts").read_text(encoding="utf-8"), (root / "i18n.tsx").read_text(encoding="utf-8")
+    api, i18n = (root / "api.ts").read_text(encoding="utf-8"), I18N.read_text(encoding="utf-8")
     from conftest import fr_messages_table
     table = fr_messages_table(i18n)
     keys = re.findall(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", table, re.MULTILINE)
@@ -252,7 +264,7 @@ def test_every_error_message_written_in_api_ts_has_a_french_translation():
 def test_a_month_key_from_the_api_is_shown_as_a_month_name_in_the_language_of_the_page():
     # DOC474.104: the accuracy screen printed '2026-03'; the rest of the interface speaks the reader's language
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
-    i18n, accuracy = (root / "i18n.tsx").read_text(encoding="utf-8"), (root / "components" / "Accuracy.tsx").read_text(encoding="utf-8")
+    i18n, accuracy = I18N.read_text(encoding="utf-8"), (root / "components" / "Accuracy.tsx").read_text(encoding="utf-8")
     assert "month: (key: string) => string" in i18n                                        # part of the language context
     assert "new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })" in i18n
     assert "/^(\\d{4})-(0[1-9]|1[0-2])$/.exec(key)" in i18n and ": key" in i18n                  # a real month, else the key as it is
@@ -262,7 +274,7 @@ def test_a_month_key_from_the_api_is_shown_as_a_month_name_in_the_language_of_th
 def test_the_counters_of_the_months_and_the_bands_come_from_translated_messages():
     # DOC474.105: '3 / 5' and '80-90 %' were written in the code: no word for what is counted, French spacing hard-coded
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
-    i18n, accuracy = (root / "i18n.tsx").read_text(encoding="utf-8"), (root / "components" / "Accuracy.tsx").read_text(encoding="utf-8")
+    i18n, accuracy = I18N.read_text(encoding="utf-8"), (root / "components" / "Accuracy.tsx").read_text(encoding="utf-8")
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
     assert "'acc.untouchedCount.other': '{n} accepted of {total}'" in en and "'acc.untouchedCount.other': '{n} acceptés sur {total}'" in fr
     assert "'acc.band': '{band}%'" in en and "'acc.band': '{band} %'" in fr            # French: a (narrow, no-break) space before %
@@ -274,7 +286,7 @@ def test_the_counters_of_the_months_and_the_bands_come_from_translated_messages(
 def test_a_document_date_from_the_server_is_shown_in_the_language_of_the_page_in_the_search_results():
     # DOC474.123: '2025-10-07' / '2025-10' / '2025' / 'XXXX' were printed as the server sends them
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
-    i18n, search = (root / "i18n.tsx").read_text(encoding="utf-8"), (root / "pages" / "Search.tsx").read_text(encoding="utf-8")
+    i18n, search = I18N.read_text(encoding="utf-8"), (root / "pages" / "Search.tsx").read_text(encoding="utf-8")
     assert "date: (key: string) => string" in i18n                                         # part of the language context
     body = i18n[i18n.index("      date: (key) => {"):]
     body = body[:body.index("      },")]
