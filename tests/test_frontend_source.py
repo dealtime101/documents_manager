@@ -897,6 +897,14 @@ def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
         assert "'rules.forgetPatternLabel'" in block and "{pattern}" in block.split("'rules.forgetPatternLabel'")[1].split("\n")[0]
 
 
+def test_the_card_does_not_repeat_for_the_small_size_a_rule_it_has_for_every_size():
+    # DOC534.262: data-[size=sm]:has-data-[slot=card-footer]:pb-0 said again what has-data-[slot=card-footer]:pb-0 already does
+    card = (UI / "card.tsx").read_text(encoding="utf-8")
+    assert card.count("has-data-[slot=card-footer]:pb-0") == 1                       # once, for every size
+    assert "data-[size=sm]:has-data-[slot=card-footer]:pb-0" not in card
+    assert "data-[size=sm]:[--card-spacing:--spacing(3)]" in card                    # and what really differs for the small size is kept
+
+
 def test_the_comment_of_the_tab_bar_says_what_its_class_does():
     # DOC534.261: it said the row scrolls, but flex-wrap makes it wrap onto several lines
     app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
