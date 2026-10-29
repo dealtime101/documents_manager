@@ -755,7 +755,11 @@ def test_french_texts_get_no_break_spaces_before_punctuation_and_inside_guilleme
       none: m.frenchSpaces('http://x.org:80/a') }""", module="typography")
     assert got["colon"] == "Total : 5" and got["guillemets"] == "Oublier le motif « ACME » de X"
     assert got["marks"] == "Quoi ? Oui ! Bon ; non" and got["plain"] == "Texte sans ponctuation, tout simple."
-    assert got["none"] == "http://x.org:80/a"                                  # a colon with no space before it is left alone
+    # DOC534.14: the characters themselves, by code (a literal no-break space looks like a plain one and is lost in a reformat)
+    nb = chr(0xA0)
+    assert got["colon"] == f"Total{nb}: 5" and got["marks"] == f"Quoi{nb}? Oui{nb}! Bon{nb}; non"
+    assert got["guillemets"] == f"Oublier le motif {chr(0xAB)}{nb}ACME{nb}{chr(0xBB)} de X"
+    assert got["none"] == "http://x.org:80/a"                                # a colon with no space before it is left alone
     i18n = (UI.parents[1] / "i18n.tsx").read_text()
     assert "lang === 'fr' ? frSpaced : en" in i18n and "frMessagesSpaced[text]" in i18n   # the screen reads the spaced copies
 
