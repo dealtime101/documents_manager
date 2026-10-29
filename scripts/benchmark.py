@@ -149,8 +149,8 @@ def score(cache: Path) -> None:
             n["manual"] += 1
     t = n["total"]
     print(f"{t} documents")
-    reasons = ", ".join(f"{left_out[k]} {k}" for k in ("extraction error", "text missing", "name not in the standard form")
-                        if left_out[k]) or "nothing"
+    # every reason counted by load() (as mine() does): a new one can never be left out of the line that promises nothing is silent
+    reasons = ", ".join(f"{n} {why}" for why, n in left_out.items() if why != "entries" and n) or "nothing"
     print(f"  {left_out['entries']} index entries, {t} scored; left out: {reasons}; rates cover the scored documents only")
     print(f"  company recognised : {pc(n['company_found'], t)} (correct: {pc(n['company_ok'], n['company_found'])})")
     print(f"  type recognised    : {pc(n['type_found'], t)} (correct: {pc(n['type_ok'], n['type_found'])})")

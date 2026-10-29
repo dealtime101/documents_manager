@@ -634,6 +634,22 @@ def test_benchmark_usage_errors_print_the_usage_not_a_traceback(argv, capsys):
     assert "usage:" in err and "Traceback" not in err
 
 
+def test_benchmark_score_names_the_entries_left_out_because_their_key_is_not_a_plain_file_name(tmp_path, capsys):
+    # DOC534.105: that reason was counted but missing from the list, so the line could say "left out: nothing" with entries dropped
+    import json
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    good = "2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf"
+    (cache / "k1.txt").write_text("Hydro-Quebec\nFacture d'electricite du 7 octobre 2025\nMontant de la presente facture : 158,98 $")
+    index = [{"key": "k1", "rel": good, "name": good},
+             {"key": "../escape", "rel": "e.pdf", "name": "2025-10-08 - Telus - ReleveMobilite.pdf"}]            # a key that is a path
+    (cache / "index.json").write_text(json.dumps(index))
+    assert load_script("benchmark").main(["score", str(cache)]) == 0
+    out = capsys.readouterr().out
+    assert "2 index entries, 1 scored; left out: 1 key is not a plain file name;" in out                      # counted AND said
+    assert "left out: nothing" not in out
+
+
 def test_benchmark_counts_the_documents_it_leaves_out_by_reason(tmp_path, capsys):
     import json
     cache = tmp_path / "cache"
