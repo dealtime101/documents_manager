@@ -5,7 +5,7 @@ import re
 log = logging.getLogger(__name__)
 # "## [1.2.3] - 2026-01-02", also with a pre-release / build suffix ("1.0.0-beta.1"), trailing spaces, or Keep a Changelog's [YANKED]
 RELEASE = re.compile(r"^## \[(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\] - (\d{4}-\d{2}-\d{2})(?:\s+\[YANKED\])?\s*$")
-ITEM = re.compile(r"^(?:- |\d+\. )(.*)$")
+ITEM = re.compile(r"^(?:[-*+] |\d+\. )(.*)$")  # the three Markdown bullets; "**bold**" has no space after its first star
 
 
 def parse(text: str) -> list[dict]:

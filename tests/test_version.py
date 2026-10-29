@@ -102,6 +102,13 @@ def test_the_intro_of_a_release_without_section_survives_a_heading_that_is_not_a
                    {"version": "0.9.0", "date": "2026-11-20", "intro": "Another.", "sections": []}]
 
 
+def test_the_three_markdown_bullets_are_items_and_a_bold_line_is_not():
+    # DOC534.163: "* " and "+ " are valid Markdown bullets and were skipped in silence
+    from docflow.changelog import parse
+    got = parse("## [1.0.0] - 2026-12-01\n### Added\n- Dash.\n* Star.\n+ Plus.\n1. One.\n**Bold line**, not an item.\n")
+    assert got[0]["sections"] == [{"title": "Added", "items": ["Dash.", "Star.", "Plus.", "One."]}]
+
+
 def test_the_real_changelog_is_read_whole():
     from docflow.changelog import parse
     got = parse((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
