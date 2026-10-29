@@ -816,6 +816,40 @@ def test_a_cross_device_copy_that_fails_midway_leaves_no_partial_file_in_the_lib
     assert not [x for x in (tmp / "lib").rglob("*") if x.is_file()]  # and no partial copy was left behind
 
 
+def test_a_move_whose_checksum_differs_is_put_back_without_overwriting_a_file_that_reappeared(tmp_path, monkeypatch, caplog):
+    # DOC534.73: the undo used os.rename: on POSIX it silently replaced a file that had appeared at the source, and a failure of it
+    # hid the checksum error
+    import logging
+
+    from docflow import pipeline
+    real = pipeline.sha256_file
+
+    def changed_after_the_move(path):
+        return "not-the-recorded-checksum" if path.parent.name == "lib" else real(path)
+    monkeypatch.setattr(pipeline, "sha256_file", changed_after_the_move)
+    (tmp_path / "lib").mkdir()
+    src, dst = tmp_path / "in.pdf", tmp_path / "lib" / "out.pdf"
+    src.write_bytes(b"original")
+    with pytest.raises(OSError, match="checksum mismatch after move"):
+        pipeline._move_verified(src, dst, "the-recorded-checksum")
+    assert src.read_bytes() == b"original" and not dst.exists()                       # the usual case: put back where it was
+    # a new file appeared at the source while the checksum was being computed: it must survive, and the moved one stays findable
+    def changed_and_replaced(path):
+        if path.parent.name == "lib":
+            src.write_bytes(b"someone else's new file")
+            return "not-the-recorded-checksum"
+        return real(path)
+    monkeypatch.setattr(pipeline, "sha256_file", changed_and_replaced)
+    src.unlink()
+    src.write_bytes(b"original")
+    with caplog.at_level(logging.ERROR, logger="docflow"):
+        with pytest.raises(OSError, match="checksum mismatch after move") as caught:
+            pipeline._move_verified(src, dst, "the-recorded-checksum")
+    assert src.read_bytes() == b"someone else's new file"                              # not overwritten
+    assert dst.read_bytes() == b"original" and isinstance(caught.value.__cause__, FileExistsError)   # kept, and the cause is chained
+    assert any("could not be put back" in r.getMessage() and str(dst) in r.getMessage() for r in caplog.records)   # and its place is logged
+
+
 def test_a_cross_device_copy_is_removed_when_the_original_cannot_be_deleted(env, monkeypatch):
     # DOC534.22: the verified copy stayed in the library with no record while the original stayed too: the next run filed a "(2)"
     import errno

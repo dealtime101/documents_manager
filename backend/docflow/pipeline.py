@@ -220,8 +220,13 @@ def _move_verified(src: Path, dst: Path, sha: str) -> None:
             raise
         return
     if sha256_file(dst) != sha:  # the file changed after it was analysed: undo the move
-        os.rename(dst, src)
-        raise OSError(f"checksum mismatch after move: {dst}")
+        mismatch = OSError(f"checksum mismatch after move: {dst}")
+        try:
+            _link_or_rename(dst, src)  # back where it came from, but never over a file that has appeared there since
+        except OSError as e:
+            log.error("MOVED=%s does not match its checksum and could not be put back at %s (%s): it stays where it is", dst, src, e)
+            raise mismatch from e  # the checksum error is the one reported, with the reason the undo failed as its cause
+        raise mismatch
 
 
 def _link_or_rename(src: Path, dst: Path) -> None:
