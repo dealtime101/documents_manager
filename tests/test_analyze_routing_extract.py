@@ -516,8 +516,8 @@ def test_no_page_is_rendered_to_an_image_when_tesseract_is_not_installed(tmp_pat
         _scanned_page(doc)
     doc.save(f)
     renders = []
-    real = extract._png
-    monkeypatch.setattr(extract, "_png", lambda page, dpi: (renders.append(dpi), real(page, dpi))[1])
+    real = extract._render
+    monkeypatch.setattr(extract, "_render", lambda page, dpi: (renders.append(dpi), real(page, dpi))[1])
     monkeypatch.setattr(extract.shutil, "which", lambda _: None)             # no Tesseract on this machine
     e = extract.extract_text(f)
     assert renders == []                                                      # nothing rendered for nothing
@@ -527,6 +527,33 @@ def test_no_page_is_rendered_to_an_image_when_tesseract_is_not_installed(tmp_pat
     monkeypatch.setattr(extract, "detect_rotation", lambda *a: 0)
     extract.extract_text(f)
     assert sorted(renders) == [150] * 5 + [300] * 5                           # with Tesseract: both renders, as before
+
+
+def test_only_the_render_holds_the_pdfium_lock_the_png_encoding_does_not(tmp_path, monkeypatch):
+    # DOC534.82: the row copy and zlib.compress of a page of several megapixels ran under _PDFIUM and serialised the parallel analyses
+    import threading
+    f = tmp_path / "one.pdf"
+    doc = pymupdf.open()
+    _scanned_page(doc)
+    doc.save(f)
+    held = {}
+
+    def free_for_others() -> bool:
+        """Can ANOTHER thread take the lock now? (an RLock held by this thread refuses it)"""
+        got = []
+        t = threading.Thread(target=lambda: got.append(extract._PDFIUM.acquire(blocking=False)) or (got[0] and extract._PDFIUM.release()))
+        t.start()
+        t.join()
+        return got[0]
+    real_render, real_encode = extract._render, extract._png_of
+    monkeypatch.setattr(extract, "_render", lambda page, dpi: held.setdefault("render", []).append(free_for_others()) or real_render(page, dpi))
+    monkeypatch.setattr(extract, "_png_of", lambda r: held.setdefault("encode", []).append(free_for_others()) or real_encode(r))
+    monkeypatch.setattr(extract.shutil, "which", lambda _: "/usr/bin/tesseract")
+    monkeypatch.setattr(extract, "ocr_image", lambda *a: "TEXTE")
+    monkeypatch.setattr(extract, "detect_rotation", lambda *a: 0)
+    extract.extract_text(f)
+    assert held["render"] == [False, False]      # PDFium is used under the lock, for the orientation render and the OCR render
+    assert held["encode"] == [True, True]        # and the PNG is built once it is released
 
 
 def test_with_ocr_disabled_the_pages_without_text_are_reported_not_silently_skipped(tmp_path, monkeypatch):

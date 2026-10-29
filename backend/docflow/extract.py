@@ -47,11 +47,17 @@ def _page_text(page) -> str:
         textpage.close()
 
 
-def _png(page, dpi: float) -> bytes:
-    """The page as a grey PNG at `dpi`, for Tesseract. Written here (a header, one zlib stream) so that no imaging library is needed."""
+def _render(page, dpi: float) -> tuple[int, int, int, bytes]:
+    """PDFium's share of the work, to be done HOLDING _PDFIUM: the grey bitmap of the page at `dpi` (width, height, stride, bytes).
+    Nothing slower than the render and the copy of its buffer is done here."""
     bitmap = page.render(scale=dpi / 72, grayscale=True)
-    width, height, stride = bitmap.width, bitmap.height, bitmap.stride
-    raw = bytes(bitmap.buffer)
+    return bitmap.width, bitmap.height, bitmap.stride, bytes(bitmap.buffer)
+
+
+def _png_of(rendered: tuple[int, int, int, bytes]) -> bytes:
+    """The grey PNG of a rendered page, for Tesseract. Written here (a header, one zlib stream) so that no imaging library is needed.
+    Pure computation on bytes: done AFTER _PDFIUM is released, so that other documents can use PDFium meanwhile."""
+    width, height, stride, raw = rendered
     rows = b"".join(b"\x00" + raw[y * stride:y * stride + width] for y in range(height))  # filter byte 0 (none) before each row
 
     def chunk(kind: bytes, data: bytes) -> bytes:
@@ -247,12 +253,14 @@ def extract_text(path: Path, ocr: dict | None = None) -> Extracted:
             else:
                 started = time.monotonic()  # one budget for the page: the orientation check and the OCR share OCR_TIMEOUT
                 with _PDFIUM:
-                    osd_png = _png(page, round(osd_dpi))
+                    osd_image = _render(page, round(osd_dpi))
+                osd_png = _png_of(osd_image)  # outside the lock
                 angle = detect_rotation(osd_png, exe, OSD_TIMEOUT)
                 with _PDFIUM:
                     if angle:  # sideways or upside-down scan: straighten the page before OCR
                         page.set_rotation((page.get_rotation() + angle) % 360)
-                    ocr_png = _png(page, round(ocr_dpi))
+                    ocr_image_data = _render(page, round(ocr_dpi))
+                ocr_png = _png_of(ocr_image_data)
                 left = max(MIN_OCR_SECONDS, OCR_TIMEOUT - (time.monotonic() - started))
                 o = ocr_image(ocr_png, exe, ocr.get("languages", "fra+eng"), left)
                 if o is None:
