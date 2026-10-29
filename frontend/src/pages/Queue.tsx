@@ -166,9 +166,14 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
   }
   // a bulk action reloads the list and rebuilds the form from the server: like select(), never drop a typed edit unasked
   const keepEdit = () => !dirty || confirm(t('queue.confirmDiscard'))
+  const afterAuto = useRef(0)  // where the previous "approve automatic" stopped: what failed there is not tried again at once
   const approveAuto = () => {
     if (!keepEdit()) return
-    return run(async () => summary(await api.approveAuto()), sel)  // sel: the current item stays if it is still in the list
+    return run(async () => {
+      const r = await api.approveAuto(afterAuto.current)
+      afterAuto.current = r.remaining ? r.next_after ?? 0 : 0  // nothing left beyond: start from the front again next time
+      return summary(r)
+    }, sel)  // sel: the current item stays if it is still in the list
   }
   const approveSelected = () => {
     if (!confirm(t('queue.confirmBatch', { n: ticks.length })) || !keepEdit()) return  // declined: nothing reloads, the selection and the form stay

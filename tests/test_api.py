@@ -1504,6 +1504,31 @@ def test_approve_all_auto_files_at_most_one_batch_and_says_how_many_remain(api, 
     assert len(second["approved"]) == 1 and second["remaining"] == 0
 
 
+def test_approve_all_auto_does_not_count_failures_as_remaining_and_goes_on_after_them(api, sb, monkeypatch):
+    # DOC534.57: failures stayed pending, were counted as `remaining` and came first in every batch: the screen retried them for ever
+    from triage import services
+    for n in (1, 2, 3, 4):
+        pdf(sb / "inbox" / f"h{n}.pdf", HYDRO[:1] + [f"Facture d'electricite du {n} octobre 2025", f"Numero de facture : 10000000{n}",
+                                                    "Montant de la presente facture : 158,98 $"])
+    api.post("/api/scan")
+    ids = list(Item.objects.filter(engine_status="auto").order_by("id").values_list("id", flat=True))
+    assert len(ids) == 4
+    monkeypatch.setattr(services, "MAX_BATCH", 2)
+    real = services.approve
+
+    def fails_for_the_first_two(it):
+        if it.id in ids[:2]:
+            raise services.ApiError("locked by another program")
+        return real(it)
+    monkeypatch.setattr(services, "approve", fails_for_the_first_two)
+    first = api.post("/api/items/approve-auto", {}, format="json").json()
+    assert first["approved"] == [] and len(first["failed"]) == 2 and first["remaining"] == 2 and first["next_after"] == ids[1]
+    second = api.post("/api/items/approve-auto", {"after": first["next_after"]}, format="json").json()
+    assert second["approved"] == ids[2:] and second["remaining"] == 0           # the failures no longer hold the front of the queue
+    assert api.post("/api/items/approve-auto", {"after": -1}, format="json").status_code == 400
+    assert api.post("/api/items/approve-auto", {"after": "x"}, format="json").status_code == 400
+
+
 def test_a_hand_typed_name_survives_the_edit_of_another_field_until_it_is_cleared(api, sb):
     # DOC474.22: the destination had a "chosen by the human" flag (_dir_user), the name did not
     pdf(sb / "inbox" / "hydro.pdf", HYDRO)

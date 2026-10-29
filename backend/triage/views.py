@@ -244,7 +244,10 @@ def scan_status(request):
 
 @api_view(["POST"])
 def approve_auto(request):
-    return Response(s.approve_all_auto())
+    after = request.data.get("after", 0) if isinstance(request.data, dict) else 0
+    if isinstance(after, bool) or not isinstance(after, int) or after < 0:
+        return err(ValueError("after must be a whole number of at least 0"))
+    return Response(s.approve_all_auto(after))
 
 
 @api_view(["POST"])

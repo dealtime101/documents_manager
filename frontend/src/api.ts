@@ -86,7 +86,7 @@ export interface ScanJob {
 }
 
 /** The answer of a bulk approval: what was filed, and every id that was not (with the reason). */
-export type Batch = { approved: number[]; failed: { id: number; detail: string }[]; remaining?: number }  // remaining: the limit of one request was reached
+export type Batch = { approved: number[]; failed: { id: number; detail: string }[]; remaining?: number; next_after?: number }  // remaining: not reached by this request; next_after: where to go on
 
 /** The four disjoint categories of pending documents: the dashboard counts them, the queue can be limited to one. */
 export type Group = 'auto' | 'needs_validation' | 'duplicates' | 'errors'
@@ -210,7 +210,7 @@ export const api = {
   remove: (id: number) => call('POST', `/api/items/${id}/remove`),
   scan: () => call<{ job: ScanJob }>('POST', '/api/scan'),
   scanStatus: () => call<ScanJob>('GET', '/api/scan/status'),
-  approveAuto: () => call<Batch>('POST', '/api/items/approve-auto'),
+  approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after }),  // after: where the previous request stopped
   search: (q: string) => call<SearchHit[]>('GET', `/api/search?${new URLSearchParams({ q })}`),
   stats: () => call<Accuracy>('GET', '/api/stats'),
   rules: () => call<LearnedRules>('GET', '/api/rules'),

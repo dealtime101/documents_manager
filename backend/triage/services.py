@@ -531,13 +531,15 @@ def decide(it: Item, state: str) -> Item:
 MAX_BATCH = 200  # what one request may approve: a tick-box selection, not the whole archive
 
 
-def approve_all_auto() -> dict:
-    """At most MAX_BATCH per request (each approval moves a file on the NAS): `remaining` tells the screen to go on."""
+def approve_all_auto(after: int = 0) -> dict:
+    """At most MAX_BATCH per request (each approval moves a file on the NAS). `remaining` is what this request did NOT reach, and
+    `next_after` is where the next request goes on: the items that failed here stay pending but are not tried again at once, or a
+    batch of failures would hold the front of the queue for ever."""
     auto = Item.objects.filter(state=Item.PENDING, engine_status="auto")
-    batch = list(auto.order_by("id")[:MAX_BATCH])
+    batch = list(auto.filter(id__gt=after).order_by("id")[:MAX_BATCH])
     result = approve_many(batch)
-    # counted AFTER, from the database: a failed item is still pending and still counts, an approved one does not
-    return {**result, "remaining": auto.count()}
+    last = batch[-1].id if batch else after
+    return {**result, "remaining": auto.filter(id__gt=last).count(), "next_after": last}
 
 
 def approve_selected(ids: object) -> dict:

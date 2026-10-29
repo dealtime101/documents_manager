@@ -396,6 +396,14 @@ def test_bulk_approvals_ask_before_dropping_an_edit_and_keep_the_current_item():
     assert "const keepEdit = () => !dirty || confirm(t('queue.confirmDiscard'))" in queue
 
 
+def test_approve_automatic_goes_on_after_the_point_where_the_previous_press_stopped():
+    # DOC534.57: pressing again retried the same failures first
+    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text()
+    body = queue[queue.index("const afterAuto = useRef(0)"):queue.index("const approveSelected")]
+    assert "api.approveAuto(afterAuto.current)" in body and "afterAuto.current = r.remaining ? r.next_after ?? 0 : 0" in body
+    assert "approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after })" in (UI.parents[1] / "api.ts").read_text()
+
+
 def test_the_sidebar_focus_ring_reaches_3_to_1_on_its_background_in_both_themes():
     # DOC474.97 (WCAG 1.4.11): a grey oklch(L 0 0) has a relative luminance of about L**3
     css = (UI.parents[1] / "index.css").read_text()
