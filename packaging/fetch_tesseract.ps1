@@ -6,7 +6,11 @@ param([string]$From = "",  # an existing Tesseract folder to copy from (skips th
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $out = Join-Path $root "packaging\tesseract"
-if (Test-Path (Join-Path $out "tesseract.exe")) { Write-Host "Tesseract already prepared in $out"; exit 0 }
+# "Already prepared" means EVERYTHING is there: a run that stopped after copying tesseract.exe must start again, not count as done
+$needed = "tesseract.exe", "tessdata\eng.traineddata", "tessdata\osd.traineddata", "tessdata\fra.traineddata"
+$missing = @($needed | Where-Object { -not (Test-Path (Join-Path $out $_)) })
+$dlls = @(Get-ChildItem -Path $out -Filter "*.dll" -ErrorAction SilentlyContinue)
+if ($missing.Count -eq 0 -and $dlls.Count -gt 0) { Write-Host "Tesseract already prepared in $out"; exit 0 }
 $work = Join-Path $root "build\tesseract-src"
 $install = $From
 if (-not $install) {

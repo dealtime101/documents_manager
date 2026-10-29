@@ -21,6 +21,16 @@ def test_the_language_data_comes_from_one_pinned_commit_and_every_file_is_checke
     assert '"blob $($bytes.Length)" + [char]0' in script
 
 
+def test_a_tesseract_folder_that_lacks_a_language_or_its_dlls_is_not_taken_for_prepared():
+    # DOC534.47: only tesseract.exe was looked for, so a run interrupted after the copy of the executable was "already prepared"
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    assert 'if (Test-Path (Join-Path $out "tesseract.exe")) {' not in script
+    first = script[:script.index("exit 0")]
+    for needed in ("tesseract.exe", "tessdata\\eng.traineddata", "tessdata\\osd.traineddata", "tessdata\\fra.traineddata", "*.dll"):
+        assert needed in first                                                   # every file the program carries is part of the test
+    assert "$missing.Count -eq 0 -and $dlls.Count -gt 0" in first
+
+
 def test_the_tesseract_installer_is_never_run_without_a_hash_to_check_it_against():
     # DOC534.45: "SHA256_PLACEHOLDER" switched the check off and the downloaded installer was run and shipped unchecked
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
