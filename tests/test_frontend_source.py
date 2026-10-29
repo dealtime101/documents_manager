@@ -1189,11 +1189,20 @@ def test_french_texts_get_no_break_spaces_before_punctuation_and_inside_guilleme
     assert "lang === 'fr' ? frSpaced : en" in i18n and "frMessagesSpaced[text]" in i18n   # the screen reads the spaced copies
 
 
-def test_the_lists_in_the_queue_messages_use_the_same_separator_in_both_languages():
-    # DOC474.35: failures were joined with " ; ", what was learned with "; "
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert "join(' ; ')" not in queue
-    assert queue.count(".join('; ')") == 2
+def test_the_lists_in_the_messages_use_one_localized_separator_in_both_languages():
+    # DOC474.35: failures were joined with " ; ", what was learned with "; ". DOC534.227: and in French the semicolon asks for a
+    # no-break space before it, which frenchSpaces never gives to a separator built at run time
+    pages = UI.parents[1] / "pages"
+    queue, library = (pages / "Queue.tsx").read_text(encoding="utf-8"), (pages / "Library.tsx").read_text(encoding="utf-8")
+    for source in (queue, library):
+        assert ".join('; ')" not in source and ".join(' ; ')" not in source              # no hand-written semicolon separator left
+    assert queue.count("joined(") == 2 and "list(r.learned" in library
+    i18n = (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
+    assert "list: (items) => joinList(items, lang === 'fr')" in i18n
+    got = _node_route("""({ en: m.joinList(['a', 'b', 'c'], false), fr: m.joinList(['a', 'b', 'c'], true), one: m.joinList(['a'], true),
+      none: m.joinList([], true) })""", module="typography")
+    nb = chr(0xA0)
+    assert got == {"en": "a; b; c", "fr": f"a{nb}; b{nb}; c", "one": "a", "none": ""}
 
 
 def test_every_loading_message_is_announced_to_screen_readers():

@@ -85,7 +85,7 @@ function MovePicker({ from, onPick, onCancel }: { from: string; onPick: (to: str
 
 /** The right-hand form of a PDF: read the document for a proposal, correct it, and re-file it under its new name and folder. */
 function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: string) => void; setNote: (n: { ok: boolean; text: string } | null) => void }) {
-  const { t, msg } = useI18n()
+  const { t, msg, list } = useI18n()
   const [form, setForm] = useState<LibraryFields>(EMPTY)
   const [relDir, setRelDir] = useState('')
   const [finalName, setFinalName] = useState('')
@@ -129,7 +129,7 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
     setBusy(true)
     try {
       const r = await api.libraryApply(file, form, relDir, finalName)
-      const learned = r.learned.map((l) => t(`learned.${l.kind}`, { v: l.value, c: l.company })).join('; ')
+      const learned = list(r.learned.map((l) => t(`learned.${l.kind}`, { v: l.value, c: l.company })))
       setNote({ ok: true, text: t('library.filed', { path: r.path }) + (learned ? ` ${t('queue.learned', { list: learned })}` : '') })
       onFiled(r.path)
     } catch (e) { setProblem(errorText(e)) } finally { setBusy(false) }

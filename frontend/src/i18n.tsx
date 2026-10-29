@@ -1,6 +1,6 @@
 // Minimal i18n: English by default, French on demand. The choice is remembered in the browser (best effort).
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { frenchSpaces } from '@/typography'
+import { frenchSpaces, joinList } from '@/typography'
 
 export type Lang = 'en' | 'fr'
 
@@ -570,6 +570,8 @@ interface Ctx {
   /** A document date from the server ('2025-10-07', '2025-10', '2025') as '7 octobre 2025' / 'October 7, 2025'; 'XXXX' (unknown)
    *  and anything else is shown as it is. */
   date: (key: string) => string
+  /** Items on one line, separated as the language writes it: 'a; b' in English, 'a ; b' (no-break space before the semicolon) in French. */
+  list: (items: string[]) => string
 }
 
 const I18n = createContext<Ctx | null>(null)
@@ -598,6 +600,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       (typeof n === 'number' ? words[`${k}.${plural.select(n)}`] ?? words[`${k}.other`] : undefined) ?? words[k]
     return {
       lang, setLang,
+      list: (items) => joinList(items, lang === 'fr'),
       percent: (ratio) => (ratio === undefined ? '—' : percent.format(ratio)),
       month,
       date: (key) => {

@@ -23,7 +23,7 @@ const GROUP_LABEL: Record<Group, AskKey> = {  // the same names as the dashboard
 }
 
 export default function Queue({ group, onShowAll }: { group: Group | null; onShowAll: () => void }) {
-  const { t, msg, percent } = useI18n()
+  const { t, msg, percent, list: joined } = useI18n()
   const [items, setItems] = useState<Item[]>([])
   const [total, setTotal] = useState(0)
   const [sel, setSel] = useState<number | null>(null)
@@ -156,7 +156,7 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
     // the server's answer decides: an item can turn into a duplicate between the scan and the click
     if (r.item.status === 'duplicate') return t('queue.quarantined')
     const sentences = [t('queue.filed')]  // each message is a complete sentence: they are joined by a space
-    if (r.learned.length) sentences.push(t('queue.learned', { list: r.learned.map(describe).join('; ') }))
+    if (r.learned.length) sentences.push(t('queue.learned', { list: joined(r.learned.map(describe)) }))
     if (r.learning_failed) sentences.push(t('queue.learningFailed'))
     return sentences.join(' ')
   })
@@ -164,7 +164,7 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
     const name = (id: number) => items.find((i) => i.id === id)?.filename ?? `#${id}`
     let text = t('queue.approvedMany', { n: r.approved.length })  // each message is a COMPLETE sentence, punctuation included
     if (r.failed.length) {
-      const list = r.failed.map((f) => `${name(f.id)} (${msg(f.detail)})`).join('; ')  // the same separator as the list of what was learned, in both languages
+      const list = joined(r.failed.map((f) => `${name(f.id)} (${msg(f.detail)})`))  // the same separator as the list of what was learned, in both languages
       text += ` ${t('queue.failedMany', { n: r.failed.length, list })}`
     }
     if (r.remaining) text += ` ${t('queue.moreToApprove', { n: r.remaining })}`  // one request files at most MAX_BATCH: press again
