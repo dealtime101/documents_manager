@@ -41,6 +41,14 @@ def test_a_failed_tesseract_install_stops_the_script_with_its_own_message():
     assert script.index("has no tesseract.exe", run) < script.index("Copy-Item (Join-Path $install \"tesseract.exe\")")
 
 
+def test_the_tesseract_script_does_not_promise_that_nothing_stays_installed():
+    # DOC534.155: the header said nothing is left on the machine, but the NSIS installer is run and never uninstalled
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    assert "nothing is left installed" not in script and "never into the system" not in script
+    head = script[:script.index("param(")]
+    assert "not uninstalled" in head and "uninstall entry" in head and "-From" in head
+
+
 def test_the_tesseract_installer_is_never_run_without_a_hash_to_check_it_against():
     # DOC534.45: "SHA256_PLACEHOLDER" switched the check off and the downloaded installer was run and shipped unchecked
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")

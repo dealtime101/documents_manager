@@ -1,6 +1,8 @@
 # Prepares packaging\tesseract\ : tesseract.exe, its DLLs and the language data (eng, fra, osd) that the executable carries.
 # The official Windows build of Tesseract (UB Mannheim, Apache-2.0) is downloaded, checked against a pinned SHA-256, installed
-# silently into build\ (never into the system) and copied; nothing is left installed on the machine.
+# silently into a folder of build\ (the files are not put in Program Files) and copied. The NSIS installer is run, not unpacked and
+# not uninstalled: it may still leave an uninstall entry in the registry or shortcuts on the build machine. Use a throwaway build
+# machine or CI runner, or pass -From with a Tesseract folder you already have to skip the installer.
 param([string]$From = "",  # an existing Tesseract folder to copy from (skips the download and the installer)
       [string]$Sha256 = "")  # the SHA-256 the installer must have, while none is pinned below
 $ErrorActionPreference = "Stop"
