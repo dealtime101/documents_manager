@@ -521,7 +521,11 @@ def test_compare_names_the_files_whose_extraction_failed_and_why(tmp_path, capsy
     section = out.split("EXTRACTION ERRORS (2,")[1]
     assert "2025-10-08 - Hydro-Quebec - FactureElectricite - 20.00$.pdf" in section      # which file...
     assert "2025-10-09 - Hydro-Quebec - FactureElectricite - 30.00$.pdf" in section
-    assert "PdfiumError" in section or "Error" in section                              # ...and why (the exception type)
+    # ...and why: the type of the exception, on the very line of each file that failed (DOC534.198: "Error" anywhere was enough)
+    import re
+    for name in ("2025-10-08 - Hydro-Quebec", "2025-10-09 - Hydro-Quebec"):
+        line = next(ln for ln in section.splitlines() if name in ln)
+        assert re.search(r"\b\w+Error:", line), line
     assert "extraction: {'text': 1, 'error': 2}" in out                                    # the counter is still there
 
 
