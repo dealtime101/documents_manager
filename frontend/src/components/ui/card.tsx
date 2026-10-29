@@ -32,8 +32,8 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-/** `as` makes the title a real heading. The default stays a `div`: a card inside a <button> (the dashboard tiles) must not
- *  hold a heading, which is not valid HTML there. */
+/** `as` makes the title a real heading; the page chooses the level. The default stays a `div` for a title that is not a heading.
+ *  A Card is made of <div>s, so it never goes inside a <button> or a link: the dashboard tiles are buttons made of spans. */
 function CardTitle({ as: Tag = "div", className, ...props }: React.ComponentProps<"div"> & { as?: "div" | "h1" | "h2" | "h3" }) {
   return (
     <Tag

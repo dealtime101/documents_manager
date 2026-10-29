@@ -768,6 +768,13 @@ def test_the_dashboard_comment_says_the_today_tile_opens_the_unfiltered_history(
     assert "newest first" in page and "not filtered by date" in page
 
 
+def test_the_card_title_comment_does_not_bless_a_card_inside_a_button():
+    # DOC534.151: it said a card inside a <button> is fine if the title is no heading, but the card itself is made of <div>s
+    card = (UI / "card.tsx").read_text()
+    assert "a card inside a <button>" not in card
+    assert "never goes inside a <button>" in card
+
+
 def test_a_dashboard_tile_is_a_button_made_of_inline_elements_only():
     # DOC474.80: Card, CardHeader and CardContent render <div>s; a <button> may only hold phrasing content
     page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text()
