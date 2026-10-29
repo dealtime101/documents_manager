@@ -768,6 +768,13 @@ def test_the_dashboard_comment_says_the_today_tile_opens_the_unfiltered_history(
     assert "newest first" in page and "not filtered by date" in page
 
 
+def test_the_notes_inline_markup_only_styles_the_matches_of_the_split():
+    # DOC534.152: "**unclosed" is no match, yet startsWith('**') made it bold and cut two characters off each end
+    page = (UI.parents[1] / "pages" / "Notes.tsx").read_text()
+    assert "i % 2 === 1 && part.startsWith('**')" in page and "i % 2 === 1 && part.startsWith('`')" in page
+    assert "\n        part.startsWith(" not in page
+
+
 def test_the_card_title_comment_does_not_bless_a_card_inside_a_button():
     # DOC534.151: it said a card inside a <button> is fine if the title is no heading, but the card itself is made of <div>s
     card = (UI / "card.tsx").read_text()

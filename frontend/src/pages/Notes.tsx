@@ -7,9 +7,10 @@ import { useI18n } from '@/i18n'
 function Inline({ text }: { text: string }) {
   return (
     <>
+      {/* split() with a capture group puts the matches at the ODD indexes: an unclosed "**x" or "`x" is plain text at an even one */}
       {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((part, i) =>
-        part.startsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong>
-          : part.startsWith('`') ? <code key={i} className="rounded bg-slate-100 px-1 text-[0.9em]">{part.slice(1, -1)}</code>
+        i % 2 === 1 && part.startsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong>
+          : i % 2 === 1 && part.startsWith('`') ?<code key={i} className="rounded bg-slate-100 px-1 text-[0.9em]">{part.slice(1, -1)}</code>
             : <Fragment key={i}>{part}</Fragment>)}
     </>
   )
