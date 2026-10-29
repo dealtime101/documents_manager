@@ -1066,7 +1066,8 @@ def test_an_error_that_is_not_an_api_error_is_logged_and_shown_as_a_generic_tran
                  "pages/History.tsx", "pages/Queue.tsx"):
         assert "errorText(" in (src / page).read_text(encoding="utf-8"), page
     i18n = (src / "i18n.tsx").read_text(encoding="utf-8")
-    assert "'Unexpected error.':" in i18n[i18n.index("const frMessages"):]       # and its French text exists
+    from conftest import fr_messages_table
+    assert "'Unexpected error.':" in fr_messages_table(i18n)                      # and its French text exists
 
 
 def test_the_contrast_figures_quoted_in_the_focus_ring_comment_are_the_computed_ones():

@@ -1372,7 +1372,8 @@ def test_the_missing_tesseract_note_reads_naturally_and_old_stored_notes_stay_tr
     assert "This page is an image and Tesseract was not found: OCR is unavailable." in p.notes
     assert not any(n.startswith("Image page and") for n in p.notes)
     table = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
-    fr = table[table.index("const frMessages"):]
+    from conftest import fr_messages_table
+    fr = fr_messages_table(table)                                                               # the French table only (DOC534.215)
     assert "'This page is an image and Tesseract was not found: OCR is unavailable.'" in fr     # the new text is translated...
     assert "'Image page and Tesseract not found: OCR unavailable.'" in fr                       # ...and so are the notes already stored
 

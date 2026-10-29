@@ -80,12 +80,28 @@ def test_the_empty_queue_message_quotes_the_exact_label_of_the_scan_button_in_bo
         assert label in empty, (label, empty)
 
 
+def test_the_french_table_reader_takes_that_table_only_and_says_clearly_when_it_cannot_find_it():
+    # DOC534.215: not "everything to the end of the file", and not a bare ValueError when the constant is renamed
+    import pytest
+    from conftest import fr_messages_table
+    source = "const en = {\n  'a': 'in en',\n}\nconst frMessages = {\n  'b': 'fr',\n}\nconst other = {\n  'c': 'elsewhere',\n}\n"
+    table = fr_messages_table(source)
+    assert "'b'" in table and "'a'" not in table and "'c'" not in table
+    with pytest.raises(AssertionError, match="no longer declares"):
+        fr_messages_table("const fr = {\n}\n")
+    real = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    assert "const frSpaced" not in fr_messages_table(real) and fr_messages_table(real).count("\n") > 50   # the real table, cut at its end
+    old_way = "index(" + '"const frMessages")'                                          # (built, so that this line is not its own match)
+    assert not [p.name for p in Path(__file__).parent.glob("test_*.py") if old_way in p.read_text(encoding="utf-8")]
+
+
 def test_every_reason_the_settings_screen_can_be_refused_with_has_a_french_text_and_goes_through_msg():
     # DOC534.123: the field errors of the server were shown as they came, in English, whatever the language of the screen
     root = Path(__file__).resolve().parents[1]
     server = (root / "backend" / "docflow" / "usersettings.py").read_text(encoding="utf-8")
     i18n = (root / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
-    table = i18n[i18n.index("const frMessages"):]
+    from conftest import fr_messages_table
+    table = fr_messages_table(i18n)
     keys = {a or b for a, b in re.findall(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", table, re.MULTILINE)}
     texts = re.findall(r'errors(?:\[[^\]]+\])? = (?:f)?"([^"]+)"', server) + re.findall(r'\n\s+return f"([^"]*\{p\}[^"]*)"', server)
     texts += re.findall(r'errors\.setdefault\("[a-z_]+", "([^"]+)"\)', server)
@@ -152,7 +168,8 @@ def test_every_error_message_written_in_api_ts_has_a_french_translation():
     # DOC474.59 claimed the client's error messages stay in English: they go through msg(), which needs an entry for each
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
     api, i18n = (root / "api.ts").read_text(encoding="utf-8"), (root / "i18n.tsx").read_text(encoding="utf-8")
-    table = i18n[i18n.index("const frMessages"):]
+    from conftest import fr_messages_table
+    table = fr_messages_table(i18n)
     keys = re.findall(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", table, re.MULTILINE)
     keys = [a or b for a, b in keys]
     literals = [text for _, text in re.findall(r"new ApiError\(\s*(['`])(.+?)\1", api)]
