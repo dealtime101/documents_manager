@@ -810,8 +810,18 @@ def test_two_simultaneous_scan_requests_start_one_job_not_two(api, sb, monkeypat
     from django.db.models.query import QuerySet
     from triage.models import ScanJob
     live = ScanJob.objects.create(state="running", total=5, done=1)
-    monkeypatch.setattr(QuerySet, "first", lambda self: None)         # B's check-then-create sees an empty table
+    # DOC534.188: only B's one read of the running scan is blinded (the first .first() on a ScanJob queryset), not every .first() of the
+    # process; the test says that this read happened, so it cannot pass without going through the check-then-create it simulates
+    real_first, blinded = QuerySet.first, []
+
+    def first_once_blind(self):
+        if self.model is ScanJob and not blinded:
+            blinded.append(self.query.where)
+            return None                                               # B's check-then-create sees an empty table
+        return real_first(self)
+    monkeypatch.setattr(QuerySet, "first", first_once_blind)
     res = api.post("/api/scan").json()
+    assert len(blinded) == 1 and [c.rhs for c in blinded[0].children] == ["running"]   # the blinded read is the one for the running scan
     assert ScanJob.objects.filter(state="running").count() == 1       # still exactly one active scan
     assert res["job"]["state"] == "running" and res["job"]["total"] == 5 and ScanJob.objects.get(pk=live.pk)
 
