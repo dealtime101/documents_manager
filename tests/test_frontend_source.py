@@ -81,6 +81,19 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_an_error_of_the_extra_folders_names_its_line_and_is_tied_to_the_box():
+    # DOC534.125: the box had no aria-invalid / aria-describedby and the message did not say which of the lines was refused
+    got = _node_route("""({ plain: [m.lineOfEntry('a\\nb\\nc', 0), m.lineOfEntry('a\\nb\\nc', 2)],
+                         blanks: [m.lineOfEntry('\\n\\n/x\\n  \\n/y\\n', 0), m.lineOfEntry('\\n\\n/x\\n  \\n/y\\n', 1)],
+                         none: [m.lineOfEntry('a', 3), m.lineOfEntry('', 0), m.lineOfEntry('a', NaN)] })""", module="paths")
+    assert got == {"plain": [1, 3], "blanks": [3, 5], "none": [None, None, None]}      # the 2nd entry sent is on line 5 of the box
+    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+    assert "aria-invalid={extraErrors.length ? true : undefined}" in settings and "aria-describedby={extraErrors.length ? 'err-extra-inboxes' : undefined}" in settings
+    assert '<div id="err-extra-inboxes">' in settings and "t('settings.line', { n: line })" in settings and "lineOfEntry(v.extra," in settings
+    i18n = (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
+    assert "'settings.line': 'Line {n}:'" in i18n and "'settings.line': 'Ligne {n} :'" in i18n
+
+
 def test_the_folder_picker_cannot_go_up_from_the_root():
     # DOC534.124: at the root the parent is the root itself (or empty, which reloads the default folder): "Up" did nothing useful
     settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")

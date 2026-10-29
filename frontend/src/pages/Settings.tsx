@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
+import { lineOfEntry } from '@/paths'
 
 /** A list of sub-folders to walk through: the browser cannot open a native folder dialog, so the server lists them. */
 function Picker({ start, onPick, onClose }: { start: string; onPick: (path: string) => void; onClose: () => void }) {
@@ -62,6 +63,7 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
   }, [])
   if (!v) return note ? <p role="alert" className="text-rose-700">{msg(note.text)}</p> : <p role="status" className="text-slate-500">{t('common.loading')}</p>
   const set = (k: keyof Values, value: string) => setV({ ...v, [k]: value })
+  const extraErrors = Object.entries(errors).filter(([k]) => k.startsWith('extra_inboxes'))
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     if (busy) return
@@ -99,8 +101,16 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
           ))}
           <div>
             <label className="text-sm font-medium" htmlFor="extra-inboxes">{t('settings.extra')}</label>
-            <textarea id="extra-inboxes" className="mt-1 w-full rounded-md border p-2 font-mono text-sm" rows={3} value={v.extra} onChange={(e) => set('extra', e.target.value)} />
-            {Object.entries(errors).filter(([k]) => k.startsWith('extra_inboxes')).map(([k, m]) => <p key={k} role="alert" className="text-sm text-rose-700">{msg(m)}</p>)}
+            <textarea id="extra-inboxes" className="mt-1 w-full rounded-md border p-2 font-mono text-sm" rows={3} value={v.extra} onChange={(e) => set('extra', e.target.value)}
+              aria-invalid={extraErrors.length ? true : undefined} aria-describedby={extraErrors.length ? 'err-extra-inboxes' : undefined} />
+            {extraErrors.length > 0 && (
+              <div id="err-extra-inboxes">
+                {extraErrors.map(([k, m]) => {
+                  const line = lineOfEntry(v.extra, Number(/\[(\d+)\]/.exec(k)?.[1]))  // the entry the server refused, as the line the person sees
+                  return <p key={k} role="alert" className="text-sm text-rose-700">{line ? `${t('settings.line', { n: line })} ` : ''}{msg(m)}</p>
+                })}
+              </div>
+            )}
           </div>
           <Button type="submit" disabled={busy} aria-busy={busy}>{t('settings.save')}</Button>
           <Notice note={note} />
