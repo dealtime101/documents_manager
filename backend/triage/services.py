@@ -266,16 +266,18 @@ def scan_status() -> dict:
 
 
 # ------------------------------------------------------------------ read
-def item_dict(it: Item) -> dict:
+def item_dict(it: Item, library_root: Path | None = None) -> dict:
+    """`library_root`: a list gets it once for the whole request; cfg() looks at the learned files each time it is called."""
     a = it.analysis or {}
-    c = cfg()
+    if it.rel_dir and library_root is None:
+        library_root = cfg().path("library_root")
     return {
         "id": it.id, "state": it.state, "status": it.engine_status, "filename": Path(it.source_path).name,
         "company": a.get("company"), "document_type": a.get("document_type"), "date": a.get("date", "XXXX"),
         "detail": a.get("detail", ""), "amount": a.get("amount"), "currency": a.get("currency", "CAD"),
         "invoice_number": a.get("invoice_number"), "conf": a.get("conf", {}), "confidence": it.confidence,
         "final_name": it.final_name, "rel_dir": it.rel_dir,
-        "destination": str(c.path("library_root") / it.rel_dir) if it.rel_dir else "",
+        "destination": str(library_root / it.rel_dir) if it.rel_dir and library_root else "",
         "notes": it.notes, "extraction": it.extraction, "result_path": it.result_path,
         "created_at": it.created_at.isoformat(), "resolved_at": it.resolved_at and it.resolved_at.isoformat(),
     }

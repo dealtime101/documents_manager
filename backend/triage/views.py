@@ -95,7 +95,8 @@ def items(request):
         except s.ApiError as e:
             return err(e)
     limit = min(limit, 500)
-    resp = Response([s.item_dict(i) for i in qs[offset:offset + limit]])
+    library_root = s.cfg().path("library_root")  # once for the whole list, not once per item
+    resp = Response([s.item_dict(i, library_root) for i in qs[offset:offset + limit]])
     resp["X-Total-Count"] = str(qs.count())  # lets the client tell when the list is not the whole queue
     return resp
 

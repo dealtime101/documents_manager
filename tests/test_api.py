@@ -1287,6 +1287,21 @@ def test_the_search_finds_documents_whose_stored_path_uses_backslashes_or_goes_t
     assert found()
 
 
+def test_listing_the_items_reads_the_configuration_once_not_once_per_item(api, sb, monkeypatch):
+    # DOC534.59: item_dict called cfg() (which looks at the learned files) for every item of the list
+    from triage import services
+    for n in (1, 2, 3):
+        pdf(sb / "inbox" / f"h{n}.pdf", HYDRO[:1] + [f"Facture d'electricite du {n} octobre 2025", f"Numero de facture : 10000000{n}",
+                                                    "Montant de la presente facture : 158,98 $"])
+    api.post("/api/scan")
+    calls = []
+    real = services.cfg
+    monkeypatch.setattr(services, "cfg", lambda: calls.append(1) or real())
+    rows = api.get("/api/items").json()
+    assert len(rows) == 3 and all(r["destination"] for r in rows)                  # the destination is still given for each
+    assert len(calls) <= 2                                                         # a constant number, whatever the length of the list
+
+
 def test_the_text_kept_for_a_document_is_capped(api, sb, monkeypatch):
     from triage import services
     from triage.models import ItemText
