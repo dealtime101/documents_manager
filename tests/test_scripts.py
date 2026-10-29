@@ -29,11 +29,15 @@ def test_the_sandbox_amazon_invoice_adds_up():
     """A sandbox sample is a test input: a total that is not the sum of its lines would mislead any amount check."""
     import re
     from decimal import Decimal
+    def adds_up(item: str) -> bool:
+        # DOC534.196: columns are Unit price, Discount, GST, QST, Total; the discount is taken off, the two taxes are added
+        price, discount, gst, qst, total = [Decimal(m) for m in re.findall(r"\$(\d+\.\d\d)", item)]
+        return price - discount + gst + qst == total
+    assert adds_up("X $10.00 $2.00 $0.40 $0.80 $9.20") and not adds_up("X $10.00 $2.00 $0.40 $0.80 $13.20")   # a real discount counts
     lines = load_script("make_sandbox").SAMPLES["amazon_order.pdf"]
     item = next(ln for ln in lines if ln.startswith("Friskies"))
-    price, *taxes_and_total = [Decimal(m) for m in re.findall(r"\$(\d+\.\d\d)", item)]
-    *taxes, line_total = taxes_and_total
-    assert price + sum(taxes) == line_total                              # unit price + the three tax columns
+    assert adds_up(item)
+    line_total = Decimal(re.findall(r"\$(\d+\.\d\d)", item)[-1])
     assert lines[-1] == f"Total ${line_total}"                           # and the invoice total is that line
     header = next(ln for ln in lines if ln.startswith("Description"))
     labels = ["Unit price", "Discount", "GST", "QST", "Total"]            # one label per money column, in the same order
