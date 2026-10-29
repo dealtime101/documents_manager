@@ -10,19 +10,30 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from docflow.analyze import RuleBasedAnalyzer
-from docflow.config import load_config
+from docflow.config import Config, load_config
 from docflow.extract import extract_text
 from docflow.fields import norm
 
-cfg = load_config()
-an = RuleBasedAnalyzer(cfg)
+cfg: Config | None = None
+an: RuleBasedAnalyzer | None = None
+
+
+def prepare() -> tuple[Config, RuleBasedAnalyzer]:
+    """The configuration and the analyzer, loaded once, when the run starts: not at import, so `--help` and a usage error work even
+    when the configuration is broken."""
+    global cfg, an
+    if cfg is None or an is None:
+        cfg = load_config()
+        an = RuleBasedAnalyzer(cfg)
+    return cfg, an
 
 
 def head(path: Path) -> tuple[str, str | None, str]:
     """(file name, first lines / "__known__" / None when unreadable, the cause when unreadable)."""
+    config, analyzer = prepare()
     try:  # the reading AND the analysis: one text that makes analyze() or norm() raise must not end a run over hundreds of PDFs
-        text = extract_text(path, cfg.settings["ocr"]).text
-        if an.analyze(text).company:
+        text = extract_text(path, config.settings["ocr"]).text
+        if analyzer.analyze(text).company:
             return path.name, "__known__", ""
         lines = [re.sub(r"\s+", " ", norm(x)).strip() for x in text.split("\n")]
     except Exception as e:  # the cause is kept and shown in the summary: a general failure must not look like corrupt PDFs
@@ -51,6 +62,7 @@ def cause_key(cause: str) -> str:
 
 
 def main(root: Path, limit: int = 45) -> None:
+    prepare()
     files = sorted(f for f in root.rglob("*") if f.is_file() and f.suffix.lower() == ".pdf")  # .PDF too (scanners)
     groups = defaultdict(list)
     causes: Counter[str] = Counter()

@@ -269,6 +269,23 @@ def test_a_path_with_spaces_in_a_failure_is_one_cause_whatever_the_file(message)
     assert discover.cause_key("page 7 of 12 failed") == "page # of # failed"                     # numbers still merge, as before
 
 
+def test_discover_help_and_usage_errors_work_when_the_configuration_is_broken(tmp_path):
+    # DOC534.136: the configuration and the analyzer were loaded at import: --help or a wrong argument ended in a traceback
+    import os
+    import subprocess
+    broken = tmp_path / "config"
+    broken.mkdir()
+    (broken / "companies.yaml").write_text("- not\n- a mapping\n", encoding="utf-8")
+    env = {**os.environ, "DOCFLOW_CONFIG_DIR": str(broken), "PYTHONPATH": str(SCRIPTS.parent / "backend")}
+    script = str(SCRIPTS / "discover.py")
+    helped = subprocess.run([sys.executable, script, "--help"], env=env, capture_output=True, text=True, timeout=60)
+    assert helped.returncode == 0 and "usage:" in helped.stdout and "Traceback" not in helped.stderr
+    wrong = subprocess.run([sys.executable, script, str(tmp_path / "nowhere")], env=env, capture_output=True, text=True, timeout=60)
+    assert wrong.returncode == 2 and "not a folder" in wrong.stderr and "Traceback" not in wrong.stderr
+    real_run = subprocess.run([sys.executable, script, str(tmp_path)], env=env, capture_output=True, text=True, timeout=60)
+    assert real_run.returncode != 0 and "companies.yaml" in real_run.stderr                    # a real run names the broken file
+
+
 def test_discover_says_how_many_causes_it_does_not_show(tmp_path, capsys):
     # DOC534.134: only the 5 most frequent causes were listed, the others vanished and the listed ones looked like the whole story
     for n in range(8):
@@ -1418,13 +1435,14 @@ def test_discover_goes_on_when_the_analysis_of_one_text_raises(tmp_path, monkeyp
     discover = load_script("discover")
     make_pdf(tmp_path / "a-good.pdf", "Lettre de la tante Huguette\nBonjour tout le monde")
     make_pdf(tmp_path / "b-odd.pdf", "texte etrange")
-    real = discover.an.analyze
+    analyzer = discover.prepare()[1]                                                        # (loaded when the run starts, not at import)
+    real = analyzer.analyze
 
     def choke_on_odd(text):
         if "etrange" in text:
             raise RecursionError("maximum recursion depth exceeded")
         return real(text)
-    monkeypatch.setattr(discover.an, "analyze", choke_on_odd)
+    monkeypatch.setattr(analyzer, "analyze", choke_on_odd)
     discover.main(tmp_path)                                                                  # must not raise
     out = capsys.readouterr().out
     assert "2 PDFs" in out and "unreadable: 1" in out                                         # the odd one is counted, the run finished
