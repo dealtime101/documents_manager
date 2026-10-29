@@ -863,7 +863,7 @@ def test_a_note_built_from_other_state_keeps_its_identity_between_renders():
     # Notice announces a "new" note when the object changes (DOC474.109): one rebuilt at every render would be re-announced each time
     pages = UI.parents[1] / "pages"
     history, rules = (pages / "History.tsx").read_text(), (pages / "Rules.tsx").read_text()
-    assert "const shownNote = useMemo(" in history and "[note, loadError, msg])" in history
+    assert "const shownNote = useMemo(" in history and "[note, loadError, msg, t])" in history
     assert "<Notice note={shownNote} />" in history and "<Notice note={shownNote} />" in rules
     assert "const shownNote = useMemo(" in rules and "[reloadError, note, msg]" in rules
 
@@ -924,9 +924,20 @@ def test_a_failed_reload_after_an_undo_is_shown_with_the_result_of_the_undo():
     history = (UI.parents[1] / "pages" / "History.tsx").read_text()
     shown = history[history.index("const shownNote"):history.index("// one undo at a time")]
     # DOC534.41: the text of the undo is kept whether it succeeded or FAILED
-    assert "loadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(loadError)}` } : note" in shown
+    assert "return loadError ? { ok: false, text: `${said ? `${said.text} ` : ''}${msg(loadError)}` } : said" in shown
     assert "note?.ok" not in shown
-    assert "[note, loadError, msg]" in shown                                                  # (the note keeps its identity)
+    assert "[note, loadError, msg, t]" in shown                                               # (the note keeps its identity)
+
+
+def test_the_result_of_an_undo_is_worded_when_shown_so_it_follows_a_change_of_language():
+    # DOC534.142: the sentence was built in the language of the moment and kept: after a switch it stayed in the old one
+    history = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
+    undo = history[history.index("const undo = async"):history.index("return (\n    <div")]
+    assert "setNote({ ok: true, detail: r.restored })" in undo and "setNote({ ok: false, detail: errorText(e) })" in undo
+    assert "t('hist.restored'" not in undo and "msg(" not in undo                             # nothing worded where the note is made
+    shown = history[history.index("const shownNote"):history.index("// one undo at a time")]
+    assert "t('hist.restored', { path: note.detail })" in shown and "msg(note.detail)" in shown   # worded where it is shown
+    assert "useState<{ ok: boolean; detail: string } | null>(null)" in history
 
 
 def test_keyboard_focus_stays_in_the_history_row_during_and_after_an_undo():

@@ -19,7 +19,7 @@ function PathCell({ path }: { path: string }) {
 export default function History() {
   const { t, msg, time } = useI18n()
   const [ops, setOps] = useState<Operation[] | null>(null)  // null: not loaded yet, which is not the same as empty
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)  // the result of the last undo
+  const [note, setNote] = useState<{ ok: boolean; detail: string } | null>(null)  // the result of the last undo: the restored path, or the server's error
   // the raw server text, translated when shown (like undo's): so it is in the reader's language, and follows a language switch
   const [loadError, setLoadError] = useState('')
   const load = useCallback(() => api.history().then((rows) => { setOps(rows); setLoadError('') })
@@ -27,8 +27,11 @@ export default function History() {
   useEffect(() => { load() }, [load])
   // the same object until note or loadError change: Notice treats a new object as a new message to announce
   // a failed reload is ALWAYS shown, after the result of the undo that came before it: the list is then stale and must say so
-  const shownNote = useMemo(
-    () => (loadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(loadError)}` } : note), [note, loadError, msg])
+  // (the note keeps what the server said and the path, not a sentence: it is worded here, in the language of the moment)
+  const shownNote = useMemo(() => {
+    const said = note ? { ok: note.ok, text: note.ok ? t('hist.restored', { path: note.detail }) : msg(note.detail) } : null
+    return loadError ? { ok: false, text: `${said ? `${said.text} ` : ''}${msg(loadError)}` } : said
+  }, [note, loadError, msg, t])
   // one undo at a time: a second click (or a double click) while one is running would ask for the same operation twice
   const [undoing, setUndoing] = useState<number | null>(null)
 
@@ -37,9 +40,9 @@ export default function History() {
     setUndoing(id)
     try {
       const r = await api.undo(id)
-      setNote({ ok: true, text: t('hist.restored', { path: r.restored }) })
+      setNote({ ok: true, detail: r.restored })
     } catch (e) {
-      setNote({ ok: false, text: msg(errorText(e)) })
+      setNote({ ok: false, detail: errorText(e) })
     }
     await load()
     setUndoing(null)
