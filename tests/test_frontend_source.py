@@ -659,7 +659,9 @@ def test_a_failed_reload_after_an_undo_is_shown_with_the_result_of_the_undo():
     # DOC474.117: the "restored" message hid the reload error; the list stayed stale with no sign that it was
     history = (UI.parents[1] / "pages" / "History.tsx").read_text()
     shown = history[history.index("const shownNote"):history.index("// one undo at a time")]
-    assert "loadError ? { ok: false, text: `${note?.ok ? `${note.text} ` : ''}${msg(loadError)}` } : note" in shown
+    # DOC534.41: the text of the undo is kept whether it succeeded or FAILED
+    assert "loadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(loadError)}` } : note" in shown
+    assert "note?.ok" not in shown
     assert "[note, loadError, msg]" in shown                                                  # (the note keeps its identity)
 
 

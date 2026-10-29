@@ -28,7 +28,7 @@ export default function History() {
   // the same object until note or loadError change: Notice treats a new object as a new message to announce
   // a failed reload is ALWAYS shown, after the result of the undo that came before it: the list is then stale and must say so
   const shownNote = useMemo(
-    () => (loadError ? { ok: false, text: `${note?.ok ? `${note.text} ` : ''}${msg(loadError)}` } : note), [note, loadError, msg])
+    () => (loadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(loadError)}` } : note), [note, loadError, msg])
   // one undo at a time: a second click (or a double click) while one is running would ask for the same operation twice
   const [undoing, setUndoing] = useState<number | null>(null)
 
