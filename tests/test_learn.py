@@ -600,9 +600,13 @@ def test_a_learned_file_that_cannot_be_read_is_reported_by_name_never_overwritte
     writes_that_file = {"company_aliases.yaml": lambda: learn_company(cfg, "Voisin", "Famille Voisin et fils"),
                         "types_learned.yaml": lambda: learn_type(cfg, "Voisin", "Lettre"),
                         "routing_learned.yaml": lambda: learn_route(cfg, "Voisin", "Famille/Voisin")}[name]
+    # DOC534.234: the contract the comment states, as assertions: callers that catch ValueError are protected, and a YAML error is not
+    # what they get
+    assert issubclass(LearnedFileError, ValueError) and not issubclass(LearnedFileError, yaml.YAMLError)
     for operation in (lambda: list_rules(cfg), writes_that_file):
-        with pytest.raises(LearnedFileError, match=name):                       # named, and a plain ValueError (not a YAMLError)
+        with pytest.raises(LearnedFileError, match=name) as caught:             # named, and a plain ValueError (not a YAMLError)
             operation()
+        assert isinstance(caught.value, ValueError) and not isinstance(caught.value, yaml.YAMLError)
     assert bad.read_bytes() == before                                            # the user's rules are NEVER overwritten
     caplog.clear()
     reloaded = load_config(sandbox=tmp_path)                                      # loading the configuration must not crash...
