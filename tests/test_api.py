@@ -915,6 +915,22 @@ def test_dashboard_counts(api, sb):
     assert api.get("/api/dashboard").json()["classified_today"] == 1
 
 
+def test_emptying_a_destination_chosen_by_hand_goes_back_to_the_automatic_route(api, sb):
+    # DOC534.17: `_dir_user` stayed true after the field was emptied, so the hand-made route was kept (and learned on approval)
+    pdf(sb / "inbox" / "hydro.pdf", HYDRO)
+    api.post("/api/scan")
+    it = api.get("/api/items").json()[0]
+    automatic = it["rel_dir"]
+    assert automatic
+    r = api.patch(f"/api/items/{it['id']}", {"rel_dir": "Autre/Dossier"}, format="json")
+    assert r.json()["rel_dir"] == "Autre/Dossier" and Item.objects.get(pk=it["id"]).original["_dir_user"] is True
+    r = api.patch(f"/api/items/{it['id']}", {"company": it["company"]}, format="json")
+    assert r.json()["rel_dir"] == "Autre/Dossier"                           # another field edited: the chosen folder stays
+    r = api.patch(f"/api/items/{it['id']}", {"rel_dir": ""}, format="json")
+    assert r.json()["rel_dir"] == automatic                                 # emptied: back to the route the rules give
+    assert "_dir_user" not in Item.objects.get(pk=it["id"]).original        # and no longer a human choice to learn
+
+
 def test_edit_approve_and_learn_then_next_document_is_recognised(api, sb):
     pdf(sb / "inbox" / "g1.pdf", GARAGE)
     api.post("/api/scan")

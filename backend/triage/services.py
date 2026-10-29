@@ -387,7 +387,8 @@ def edit(it: Item, data: dict) -> Item:
             raise ApiError(str(e)) from None
         it.rel_dir = str(data["rel_dir"]).strip("/\\")
         orig["_dir_user"] = True
-    elif not orig.get("_dir_user"):
+    elif "rel_dir" in data or not orig.get("_dir_user"):
+        orig.pop("_dir_user", None)  # sent empty or null: back to the automatic route, like the name above
         r = route(c.routing, a.company, a.document_type)
         r = fill(r, a.date) if r else None
         it.rel_dir = r or ""
