@@ -1594,7 +1594,9 @@ def test_llm_eval_refuses_a_sample_size_that_is_not_a_positive_whole_number_with
             llm_eval.main(tmp_path, "fake-model", int(bad))
     env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend", SCRIPTS)}
     run = subprocess.run([sys.executable, str(SCRIPTS / "llm_eval.py"), str(tmp_path), "fake-model", bad], capture_output=True, text=True, env=env)
-    assert run.returncode == 2 and "Traceback" not in run.stderr and "N" in run.stderr and "whole number" in run.stderr, run.stderr
+    # DOC534.205: the whole sentence, so a stray capital N (in a usage line, a NameError...) cannot satisfy it
+    assert run.returncode == 2 and "Traceback" not in run.stderr, run.stderr
+    assert "usage error: N must be a whole number of at least 1" in run.stderr, run.stderr
 
 
 @pytest.mark.parametrize("extra", [[], ["only-a-cache"], ["cache", "model"], ["cache", "model", "5", "surplus"]])
