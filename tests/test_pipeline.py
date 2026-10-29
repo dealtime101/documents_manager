@@ -217,9 +217,34 @@ def test_engine_timestamps_carry_their_utc_offset_so_the_autumn_hour_is_not_ambi
     parsed = datetime.fromisoformat(stamp)
     assert parsed.tzinfo is not None and parsed.utcoffset() is not None                    # not a naive local time
     assert abs(parsed - datetime.now(UTC)) < timedelta(seconds=5)                  # and it is NOW
-    assert parsed.utcoffset() == datetime.now().astimezone().utcoffset()                    # the local offset, wall-clock kept
+    # the local offset AT THAT INSTANT, wall-clock kept (DOC534.209: asked of the stamp itself, not of a second call to now(), which
+    # could fall on the other side of a change of hour)
+    assert parsed.utcoffset() == parsed.astimezone().utcoffset()
     # old rows are naive ("2026-10-04T13:10:36"): both forms still parse, so a mixed history is still readable
     assert datetime.fromisoformat("2026-10-04T13:10:36").tzinfo is None
+
+
+def test_engine_timestamps_follow_the_local_zone_whatever_its_offset():
+    # DOC534.209: with the zone fixed, the offset is known, so nothing here depends on the day the suite runs
+    import os
+    import time
+    from datetime import datetime, timedelta
+
+    from docflow.db import now
+    if not hasattr(time, "tzset"):
+        pytest.skip("no tzset on this system (Windows)")
+    before = os.environ.get("TZ")
+    try:
+        for zone, hours in (("Etc/GMT+5", -5), ("Etc/GMT-9", 9), ("UTC", 0)):          # fixed offsets: no change of hour
+            os.environ["TZ"] = zone
+            time.tzset()
+            assert datetime.fromisoformat(now()).utcoffset() == timedelta(hours=hours), zone
+    finally:
+        if before is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = before
+        time.tzset()
 
 
 def test_add_document_only_accepts_the_columns_of_the_table(env):
