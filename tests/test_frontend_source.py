@@ -208,11 +208,39 @@ def test_every_tab_has_a_tabpanel_inside_the_same_tabs_root():
         assert f'<TabsTrigger value="{page}">' in app and f'<TabsContent value="{page}"' in app
 
 
+NODE_TIMEOUT = 30  # seconds: these scripts transpile one file and print a line
+
+
+def run_node(command: list[str], **kwargs):
+    """subprocess.run for node with its own short limit; a node that never ends (a promise that is never settled, a missing module
+    waiting) is a failure that says so, not a frozen suite (DOC534.225)."""
+    import subprocess
+
+    import pytest
+    try:
+        return subprocess.run(command, capture_output=True, text=True, timeout=NODE_TIMEOUT, **kwargs)
+    except subprocess.TimeoutExpired:
+        pytest.fail(f"node did not finish within {NODE_TIMEOUT} s: {' '.join(command[:2])} ...", pytrace=False)
+
+
+def test_a_node_that_never_ends_fails_the_test_with_a_message(monkeypatch):
+    # DOC534.225: no node call had a limit; a promise never settled held the whole suite
+    import shutil
+
+    import pytest
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not available")
+    monkeypatch.setitem(globals(), "NODE_TIMEOUT", 1)
+    with pytest.raises(pytest.fail.Exception, match="node did not finish within 1 s"):
+        run_node([node, "-e", "setInterval(() => {}, 1000)"])
+    assert run_node([node, "-e", "console.log(1)"]).stdout.strip() == "1"                 # and a normal run is untouched
+
+
 def _node_route(expression: str, module: str = "route", setup: str = ""):
     """Run frontend/src/route.ts itself (transpiled with the project's own TypeScript), so the URL logic is tested, not read."""
     import json
     import shutil
-    import subprocess
 
     import pytest
     node = shutil.which("node")
@@ -227,7 +255,7 @@ def _node_route(expression: str, module: str = "route", setup: str = ""):
       {setup}
       import('data:text/javascript;base64,' + Buffer.from(js).toString('base64')).then(async (m) => console.log(JSON.stringify(await ({expression}))));
     """
-    done = subprocess.run([node, "-e", code], capture_output=True, text=True)
+    done = run_node([node, "-e", code])
     assert done.returncode == 0, done.stderr
     return json.loads(done.stdout)
 
@@ -288,7 +316,6 @@ def test_the_cn_helper_merges_conflicting_tailwind_classes_the_way_the_component
     """Components override each other's classes (TabsContent text-sm -> text-base, StatusBadge shrink-0 -> shrink)."""
     import json
     import shutil
-    import subprocess
 
     import pytest
     frontend = UI.parents[2]
@@ -296,7 +323,7 @@ def test_the_cn_helper_merges_conflicting_tailwind_classes_the_way_the_component
         pytest.skip("node or the frontend's node_modules is not available")
     code = ("import('cn').then(({cn}) => console.log(JSON.stringify([cn('px-2 py-1 text-sm', 'px-4 text-base'),"
             " cn('shrink-0', 'shrink'), cn('hover:bg-muted', 'hover:bg-primary', 'dark:hover:bg-muted/50'), cn('a', false, null, 'b')])))")
-    done = subprocess.run(["node", "-e", code], capture_output=True, text=True, cwd=frontend)
+    done = run_node(["node", "-e", code], cwd=frontend)
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout) == ["py-1 px-4 text-base", "shrink", "hover:bg-primary dark:hover:bg-muted/50", "a b"]
 
