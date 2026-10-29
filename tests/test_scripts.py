@@ -11,12 +11,21 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
 
 def load_script(name: str):
-    if str(SCRIPTS) not in sys.path:  # as when a script runs: its own folder is on the path, so scripts can import each other
-        sys.path.insert(0, str(SCRIPTS))
-    spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
-    assert spec is not None and spec.loader is not None, name
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    """The script as a module. While it loads, its own folder is on the path (as when a script runs), so scripts can import each
+    other; afterwards the path and the sibling modules it pulled in are gone again (DOC534.201), so nothing in scripts/ can hide a
+    module of the same name from the other test files, whatever the order they run in."""
+    before = set(sys.modules)
+    sys.path.insert(0, str(SCRIPTS))
+    try:
+        spec = importlib.util.spec_from_file_location(name, SCRIPTS / f"{name}.py")
+        assert spec is not None and spec.loader is not None, name
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(SCRIPTS))
+        for loaded in set(sys.modules) - before:
+            if str(getattr(sys.modules[loaded], "__file__", None) or "").startswith(str(SCRIPTS)):
+                del sys.modules[loaded]
     return module
 
 
@@ -24,6 +33,15 @@ def make_pdf(path: Path, text: str) -> None:
     doc = pymupdf.open()
     doc.new_page().insert_text((72, 72), text)
     doc.save(path)
+
+
+def test_loading_a_script_leaves_neither_its_folder_on_the_path_nor_its_siblings_in_the_module_cache():
+    # DOC534.201: scripts/ stayed first on sys.path for the whole session, and `benchmark` (imported by compare) in sys.modules
+    before = list(sys.path)
+    compare = load_script("compare")                                       # compare.py does `from benchmark import ...`
+    assert callable(compare.main) and sys.path == before and str(SCRIPTS) not in sys.path
+    assert "benchmark" not in sys.modules and "compare" not in sys.modules
+    assert not [m for m, mod in sys.modules.items() if str(getattr(mod, "__file__", None) or "").startswith(str(SCRIPTS))]
 
 
 def test_a_child_process_that_hangs_is_stopped_by_the_default_timeout_and_an_explicit_one_wins(monkeypatch):
