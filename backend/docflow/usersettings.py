@@ -95,10 +95,16 @@ def validate(values: dict) -> dict[str, str]:
         errors["quarantine"] = "must be outside the library (duplicates would be filed into it)"
     if library and not os.access(library, os.W_OK):
         errors.setdefault("library_root", "is not writable")
-    for i, extra in enumerate(values.get("extra_inboxes") or []):
-        if why := _problem(Path(str(extra)).expanduser()):
+    extras = values.get("extra_inboxes") or []
+    if not isinstance(extras, list):  # a string would be read letter by letter, and kept if it passed: refused as a whole
+        errors["extra_inboxes"] = "must be a list of folders"
+        extras = []
+    for i, extra in enumerate(extras):
+        if not isinstance(extra, str) or not extra.strip():
+            errors[f"extra_inboxes[{i}]"] = "a folder is required"
+        elif why := _problem(Path(extra).expanduser()):
             errors[f"extra_inboxes[{i}]"] = why
-        elif library and (Path(str(extra)).expanduser().resolve() in (library.resolve(), *library.resolve().parents)):
+        elif library and (Path(extra).expanduser().resolve() in (library.resolve(), *library.resolve().parents)):
             errors[f"extra_inboxes[{i}]"] = "must not be the library or contain it (filed documents would be scanned again)"
     return errors
 

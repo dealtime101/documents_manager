@@ -516,6 +516,7 @@ const frMessages: Record<string, string> = {
   'Request timed out: the server did not answer.': "Délai dépassé : le serveur n'a pas répondu.",
   // the reasons the Settings screen gets for a folder it refuses (docflow/usersettings.py); `{p}` stands for the path in the text
   'a folder is required': 'un dossier est requis',
+  'must be a list of folders': 'doit être une liste de dossiers',
   '{p} is not a folder': "{p} n'est pas un dossier",
   '{p} does not exist': "{p} n'existe pas",
   'access to {p} is refused': "l'accès à {p} est refusé",

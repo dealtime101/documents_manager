@@ -17,6 +17,23 @@ def _folders(tmp_path):
     return d
 
 
+@pytest.mark.parametrize("extras,key,words", [
+    ("/some/folder", "extra_inboxes", "must be a list of folders"), ({"a": 1}, "extra_inboxes", "must be a list of folders"),
+    (5, "extra_inboxes", "must be a list of folders"), ([None], "extra_inboxes[0]", "a folder is required"),
+    (["  "], "extra_inboxes[0]", "a folder is required"), ([3], "extra_inboxes[0]", "a folder is required")])
+def test_extra_inboxes_must_be_a_list_of_non_empty_folders_and_a_bad_shape_is_refused_whole(home, tmp_path, extras, key, words):
+    # DOC534.140: a string was walked letter by letter ("/", "s", "o"...), each one checked as a folder; a non-list could also be saved
+    f = _folders(tmp_path)
+    values = {"inbox": str(f["inbox"]), "library_root": str(f["library"]), "extra_inboxes": extras}
+    errors = usersettings.validate(values)
+    assert errors == {key: words}, errors                                                 # ONE clear error, on that key
+    with pytest.raises(usersettings.InvalidSettings):
+        usersettings.save(values)
+    assert usersettings.load() == {}                                                       # and nothing was written
+    values["extra_inboxes"] = [str(f["extra"])]
+    assert usersettings.validate(values) == {} and usersettings.validate({**values, "extra_inboxes": []}) == {}   # a list is still fine
+
+
 def test_the_test_session_works_in_a_throw_away_folder_and_on_the_test_rules():
     # DOC534.54: conftest imported docflow.config before setting the two variables; this checks what the session really resolves
     import tempfile
