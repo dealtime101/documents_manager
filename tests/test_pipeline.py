@@ -884,14 +884,33 @@ def test_without_hard_links_the_destination_name_is_reserved_before_the_move(tmp
     dst.parent.mkdir()
     src.write_bytes(b"new")
     monkeypatch.setattr(pipeline.os, "link", lambda *a: (_ for _ in ()).throw(OSError(errno.EPERM, "no hard links here")))
-    real_rename, seen = pipeline.os.rename, []
+    real_replace, seen = pipeline.os.replace, []
 
     def spy(a, b):
         seen.append(Path(b).exists())                       # is the name already ours when the move happens?
-        return real_rename(a, b)
-    monkeypatch.setattr(pipeline.os, "rename", spy)
+        return real_replace(a, b)
+    monkeypatch.setattr(pipeline.os, "replace", spy)
     pipeline._link_or_rename(src, dst)
     assert seen == [True] and dst.read_bytes() == b"new" and not src.exists()
+
+
+def test_without_hard_links_the_move_over_our_placeholder_works_where_rename_refuses_an_existing_target(tmp_path, monkeypatch):
+    # DOC534.21: on Windows os.rename raises FileExistsError for ANY existing target, so the fallback failed on its own placeholder
+    import errno
+
+    from docflow import pipeline
+    src, dst = tmp_path / "a.pdf", tmp_path / "b.pdf"
+    src.write_bytes(b"new")
+    monkeypatch.setattr(pipeline.os, "link", lambda *a: (_ for _ in ()).throw(OSError(errno.EPERM, "no hard links here")))
+    real_rename = pipeline.os.rename
+
+    def windows_rename(a, b):
+        if Path(b).exists():
+            raise FileExistsError(b)
+        return real_rename(a, b)
+    monkeypatch.setattr(pipeline.os, "rename", windows_rename)
+    pipeline._link_or_rename(src, dst)
+    assert dst.read_bytes() == b"new" and not src.exists()
 
 
 def test_without_hard_links_an_existing_destination_is_never_replaced_and_a_failed_move_leaves_no_placeholder(tmp_path, monkeypatch):
@@ -906,7 +925,7 @@ def test_without_hard_links_an_existing_destination_is_never_replaced_and_a_fail
         pipeline._link_or_rename(src, dst)
     assert dst.read_bytes() == b"someone else's" and src.exists()
     free = tmp_path / "free.pdf"
-    monkeypatch.setattr(pipeline.os, "rename", lambda *a: (_ for _ in ()).throw(OSError(errno.EIO, "share dropped")))
+    monkeypatch.setattr(pipeline.os, "replace", lambda *a: (_ for _ in ()).throw(OSError(errno.EIO, "share dropped")))
     with pytest.raises(OSError, match="share dropped"):
         pipeline._link_or_rename(src, free)
     assert not free.exists() and src.exists()               # our empty placeholder was removed again

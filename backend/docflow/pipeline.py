@@ -234,7 +234,7 @@ def _link_or_rename(src: Path, dst: Path) -> None:
         # reserve the name EXCLUSIVELY first (FileExistsError if anyone has it), then move over our own empty placeholder.
         os.close(os.open(dst, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
         try:
-            os.rename(src, dst)
+            os.replace(src, dst)  # not rename(): on Windows rename() refuses an existing target, our own placeholder included
         except BaseException:
             Path(dst).unlink(missing_ok=True)  # the placeholder is ours and empty
             raise
