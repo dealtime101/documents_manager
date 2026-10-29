@@ -60,11 +60,15 @@ def test_apply_then_undo_restores_path_and_name(env):
 def test_undo_refuses_to_overwrite(env):
     cfg, db, tmp = env
     f = mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO)
-    apply(propose(f, cfg, db, RuleBasedAnalyzer(cfg)), cfg, db)
+    sha = sha256_file(f)
+    dst = apply(propose(f, cfg, db, RuleBasedAnalyzer(cfg)), cfg, db)
     f.write_text("something else")
     with pytest.raises(FileExistsError):
         undo(db)
     assert f.read_text(encoding="utf-8") == "something else"
+    # DOC534.210: and the filed document is untouched, and the operation is still in force (not recorded as undone)
+    assert dst.exists() and sha256_file(dst) == sha
+    assert db.op(None) is not None
 
 
 def test_undo_refuses_to_restore_a_file_that_is_no_longer_the_one_that_was_filed(env):
