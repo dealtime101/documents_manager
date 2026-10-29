@@ -27,12 +27,16 @@ def test_saving_learned_config_replaces_the_file_atomically_and_survives_a_failu
     from docflow.learn import _save
     target = tmp_path / "learned" / "company_aliases.yaml"
     _save(target, {"A": ["old"]})
-    assert target.stat().st_mode & 0o777 == 0o644                                  # readable like the other config files
-    target.chmod(0o640)
-    first_inode = target.stat().st_ino
+    posix = os.name != "nt"                       # DOC534.235: on Windows chmod and st_mode do not carry these bits, nor the inode the identity
+    if posix:
+        assert target.stat().st_mode & 0o777 == 0o644                              # readable like the other config files
+        target.chmod(0o640)
+        first_inode = target.stat().st_ino
     _save(target, {"A": ["old", "new"]})
-    assert yaml.safe_load(target.read_text(encoding="utf-8")) == {"A": ["old", "new"]} and target.stat().st_ino != first_inode
-    assert target.stat().st_mode & 0o777 == 0o640                                  # an existing file keeps its mode
+    assert yaml.safe_load(target.read_text(encoding="utf-8")) == {"A": ["old", "new"]}
+    if posix:
+        assert target.stat().st_ino != first_inode                                 # the file was replaced, not written in place
+        assert target.stat().st_mode & 0o777 == 0o640                              # an existing file keeps its mode
 
     def interrupted(*a, **k):
         raise OSError("interrupted before the new file could replace the old one")
