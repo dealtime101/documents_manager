@@ -929,6 +929,14 @@ def test_a_failed_reload_after_an_undo_is_shown_with_the_result_of_the_undo():
     assert "[note, loadError, msg, t]" in shown                                               # (the note keeps its identity)
 
 
+def test_a_failed_load_of_the_history_can_be_tried_again_from_the_page():
+    # DOC534.144: after a failed first load there was an error and an empty table, and only reloading the whole page tried again
+    page = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
+    assert "{loadError && <Button variant=\"outline\" size=\"sm\" onClick={() => void load()}>{t('common.retry')}</Button>}" in page
+    assert page.index("<Notice note={shownNote} />") < page.index("onClick={() => void load()}") < page.index("<table")   # next to the message
+    assert "setLoadError('')" in page[page.index("const load = "):page.index("useEffect(() => { load() }")]       # and a good load clears it
+
+
 def test_the_loading_region_of_the_history_is_in_the_page_before_its_text():
     # DOC534.143: <p role="status"> appeared together with "Loading...": a live region added with its content is often not announced
     page = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")

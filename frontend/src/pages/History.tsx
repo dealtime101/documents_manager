@@ -54,6 +54,7 @@ export default function History() {
     <div className="space-y-3">
       {/* live regions that are in the page BEFORE their text arrives, or the text is not announced */}
       <Notice note={shownNote} />
+      {loadError && <Button variant="outline" size="sm" onClick={() => void load()}>{t('common.retry')}</Button>}   {/* the error clears when it works */}
       <table className="w-full text-sm">
         <caption className="sr-only">{t('hist.caption')}</caption>
         <thead>
