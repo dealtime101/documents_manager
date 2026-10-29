@@ -12,6 +12,22 @@ os.environ["DOCFLOW_HOME"] = tempfile.mkdtemp(prefix="docflow-home-")  # forced:
 os.environ.setdefault("DOCFLOW_CONFIG_DIR", str(Path(__file__).parent / "fixtures" / "config"))
 
 
+SUBPROCESS_TIMEOUT = 180  # seconds; read at each call, so a test can lower it
+
+
+@pytest.fixture(autouse=True)
+def _a_child_process_that_hangs_fails_the_test_instead_of_freezing_the_suite(monkeypatch):
+    """DOC534.200: a script waiting for input or an OCR that never ends held the whole run until the timeout of the CI, with no message.
+    Every subprocess.run made while a test runs gets a timeout unless the call sets its own."""
+    import subprocess
+    real = subprocess.run
+
+    def run(*args, **kwargs):
+        kwargs.setdefault("timeout", SUBPROCESS_TIMEOUT)
+        return real(*args, **kwargs)
+    monkeypatch.setattr(subprocess, "run", run)
+
+
 @pytest.fixture(autouse=True)
 def _tests_do_not_depend_on_what_production_has_learned(monkeypatch):
     """A sandbox normally starts from the learned files of config/ (the real ones). A test must not: its result would

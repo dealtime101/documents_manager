@@ -26,6 +26,21 @@ def make_pdf(path: Path, text: str) -> None:
     doc.save(path)
 
 
+def test_a_child_process_that_hangs_is_stopped_by_the_default_timeout_and_an_explicit_one_wins(monkeypatch):
+    # DOC534.200: no subprocess.run of the tests had a timeout; a script waiting on a prompt froze the run with no message
+    import subprocess
+
+    import conftest
+    sleeper = [sys.executable, "-c", "import time; time.sleep(30)"]
+    monkeypatch.setattr(conftest, "SUBPROCESS_TIMEOUT", 0.5)
+    with pytest.raises(subprocess.TimeoutExpired):
+        subprocess.run(sleeper, capture_output=True)                                   # no timeout given: the default applies
+    with pytest.raises(subprocess.TimeoutExpired) as stopped:
+        subprocess.run(sleeper, capture_output=True, timeout=0.3)                      # one given: it is kept
+    assert stopped.value.timeout == 0.3
+    assert subprocess.run([sys.executable, "-c", "print(1)"], capture_output=True, text=True).stdout.strip() == "1"
+
+
 def test_the_sandbox_amazon_invoice_adds_up():
     """A sandbox sample is a test input: a total that is not the sum of its lines would mislead any amount check."""
     import re
