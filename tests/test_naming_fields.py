@@ -11,6 +11,15 @@ from docflow.fields import (
 from docflow.naming import build_filename, sanitize, token
 
 
+@pytest.mark.parametrize("text,amount", [
+    ("Total : 25,00 €", "25.00"), ("Montant dû €25.50", "25.50"), ("Total TTC 1 234,56 €", "1234.56"),
+    ("Total € 99,99", "99.99"), ("Total : 150 €", "150")])
+def test_the_euro_sign_is_read_as_the_currency_eur(text, amount):
+    # DOC534.75: only "$" and the ISO codes were known: a European invoice had no amount, or one taken elsewhere in the text
+    found = find_amount(text)
+    assert found is not None and found.value == Decimal(amount) and found.currency == "EUR"
+
+
 def test_the_kinds_of_a_found_date_are_all_listed():
     # DOC534.74: the comment named six kinds; the module also produces skip, period, tax_year and month_before
     import re

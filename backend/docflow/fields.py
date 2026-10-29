@@ -223,7 +223,13 @@ def _currency(s: str, m: re.Match, code: str | None) -> str:
     return "USD" if code.upper() == "US" else code.upper()
 
 
+def _spell_euro(s: str) -> str:
+    """The euro sign is read as the code EUR ("25,00 EUR", "EUR 25,00"): one way to write a currency for the patterns below."""
+    return s.replace(chr(0x20AC), " EUR ")
+
+
 def _amounts_in(s: str) -> list[tuple[Decimal, str]]:
+    s = _spell_euro(s)
     out = []
     for m in _AMT.finditer(s):
         g = m.groups()
@@ -235,6 +241,7 @@ def _amounts_in(s: str) -> list[tuple[Decimal, str]]:
 
 
 def _whole_amounts_in(s: str) -> list[tuple[Decimal, str]]:
+    s = _spell_euro(s)
     out = []
     for m in _INT_AMT.finditer(s):
         g = m.groups()
