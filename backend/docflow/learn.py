@@ -95,6 +95,7 @@ def learn_company(cfg: Config, company: str, header: str, text: str = "") -> boo
     pat = (text and _name_pattern(company, text)) or _pattern(header)
     if not pat or not NAME_RE.match(company or ""):
         return False
+    cfg.refresh_learned()  # what another worker learned or forgot since: the "already known" test must not read stale memory
     if pat in cfg.companies.get(company, []):
         return False
     f = cfg.learn_dir / "company_aliases.yaml"
@@ -112,6 +113,7 @@ def learn_type(cfg: Config, company: str, doc_type: str) -> bool:
     """Default type of a company (confidence 0.85: always confirmed), if it does not already exist."""
     if not (NAME_RE.match(company or "") and NAME_RE.match(doc_type or "")):
         return False
+    cfg.refresh_learned()  # as in learn_company: another worker may have replaced this company's learned type in the file
     mine = [r for r in cfg.types if r.get("company") == company and r.get("_learned")]
     other = [r for r in cfg.types if r.get("company") == company and not r.get("_learned")]
     if any(r.get("type") == doc_type for r in other) or any(r.get("type") == doc_type for r in mine):
@@ -135,6 +137,7 @@ def learn_route(cfg: Config, company: str, rel_dir: str) -> bool:
     if not NAME_RE.match(company or "") or not p.parts or p.is_absolute() or ".." in p.parts \
             or any(re.search(r'[<>:"|?*\x00-\x1f]', x) for x in p.parts):
         return False
+    cfg.refresh_learned()  # as in learn_company
     if cfg.routing.get(company) and company not in cfg.learned_routes:
         return False  # it comes from the hand-written routing_rules.yaml
     f = cfg.learn_dir / "routing_learned.yaml"

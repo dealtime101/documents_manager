@@ -220,6 +220,18 @@ def test_learn_company_writes_alias_and_next_analysis_uses_it(tmp_path):
     assert "GarageTremblay" in load_config(sandbox=tmp_path).companies
 
 
+def test_a_correction_back_to_a_value_another_worker_replaced_is_not_refused_as_already_known(tmp_path):
+    # DOC534.29: the "already known" test read this worker's memory, stale after another worker replaced the learned type in the file
+    worker_a = cfg_in(tmp_path)
+    assert learn_type(worker_a, "Voisin", "Lettre") is True
+    worker_b = load_config(sandbox=tmp_path)                       # another worker, same learned folder
+    assert learn_type(worker_b, "Voisin", "Facture") is True       # replaces Lettre in the file; worker A still remembers Lettre
+    assert learn_type(worker_a, "Voisin", "Lettre") is True        # the user corrects back: A must see the file, not its memory
+    saved = yaml.safe_load((tmp_path / "learned" / "types_learned.yaml").read_text())
+    assert [r["type"] for r in saved if r["company"] == "Voisin"] == ["Lettre"]
+    assert learn_type(worker_b, "Voisin", "Lettre") is False       # and now B sees it is already there
+
+
 def test_the_pattern_drawn_from_a_company_name_has_word_limits_and_a_length_counted_on_the_name():
     # DOC534.28: "Bell" matched "Isabelle", and "A-B" (a\s*b) passed the length test on its escapes and matched "about"
     from docflow.learn import _name_pattern
@@ -256,7 +268,7 @@ def test_learn_type_default_rule_needs_confirmation(tmp_path):
 
 def test_a_later_type_correction_replaces_the_earlier_learned_one(tmp_path):
     cfg = cfg_in(tmp_path)
-    cfg.companies["GarageTremblay"] = ["garage tremblay"]
+    assert learn_company(cfg, "GarageTremblay", "garage tremblay") is True   # in the file, not only in memory: learning re-reads the file
     text = "Garage Tremblay\nDate: 5 mars 2025\nTotal 80,00 $"
     assert learn_type(cfg, "GarageTremblay", "FactureEntretien") is True
     assert learn_type(cfg, "GarageTremblay", "FacturePneus") is True           # the user changed their mind
