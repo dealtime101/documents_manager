@@ -907,7 +907,9 @@ def test_benchmark_says_what_to_do_when_the_corpus_is_missing(tmp_path, capsys):
     benchmark = load_script("benchmark")
     assert benchmark.main(["score", str(tmp_path / "no-such-corpus")]) == 2
     assert benchmark.main(["mine", str(tmp_path), "Hydro-Quebec"]) == 2            # a folder without an index.json
-    out = capsys.readouterr().out
+    shown = capsys.readouterr()
+    assert shown.out == ""                                                              # DOC534.256: nothing in the results, all on stderr
+    out = shown.err
     assert out.count("ERROR") == 2 and "build_corpus.py" in out
     # DOC534.199: the message names the folder that lacks the index (each time) and the command to run for it
     assert f"no index.json in {tmp_path / 'no-such-corpus'}" in out and f"no index.json in {tmp_path}:" in out

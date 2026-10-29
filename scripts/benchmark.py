@@ -225,7 +225,8 @@ def main(argv: list[str] | None = None) -> int:
     mine_p.add_argument("company")
     args = ap.parse_args(argv)
     if not (args.cache / "index.json").is_file():  # not a traceback: say what is missing and how to get it
-        print(f"ERROR: no index.json in {args.cache}: build the corpus first (scripts/build_corpus.py ARCHIVE_ROOT {args.cache})")
+        print(f"ERROR: no index.json in {args.cache}: build the corpus first (scripts/build_corpus.py ARCHIVE_ROOT {args.cache})",
+              file=sys.stderr)  # not in the results a redirection or a pipe collects
         return 2
     score(args.cache) if args.command == "score" else mine(args.cache, args.company)
     return 0
