@@ -87,6 +87,8 @@ def validate(values: dict) -> dict[str, str]:
     quarantine = folder("quarantine", must_exist=False) if "quarantine" in values else None
     if inbox and library and inbox.resolve() == library.resolve():
         errors["library_root"] = "must be a different folder from the inbox (filed documents would be scanned again)"
+    elif inbox and library and inbox.resolve() in library.resolve().parents:  # the scan reads sub-folders too
+        errors["library_root"] = "must not be inside the inbox (filed documents would be scanned again)"
     if library and quarantine and (library.resolve() == quarantine.resolve() or library.resolve() in quarantine.resolve().parents):
         errors["quarantine"] = "must be outside the library (duplicates would be filed into it)"
     if library and not os.access(library, os.W_OK):
@@ -94,6 +96,8 @@ def validate(values: dict) -> dict[str, str]:
     for i, extra in enumerate(values.get("extra_inboxes") or []):
         if why := _problem(Path(str(extra)).expanduser()):
             errors[f"extra_inboxes[{i}]"] = why
+        elif library and (Path(str(extra)).expanduser().resolve() in (library.resolve(), *library.resolve().parents)):
+            errors[f"extra_inboxes[{i}]"] = "must not be the library or contain it (filed documents would be scanned again)"
     return errors
 
 

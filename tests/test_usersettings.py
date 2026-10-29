@@ -48,6 +48,12 @@ def test_validation_names_each_wrong_folder(home, tmp_path):
     same = usersettings.validate({"inbox": str(f["inbox"]), "library_root": str(f["inbox"]), "quarantine": str(f["inbox"] / "q")})
     assert "different" in same["library_root"]                                           # the inbox and the library must not be the same folder
     assert "outside" in same["quarantine"]                                               # not inside the library: it would be filed into itself
+    # DOC534.39: the scan reads sub-folders, so a library inside the inbox or inside / equal to an extra inbox is scanned again
+    (f["inbox"] / "lib").mkdir()
+    inside = usersettings.validate({"inbox": str(f["inbox"]), "library_root": str(f["inbox"] / "lib"), "quarantine": str(f["quarantine"])})
+    assert "inside the inbox" in inside["library_root"]
+    extras = usersettings.validate({"inbox": str(f["inbox"]), "library_root": str(f["library"]), "extra_inboxes": [str(f["extra"]), str(f["library"]), str(tmp_path)]})
+    assert "extra_inboxes[0]" not in extras and "library" in extras["extra_inboxes[1]"] and "contain it" in extras["extra_inboxes[2]"]
     # DOC534.38: nor the library itself (`parents` does not hold the folder itself)
     equal = usersettings.validate({"inbox": str(f["inbox"]), "library_root": str(f["library"]), "quarantine": str(f["library"])})
     assert "outside" in equal["quarantine"]
