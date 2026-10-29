@@ -693,9 +693,8 @@ def test_a_destination_with_no_folder_in_it_is_not_a_destination(tmp_path, blank
     from docflow.pipeline import resolve_destination
     assert route({"Acme": {"destination": blank}}, "Acme", "Facture") is None            # the company-level branch
     assert route({"Acme": {"Facture": {"destination": blank}}}, "Acme", "Facture") is None   # and the per-type one
-    if blank.strip() in ("", ".", "./"):
-        with pytest.raises(ValueError):
-            safe_join(tmp_path, blank)                                                    # the last line of defence
+    with pytest.raises(ValueError, match="destination refused"):                          # the last line of defence, for EVERY value
+        safe_join(tmp_path, blank)                                                        # (DOC534.218: "/" and " . " were left out)
     cfg = load_config(sandbox=tmp_path)
     cfg.routing["Acme"] = {"destination": blank}
     got = resolve_destination(cfg, Analysis(date="2025-10-07", company="Acme", document_type="Facture"))
