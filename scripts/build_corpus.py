@@ -1,7 +1,9 @@
 """Test bench: reads (OCR if needed) the archive PDFs whose NAME already follows the standard, and keeps their text
 in a disposable LOCAL folder (never in the repository). The file name serves as the expected answer.
-usage: PYTHONPATH=backend uv run python scripts/build_corpus.py ARCHIVE_ROOT CACHE_FOLDER [--fresh]
+usage: PYTHONPATH=backend uv run python scripts/build_corpus.py ARCHIVE_ROOT CACHE_FOLDER [--fresh] [--prune]
 A saved text is reused only if its PDF, the OCR settings and the extractor are unchanged (--fresh: extract everything).
+--prune deletes the saved texts of PDFs that are no longer in the archive: those texts are copies of private documents, so a
+deleted document should not leave one behind; it is not the default because it deletes files, and a run only REPORTS the orphans.
 Left out on purpose: files under a folder whose name starts with "@" (the NAS's own folders: @Recycle, @eaDir, thumbnails), and
 files whose name does not follow the standard. A folder that merely CONTAINS an "@" (team@2024) is read."""
 import argparse

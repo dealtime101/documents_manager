@@ -496,6 +496,18 @@ def test_compare_does_not_save_a_text_from_an_extraction_that_lost_pages(tmp_pat
     assert "exact full date      : 1/1 = 100%" in capsys.readouterr().out.split("(rates below")[-1]   # the next run re-extracts
 
 
+def test_the_usage_line_of_build_corpus_lists_every_option_the_script_has():
+    # DOC534.116: --prune was missing from the usage, so nobody learned that orphan texts (copies of private documents) can be removed
+    import re
+    script = (SCRIPTS / "build_corpus.py").read_text(encoding="utf-8")
+    doc = load_script("build_corpus").__doc__
+    options = re.findall(r'add_argument\("(--[a-z-]+)"', script)
+    assert set(options) >= {"--fresh", "--prune"}
+    usage = next(line for line in doc.splitlines() if line.startswith("usage:"))
+    assert all(f"[{o}]" in usage for o in options), (options, usage)                  # every option is on the usage line
+    assert "private documents" in doc and "not the default" in doc                    # and the document says what --prune does and why it is off
+
+
 def test_two_samples_that_differ_only_by_the_case_of_the_extension_keep_their_own_saved_text(tmp_path, capsys, monkeypatch):
     # DOC534.110: x.pdf and x.PDF both wrote x.txt: each run invalidated the other's cache and ran the slow extraction again
     compare = load_script("compare")
