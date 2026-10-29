@@ -91,16 +91,16 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
     if ollama:
         o = cfg.settings.get("ollama") or {}
         if not o.get("model"):
-            print("ERROR: --ollama needs `ollama.model` in config/settings.yaml")
+            print("ERROR: --ollama needs `ollama.model` in config/settings.yaml", file=sys.stderr)  # a refusal to start: stderr, not the report
             return 2
         try:
             fb = OllamaAnalyzer(o["model"], o.get("host", "http://127.0.0.1:11434"), types=cfg.types)
         except ValueError as e:  # e.g. a host that is not localhost: refused before any document is sent
-            print(f"ERROR: {e}")
+            print(f"ERROR: {e}", file=sys.stderr)
             return 2
     inbox = source or cfg.path("inbox")
     if not inbox.is_dir():  # a typo or an unmounted share must not look like "scanned, nothing to do"
-        print(f"ERROR: not a folder: {inbox}")
+        print(f"ERROR: not a folder: {inbox}", file=sys.stderr)
         return 2
     files = sorted(f for f in (inbox.rglob("*") if recursive else inbox.glob("*")) if f.is_file())
     done = held = failed = skipped = analysed = 0

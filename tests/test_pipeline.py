@@ -621,7 +621,9 @@ def test_cli_scan_of_a_missing_or_non_folder_source_fails_loudly(env, capsys):
     a_file.write_text("x")
     for source in (tmp / "typo" / "In_Work", a_file):
         assert cli.scan(cfg, db, dry=True, interactive=False, ollama=False, source=source) == 2
-        assert "ERROR" in capsys.readouterr().out
+        shown = capsys.readouterr()
+        # DOC534.211: a refusal to start is on stderr, so that a cron job or a script can tell it from the report on stdout
+        assert f"ERROR: not a folder: {source}" in shown.err and shown.out == ""
     assert cli.scan(cfg, db, dry=True, interactive=False, ollama=False) == 0   # the real (empty) Inbox is fine
 
 
@@ -818,7 +820,8 @@ def test_cli_scan_of_a_missing_default_inbox_fails_too(env, capsys):
     cfg, db, tmp = env
     (tmp / "inbox").rmdir()                                                    # e.g. the share is not mounted
     assert cli.scan(cfg, db, dry=True, interactive=False, ollama=False) == 2
-    assert "ERROR" in capsys.readouterr().out
+    shown = capsys.readouterr()
+    assert "ERROR: not a folder" in shown.err and shown.out == ""                  # stderr, not the report (DOC534.211)
 
 
 @pytest.mark.parametrize("table", [False, True])
@@ -878,10 +881,12 @@ def test_ollama_option_misconfiguration_is_a_clear_message_not_a_traceback(env, 
     mkpdf(tmp / "inbox" / "ok.pdf", HYDRO)
     cfg.settings["ollama"] = {}                                                    # no model configured
     assert cli.scan(cfg, db, dry=True, interactive=False, ollama=True) == 2
-    assert "ollama.model" in capsys.readouterr().out
+    shown = capsys.readouterr()
+    assert "ollama.model" in shown.err and shown.out == ""                          # stderr (DOC534.211), the report stays on stdout
     cfg.settings["ollama"] = {"model": "m", "host": "http://192.0.2.5:11434"}    # a remote host: refused, nothing sent
     assert cli.scan(cfg, db, dry=True, interactive=False, ollama=True) == 2
-    assert "localhost" in capsys.readouterr().out
+    shown = capsys.readouterr()
+    assert "localhost" in shown.err and shown.out == ""
     assert (tmp / "inbox" / "ok.pdf").exists()
 
 
