@@ -14,10 +14,13 @@ CFG = load_config()
 AN = RuleBasedAnalyzer(CFG)
 
 
-def name_of(text: str) -> str:
-    a = AN.analyze(text)
+def name_from(a) -> str:
     assert a.company and a.document_type, f"incomplete analysis: {a.company!r} / {a.document_type!r}"  # a name needs both
     return build_filename(a.date, a.company, a.document_type, a.detail, a.amount if a.include_amount else None, a.currency)
+
+
+def name_of(text: str) -> str:
+    return name_from(AN.analyze(text))
 
 
 def test_hydro_facture():
@@ -32,9 +35,8 @@ def test_hydro_mve_beats_plain():
 
 
 def test_card_without_date():
-    a = AN.analyze("Croix Bleue Medavie\nCarte d'identification")
-    assert name_of("Croix Bleue Medavie\nCarte d'identification") == \
-        "XXXX - CroixBleueMedavie - CarteAssuranceSante - Identification.pdf"
+    a = AN.analyze("Croix Bleue Medavie\nCarte d'identification")              # analysed once: the name and the confidence are of the same analysis
+    assert name_from(a) == "XXXX - CroixBleueMedavie - CarteAssuranceSante - Identification.pdf"
     assert a.confidence >= 0.95
 
 
