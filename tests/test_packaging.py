@@ -95,6 +95,13 @@ def test_the_windows_build_checks_the_python_version_and_remakes_an_old_build_ve
     assert interpreter < old_venv < script.index("rmdir /s /q .venv-build") < script.index("%PY% -m venv .venv-build")
 
 
+def test_the_tesseract_work_folder_is_assigned_once_where_it_is_used():
+    # DOC534.263: it was set before the `if` and again inside it, the same way; only the inner one is read
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    assert script.count('$work = ') == 1
+    assert script.index('$work = ') > script.index("if (-not $install) {")                 # inside the block that uses it
+
+
 def test_the_progress_bar_is_off_before_the_first_download():
     # DOC534.158: on Windows PowerShell 5.1 the progress bar of Invoke-WebRequest makes a big download many times slower
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")

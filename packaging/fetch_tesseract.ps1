@@ -14,7 +14,6 @@ $needed = "tesseract.exe", "tessdata\eng.traineddata", "tessdata\osd.traineddata
 $missing = @($needed | Where-Object { -not (Test-Path (Join-Path $out $_)) })
 $dlls = @(Get-ChildItem -Path $out -Filter "*.dll" -ErrorAction SilentlyContinue)
 if ($missing.Count -eq 0 -and $dlls.Count -gt 0) { Write-Host "Tesseract already prepared in $out"; exit 0 }
-$work = Join-Path $root "build\tesseract-src"
 $install = $From
 if (-not $install) {
   $work = Join-Path $root "build\tesseract-src"
