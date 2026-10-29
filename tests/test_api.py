@@ -1560,7 +1560,7 @@ def test_the_dashboard_does_not_walk_the_source_folders_on_every_refresh(api, sb
     real = services.pdfs_under
     monkeypatch.setattr(services, "pdfs_under", lambda p: walks.append(p) or real(p))
     clock = [1000.0]
-    monkeypatch.setattr(services.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(services, "_now", lambda: clock[0])         # DOC534.189: this clock only; time.monotonic keeps running for the scan
     services._forget_counts()
     pdf(sb / "inbox" / "a.pdf", HYDRO)
     first = api.get("/api/dashboard").json()
@@ -1576,6 +1576,8 @@ def test_the_dashboard_does_not_walk_the_source_folders_on_every_refresh(api, sb
     api.post("/api/scan")                                        # a scan changes the files: the next view is fresh at once
     api.get("/api/dashboard")
     assert len(walks) > n
+    import time
+    assert services.time is time and time.monotonic() != clock[0]       # the shared module was left alone
 
 
 def test_a_scan_left_running_by_a_killed_worker_does_not_block_the_next_one(api, sb):

@@ -82,8 +82,14 @@ def _forget_counts() -> None:
     _counts.clear()
 
 
+def _now() -> float:
+    """The clock of the folder counts. Its own function, so that a test can move it without freezing `time.monotonic` for the rest
+    of the process (the scan's heartbeat reads that one)."""
+    return time.monotonic()
+
+
 def _pdf_count(folder: Path) -> int:
-    now = time.monotonic()
+    now = _now()
     hit = _counts.get(str(folder))
     if hit and now - hit[0] < COUNT_TTL:
         return hit[1]
