@@ -227,7 +227,7 @@ def _covers(ocr: str, native: str) -> bool:
     wanted, got = _words(native), _words(ocr)
     if not wanted:
         return True
-    if " ".join(wanted) in " ".join(got):
+    if f" {' '.join(wanted)} " in f" {' '.join(got)} ":  # whole words: "12" is not inside "2012", "an" is not inside "plan"
         return True
     seen = set(got)
     return sum(w in seen for w in wanted) / len(wanted) >= 0.8

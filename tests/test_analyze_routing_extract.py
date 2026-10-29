@@ -438,6 +438,17 @@ def test_ocr_timeout_does_not_crash_the_document(tmp_path, monkeypatch):
     assert extract.extract_text(f).method == "ocr_unavailable"  # page not read, but no exception
 
 
+def test_native_text_is_covered_by_whole_words_of_the_ocr_text_not_by_pieces_of_words():
+    # DOC534.85: a stamp "12" or "an" was found inside the OCR words "2012" and "plan", judged read, and dropped from the final text
+    assert not extract._covers("Facture 2012 du plan", "12")
+    assert not extract._covers("Facture 2012 du plan", "an")
+    assert not extract._covers("Facture du 15 mars 2012", "mars 20")                     # the end of a word is not a word either
+    assert extract._covers("Hydro-Québec Facture 158,98 $ du 7 octobre", "facture 158 98")      # what OCR really read: covered
+    assert extract._covers("Facture 12 du plan", "12")                                   # as a whole word it is found
+    assert extract._covers("une facture", "")                                            # nothing native to cover
+    assert extract._covers("a b c d e f g h i j", "a b c d e f g h i x")                 # a few misread words are still covered
+
+
 def test_a_failed_or_timed_out_orientation_check_leaves_a_warning_saying_why(monkeypatch, caplog):
     # DOC534.84: a missing osd.traineddata or a timeout made every sideways page be read as it is, without a word in the log
     import logging
