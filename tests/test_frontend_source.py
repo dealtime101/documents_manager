@@ -81,6 +81,15 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_forgetting_a_route_also_forgets_the_unsaved_typing_for_that_company():
+    # DOC534.119: the draft stayed in memory: when the company was learned again the field showed the old typing, not the destination
+    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text()
+    assert "const dropDraft = (company: string) => setDrafts(" in rules and "delete next[company]" in rules
+    forget = rules[rules.index("const forget = "):rules.index("const saveRoute = ")]
+    assert "kind === 'route' ? () => dropDraft(company) : undefined" in forget            # only a route has a draft
+    assert "() => dropDraft(company))" in rules[rules.index("const saveRoute = "):]       # and saving still clears it, as before
+
+
 def test_a_failed_background_refresh_is_quiet_only_when_numbers_are_already_on_screen():
     # DOC534.118: the tab became visible during the first load, the quiet request replaced it and failed: "Loading" for ever, no error
     page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text()
@@ -698,7 +707,7 @@ def test_a_saved_destination_stays_on_screen_until_the_rules_are_reloaded():
     rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text()
     save = rules[rules.index("const saveRoute"):rules.index("const filed")]
     assert "await api.setRoute(company, destination)" in save or "api.setRoute(company, destination)" in save
-    assert "setDrafts" in save and save.index("api.setRoute") < save.index("setDrafts")
+    assert "dropDraft(company)" in save and save.index("api.setRoute") < save.index("dropDraft")   # (dropDraft = setDrafts without that company)
     assert "const loaded = await load()" in rules and "if (loaded) after?.()" in rules          # the draft goes only after a good reload
     act = rules[rules.index("const act"):rules.index("const forget")]
     assert act.index("await load()") < act.index("after?.()")

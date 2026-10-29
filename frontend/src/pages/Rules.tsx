@@ -47,12 +47,16 @@ export default function Rules() {
       setBusy(false)
     }
   }
+  const dropDraft = (company: string) => setDrafts((d) => { const next = { ...d }; delete next[company]; return next })
   const forget = (kind: Kind, company: string, pattern?: string) => {
-    if (confirm(t('rules.confirmForget', { what: pattern ? `${company} / “${pattern}”` : company }))) void act(() => api.forgetRule(kind, company, pattern), t('rules.forgotten'))
+    if (confirm(t('rules.confirmForget', { what: pattern ? `${company} / “${pattern}”` : company }))) {
+      // a forgotten route takes its unsaved typing with it: if the company comes back, the field shows what was learned, not that
+      void act(() => api.forgetRule(kind, company, pattern), t('rules.forgotten'), kind === 'route' ? () => dropDraft(company) : undefined)
+    }
   }
   const saveRoute = (company: string, destination: string) => act(
     () => api.setRoute(company, destination), t('rules.routeSaved'),
-    () => setDrafts((d) => { const next = { ...d }; delete next[company]; return next }))  // back to the saved value, after the reload
+    () => dropDraft(company))  // back to the saved value, after the reload
 
   // the same object until its inputs change: Notice treats a new object as a new message to announce
   const shownNote = useMemo(
