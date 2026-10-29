@@ -28,6 +28,19 @@ def test_the_test_session_works_in_a_throw_away_folder_and_on_the_test_rules():
     assert load_config().learn_dir.is_relative_to(Path(tempfile.gettempdir()))
 
 
+def test_a_docflow_home_exported_by_the_developers_shell_is_replaced_by_a_throw_away_folder(tmp_path):
+    # DOC534.55: conftest used setdefault, so the tests would have read and written a DOCFLOW_HOME already in the environment
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    real = tmp_path / "the-real-folder"
+    code = "import os, sys; sys.path.insert(0, sys.argv[1]); import conftest; print(os.environ['DOCFLOW_HOME'])"
+    out = subprocess.run([sys.executable, "-c", code, str(Path(__file__).parent)], capture_output=True, text=True, check=True,
+                         env={**os.environ, "DOCFLOW_HOME": str(real)}).stdout.strip()
+    assert out != str(real) and Path(out).name.startswith("docflow-home-")
+
+
 def test_the_user_folder_is_docflow_home_when_set_and_otherwise_a_per_user_place(monkeypatch, tmp_path):
     monkeypatch.setenv("DOCFLOW_HOME", str(tmp_path / "h"))
     assert usersettings.user_dir() == tmp_path / "h"
