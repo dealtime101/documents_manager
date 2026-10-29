@@ -190,8 +190,9 @@ def load_config(config_dir: Path | str | None = None, sandbox: Path | None = Non
             return default
         try:
             data = yaml.safe_load(f.read_text(encoding="utf-8")) or default
-            if learned and not isinstance(data, type(default)):
-                raise ValueError(f"expected a {type(default).__name__}, found a {type(data).__name__}")
+            if not isinstance(data, type(default)):  # a hand-written file too: a list where a mapping is expected is named, not an AttributeError
+                shape = {"dict": "mapping", "list": "list"}.get(type(default).__name__, type(default).__name__)
+                raise ValueError(f"{name}: expected a {shape}, found a {type(data).__name__}")
             return data
         except (yaml.YAMLError, OSError, UnicodeDecodeError, ValueError) as e:
             if not learned:

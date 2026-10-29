@@ -77,6 +77,16 @@ def test_one_malformed_learned_alias_costs_that_entry_not_the_start_of_the_progr
         load_config(prod)
 
 
+@pytest.mark.parametrize("name,text,found", [("companies.yaml", "- Hydro\n- Voisin\n", "list"), ("settings.yaml", "- a\n", "list"),
+                                              ("document_types.yaml", "Hydro: x\n", "dict"), ("routing_rules.yaml", "- x\n", "list")])
+def test_a_hand_written_file_of_the_wrong_shape_names_the_file_and_what_was_found(tmp_path, name, text, found):
+    # DOC534.98: a list instead of a mapping gave "'list' object has no attribute 'items'", with no file name
+    d = _config_dir(tmp_path, "ACME: [acme]\n")
+    (d / name).write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match=rf"{name}: expected a (mapping|list), found a {found}"):
+        load_config(d, sandbox=tmp_path / "sb")
+
+
 def test_a_sandbox_rule_with_no_company_does_not_hide_the_inherited_rules_that_have_none(tmp_path):
     # DOC534.97: None entered `taken`, so every inherited rule without a company disappeared as soon as the sandbox had one
     prod = _production_with_learned(tmp_path / "prod")
