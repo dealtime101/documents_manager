@@ -123,6 +123,17 @@ def test_the_empty_queue_message_quotes_the_exact_label_of_the_scan_button_in_bo
         assert label in empty, (label, empty)
 
 
+def test_top_level_block_is_the_whole_block_and_not_a_fixed_window():
+    import pytest
+    from conftest import top_level_block
+    long_body = "\n".join(f"  // line {n}" for n in range(200))
+    source = f"function first() {{\n{long_body}\n  return 1\n}}\n\nfunction second() {{\n  return 2\n}}\n"
+    block = top_level_block(source, "function first")
+    assert block.endswith("return 1\n}") and "second" not in block and block.count("line") == 200      # longer than any window
+    with pytest.raises(AssertionError, match="no longer in the source"):
+        top_level_block(source, "function third")
+
+
 def test_the_french_table_reader_takes_that_table_only_and_says_clearly_when_it_cannot_find_it():
     # DOC534.215: not "everything to the end of the file", and not a bare ValueError when the constant is renamed
     import pytest
@@ -130,7 +141,7 @@ def test_the_french_table_reader_takes_that_table_only_and_says_clearly_when_it_
     source = "const en = {\n  'a': 'in en',\n}\nconst frMessages = {\n  'b': 'fr',\n}\nconst other = {\n  'c': 'elsewhere',\n}\n"
     table = fr_messages_table(source)
     assert "'b'" in table and "'a'" not in table and "'c'" not in table
-    with pytest.raises(AssertionError, match="no longer declares"):
+    with pytest.raises(AssertionError, match="no longer in the source"):
         fr_messages_table("const fr = {\n}\n")
     real = I18N.read_text(encoding="utf-8")                                              # (DOC534.236: the one constant for this file)
     assert "const frSpaced" not in fr_messages_table(real) and fr_messages_table(real).count("\n") > 50   # the real table, cut at its end
@@ -190,7 +201,9 @@ def test_the_count_of_accepted_documents_has_a_singular_and_a_plural_in_both_lan
 def test_without_a_saved_choice_the_language_follows_the_browser_and_a_saved_choice_wins():
     # DOC474.28: a fr-CA browser got the English interface until the switch was used by hand (and again in a private window)
     src = I18N.read_text(encoding="utf-8")
-    body = src[src.index("function readLang"):src.index("function readLang") + 600]
+    from conftest import top_level_block
+    body = top_level_block(src, "function readLang")                              # the whole function, whatever its length (DOC534.240)
+    assert "function " not in body[len("function readLang"):] and "navigator.language" in body
     assert "stored === 'fr' || stored === 'en'" in body                          # a saved choice, either one, is kept
     assert "navigator.language" in body and "startsWith('fr')" in body            # otherwise the browser's language decides
     assert body.index("stored === 'fr'") < body.index("navigator.language")      # in that order

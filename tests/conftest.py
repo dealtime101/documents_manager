@@ -12,15 +12,20 @@ os.environ["DOCFLOW_HOME"] = tempfile.mkdtemp(prefix="docflow-home-")  # forced:
 os.environ["DOCFLOW_CONFIG_DIR"] = str(Path(__file__).parent / "fixtures" / "config")  # forced too: not the one of the developer's shell
 
 
+def top_level_block(source: str, start: str) -> str:
+    """From `start` to the closing brace that stands alone at the start of a line: the whole function or table, however long, and not
+    a word more (DOC534.240; DOC534.215 for the French table). A fixed number of characters either cut the code short or ran on into
+    the next declaration; a name that is gone is a clear failure, not a bare ValueError."""
+    first = source.find(start)
+    assert first >= 0, f"{start!r} is no longer in the source: update the test that reads it"
+    end = source.find("\n}\n", first)
+    assert end > first, f"the block that starts with {start!r} has no closing brace at the start of a line"
+    return source[first:end + 2]
+
+
 def fr_messages_table(i18n_source: str) -> str:
-    """The text of the `frMessages` table of frontend/src/i18n.tsx and nothing else: from its declaration to the closing brace at the
-    start of a line (DOC534.215). Before, the tests took everything to the end of the file, so a key of another table placed after
-    it passed as French, and a renamed constant stopped them with a bare ValueError."""
-    start = i18n_source.find("const frMessages")
-    assert start >= 0, "frontend/src/i18n.tsx no longer declares `const frMessages`: update tests/conftest.py fr_messages_table()"
-    end = i18n_source.find("\n}\n", start)
-    assert end > start, "the frMessages table of i18n.tsx has no closing brace at the start of a line"
-    return i18n_source[start:end + 2]
+    """The text of the `frMessages` table of frontend/src/i18n.tsx and nothing else."""
+    return top_level_block(i18n_source, "const frMessages")
 
 
 SUBPROCESS_TIMEOUT = 180  # seconds; read at each call, so a test can lower it
