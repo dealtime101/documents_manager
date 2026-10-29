@@ -500,17 +500,21 @@ def test_the_pdf_is_served_with_its_own_file_name_so_saving_it_does_not_give_a_g
 def test_serving_the_pdf_preview_does_not_leak_file_descriptors(api, sb):
     """The view hands an open file to FileResponse on purpose (a `with` block would close it before the body is streamed):
     the response closes it itself. 300 previews, fully read, must not leave 300 descriptors open."""
-    import os
+    def open_descriptors() -> int:
+        for folder in ("/proc/self/fd", "/dev/fd"):                                   # Linux, then macOS and the BSDs
+            if os.path.isdir(folder):
+                return len(os.listdir(folder))
+        pytest.skip("this system has no folder listing the open descriptors (Windows)")
     pdf(sb / "inbox" / "a.pdf", HYDRO)
     api.post("/api/scan")
     item = Item.objects.get()
     api.get(f"/api/items/{item.id}/pdf")                                              # warm-up (first-use allocations)
-    before = len(os.listdir("/proc/self/fd"))
+    before = open_descriptors()
     for _ in range(300):
         r = api.get(f"/api/items/{item.id}/pdf")
         assert r.status_code == 200 and b"".join(r.streaming_content).startswith(b"%PDF")
         r.close()
-    assert len(os.listdir("/proc/self/fd")) <= before + 3                             # not +300
+    assert open_descriptors() <= before + 3                                           # not +300
 
 
 def test_a_pdf_that_cannot_be_opened_leaves_the_reason_in_the_log(api, sb, monkeypatch, caplog):
