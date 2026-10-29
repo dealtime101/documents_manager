@@ -99,6 +99,14 @@ def _patterns(company: str, value, source: str) -> list[str]:
     raise ValueError(f"{source}: the entry {company!r} must be a pattern or a list of patterns, got {type(value).__name__}")
 
 
+def _only_dicts(items: list, source: str) -> list[dict]:
+    """The entries of a LEARNED list that are mappings. The others are dropped with a warning: they would crash `.get` below."""
+    kept = [r for r in items if isinstance(r, dict)]
+    if len(kept) != len(items):
+        log.warning("%s: %d entries that are not a mapping ignored", source, len(items) - len(kept))
+    return kept
+
+
 PATH_SETTINGS = ("inbox", "library_root", "quarantine", "db", "log")
 
 
@@ -200,9 +208,10 @@ def load_config(config_dir: Path | str | None = None, sandbox: Path | None = Non
                 continue
             companies.setdefault(name, []).extend(p for p in found if p not in companies.get(name, []))
     # learned rules carry an in-memory marker (never written back) so they can be told apart from hand-written ones
-    own_types = rd(learn, "types_learned.yaml", [], learned=True)
+    own_types = _only_dicts(rd(learn, "types_learned.yaml", [], learned=True), "types_learned.yaml")
     taken = {r.get("company") for r in own_types}  # a company the sandbox corrected: its default type replaces the inherited one
-    inherited_types = [r for r in rd(inherited, "types_learned.yaml", [], learned=True) if r.get("company") not in taken] if inherited else []
+    inherited_types = [r for r in _only_dicts(rd(inherited, "types_learned.yaml", [], learned=True), "types_learned.yaml")
+                       if r.get("company") not in taken] if inherited else []
     types = list(rd(hand_dir("document_types.yaml"), "document_types.yaml", [])) + [dict(r, _learned=True) for r in inherited_types + own_types]
     routing: dict = {}
     for source in ([inherited] if inherited else []) + [learn]:

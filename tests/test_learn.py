@@ -77,6 +77,19 @@ def test_one_malformed_learned_alias_costs_that_entry_not_the_start_of_the_progr
         load_config(prod)
 
 
+def test_a_learned_type_entry_that_is_not_a_mapping_is_ignored_not_fatal(tmp_path, caplog):
+    # DOC534.27: types_learned.yaml was checked as a list only; a string or null item crashed `.get` / dict() in load_config
+    import logging
+    prod = _production_with_learned(tmp_path / "prod")
+    (prod / "types_learned.yaml").write_text("- {type: Lettre, company: Voisin, type_conf: 0.85}\n- oops\n- null\n", encoding="utf-8")
+    with caplog.at_level(logging.WARNING):
+        sandbox = load_config(prod, sandbox=tmp_path / "sb", inherit_learned=True)
+        own = load_config(prod)
+    for cfg in (sandbox, own):
+        assert {(r["company"], r["type"]) for r in cfg.types if r.get("_learned")} == {("Voisin", "Lettre")}
+    assert any("types_learned.yaml" in r.getMessage() and "2 entries" in r.getMessage() for r in caplog.records)
+
+
 def test_a_sandbox_rehearses_with_what_production_has_learned(tmp_path):
     prod = _production_with_learned(tmp_path / "prod")
     sandbox = load_config(prod, sandbox=tmp_path / "sb", inherit_learned=True)
