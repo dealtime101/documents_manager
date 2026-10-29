@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pymupdf
@@ -449,6 +450,14 @@ def test_items_queued_before_the_stamp_existed_are_stamped_by_one_read_then_left
     assert api.post("/api/scan").json()["skipped"] == 1 and hash_calls == []
 
 
+def lock(path: Path) -> None:
+    """chmod 0 a file so that opening it is refused. Not possible for root (a CI container) or on Windows, where the mode does not
+    keep the owner out: the test is skipped there rather than reporting a regression that does not exist (DOC534.184)."""
+    if os.name == "nt" or os.geteuid() == 0:
+        pytest.skip("a mode 0 file is still readable by root and on Windows")
+    path.chmod(0)
+
+
 @pytest.mark.parametrize("what", ["vanishes", "is_a_folder", "unreadable"])
 def test_a_pdf_that_cannot_be_opened_after_the_path_was_checked_is_a_404_not_a_500(api, sb, monkeypatch, what):
     from triage import services
@@ -463,7 +472,7 @@ def test_a_pdf_that_cannot_be_opened_after_the_path_was_checked_is_a_404_not_a_5
     else:
         target = sb / "locked.pdf"
         target.write_bytes(b"%PDF-1.4")
-        target.chmod(0)
+        lock(target)
     monkeypatch.setattr(services, "pdf_path", lambda it: target)
     try:
         r = api.get(f"/api/items/{item.id}/pdf")
@@ -514,7 +523,7 @@ def test_a_pdf_that_cannot_be_opened_leaves_the_reason_in_the_log(api, sb, monke
     item = Item.objects.get()
     locked = sb / "locked.pdf"
     locked.write_bytes(b"%PDF-1.4")
-    locked.chmod(0)
+    lock(locked)
     monkeypatch.setattr(services, "pdf_path", lambda it: locked)
     try:
         with caplog.at_level(logging.WARNING):
