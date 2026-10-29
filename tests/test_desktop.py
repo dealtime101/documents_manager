@@ -25,6 +25,19 @@ def test_the_settings_describe_the_one_deployment_there_is_a_local_desktop_appli
     assert source.startswith('"""Django settings. Desktop application')
 
 
+def test_the_selftest_exit_code_says_whether_it_passed(monkeypatch, capsys):
+    # DOC534.35: --selftest printed the result and always returned 0: a script checking the packaged program never saw a failure
+    from docflow import desktop
+    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("free_port", lambda: 1),
+                        ("start_server", lambda port: None)):
+        monkeypatch.setattr(desktop, name, value)
+    good = {"signed_in": True, "interface": True, "database_in_user_folder": True, "version": "x", "ocr": []}
+    results = iter([good, {**good, "signed_in": False}, {**good, "interface": False}, {**good, "database_in_user_folder": False}])
+    monkeypatch.setattr(desktop, "selftest", lambda port, token: next(results))
+    assert [desktop.main(["--selftest"]) for _ in range(4)] == [0, 1, 1, 1]
+    assert capsys.readouterr().out.count('"signed_in"') == 4                         # and the result is still printed each time
+
+
 def test_a_free_local_port_is_found_and_really_free():
     from docflow.desktop import free_port
     port = free_port()

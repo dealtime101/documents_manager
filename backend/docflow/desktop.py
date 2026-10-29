@@ -115,8 +115,9 @@ def main(argv: list[str] | None = None) -> int:
     start_server(port)
     print("server up", flush=True)
     if "--selftest" in argv:
-        print(json.dumps(selftest(port, token)))
-        return 0
+        result = selftest(port, token)
+        print(json.dumps(result))
+        return 0 if result["signed_in"] and result["interface"] and result["database_in_user_folder"] else 1  # a script can tell
     url = f"http://127.0.0.1:{port}/?t={token}"
     try:
         import webview
