@@ -81,6 +81,17 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_the_fixed_extension_of_a_file_name_field_is_read_by_screen_readers_with_the_field():
+    # DOC534.121: the extension was aria-hidden: nobody using a screen reader learned that it is added by the program
+    bits = BITS.read_text(encoding="utf-8")
+    name_input = bits[bits.index("export function NameInput"):bits.index("export function Notice")]
+    assert "aria-hidden" not in name_input                                                                        # the extension box is no longer hidden
+    assert "aria-describedby={ext ? extId : undefined}" in name_input and "<span id={extId}" in name_input         # tied to the field
+    assert "<span className=\"sr-only\">{t('field.extAdded')} </span>{ext}" in name_input                          # and says what it is
+    i18n = (BITS.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
+    assert "'field.extAdded': 'Extension added automatically:'" in i18n and "'field.extAdded': \"Extension ajoutée automatiquement :\"" in i18n
+
+
 def test_the_rules_screen_locks_a_change_with_a_ref_read_at_once_not_with_a_state_one_render_late():
     # DOC534.120: two clicks before the re-render both read busy=false and started two requests
     rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text()
@@ -354,7 +365,7 @@ def test_the_dashboard_shows_the_accuracy_card_with_the_observation_worded_as_on
 def test_a_file_name_is_typed_without_its_pdf_extension_which_is_fixed_and_greyed():
     src = UI.parents[1]
     bits = (src / "components" / "Bits.tsx").read_text()
-    assert "export function NameInput" in bits and 'aria-hidden="true" className="flex select-none' in bits and "text-slate-500" in bits
+    assert "export function NameInput" in bits and 'className="flex select-none items-center rounded-r-md' in bits and "text-slate-500" in bits   # (DOC534.121: no aria-hidden)
     assert "stem + ext" in bits and "toLowerCase().endsWith(ext.toLowerCase())" in bits       # a typed ".pdf" is not doubled
     for page in ("Queue.tsx", "Library.tsx"):
         text = (src / "pages" / page).read_text()

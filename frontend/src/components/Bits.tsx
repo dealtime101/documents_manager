@@ -22,12 +22,19 @@ export function Field({ label, children }: { label: string; children: ReactEleme
 export function NameInput({ value, onChange, ext = '.pdf', placeholder = '', id }: {
   value: string; onChange: (full: string) => void; ext?: string; placeholder?: string; id?: string
 }) {
+  const { t } = useI18n()
+  const extId = useId()
   const strip = (v: string) => (ext && v.toLowerCase().endsWith(ext.toLowerCase()) ? v.slice(0, -ext.length) : v)  // a typed ".pdf" is not doubled
   return (
     <div className="flex items-stretch">
-      <Input id={id} className="rounded-r-none" value={strip(value)} placeholder={strip(placeholder)}
+      <Input id={id} className="rounded-r-none" value={strip(value)} placeholder={strip(placeholder)} aria-describedby={ext ? extId : undefined}
         onChange={(e) => { const stem = strip(e.target.value); onChange(stem ? stem + ext : '') }} />
-      {ext && <span aria-hidden="true" className="flex select-none items-center rounded-r-md border border-l-0 bg-slate-100 px-2 text-slate-500">{ext}</span>}
+      {/* read with the field (aria-describedby): the extension is fixed and added by the program, not to be typed */}
+      {ext && (
+        <span id={extId} className="flex select-none items-center rounded-r-md border border-l-0 bg-slate-100 px-2 text-slate-500">
+          <span className="sr-only">{t('field.extAdded')} </span>{ext}
+        </span>
+      )}
     </div>
   )
 }
