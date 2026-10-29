@@ -158,6 +158,10 @@ def scan(job: ScanJob | None = None) -> dict:
             hashed[f] = (sha, st.st_size, st.st_mtime_ns)
             owner.setdefault(sha, f)  # of identical files, the first by path is the original, the others are copies
     batch = {str(f) for f in todo}
+    # the contents already waiting from EARLIER scans, taken once (and filtered here, not with a SQL IN over the whole batch: a backlog
+    # of thousands of files would pass thousands of parameters to the database for every result)
+    queued_before = {sha for sha, path in Item.objects.filter(state=Item.PENDING).exclude(sha256="").values_list("sha256", "source_path")
+                     if path not in batch}
     if job:
         job.total, job.skipped = len(todo), skipped
         job.save()
@@ -187,8 +191,7 @@ def scan(job: ScanJob | None = None) -> dict:
                 # A copy is flagged whatever the order in which results arrive: either an item from an EARLIER scan has
                 # the same content, or a file that sorts before it in THIS batch does.
                 # A file that could not be read has no SHA (""): it is the same as nothing, not as the other unreadable files.
-                same = Item.objects.filter(sha256=p.sha256, state=Item.PENDING).exclude(source_path__in=batch)
-                earlier = bool(p.sha256) and same.exists()
+                earlier = p.sha256 in queued_before
                 if p.status != "duplicate" and p.sha256 and (earlier or owner.get(p.sha256) not in (None, f)):
                     p.status = "duplicate"  # same content as another file already in the queue
                     p.notes.append("Identical to another file in the queue (SHA-256).")

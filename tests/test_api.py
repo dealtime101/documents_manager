@@ -1287,6 +1287,30 @@ def test_the_search_finds_documents_whose_stored_path_uses_backslashes_or_goes_t
     assert found()
 
 
+def test_a_scan_never_sends_the_whole_batch_to_the_database_for_each_result(api, sb):
+    # DOC534.60: every result ran a query with one SQL parameter per file of the scan (SQLite caps them; thousands of files are slow)
+    from django.db import connection
+    files = 8
+    for n in range(files):
+        pdf(sb / "inbox" / f"h{n}.pdf", HYDRO[:1] + [f"Facture d'electricite du {n + 1} octobre 2025", f"Numero de facture : 20000000{n}",
+                                                   "Montant de la presente facture : 158,98 $"])
+    widest = [0]
+
+    def watch(execute, sql, params, many, context):
+        if " IN (" in sql:                                                           # a list of values handed to the database
+            widest.append(len(params or ()))
+        return execute(sql, params, many, context)
+    with connection.execute_wrapper(watch):
+        api.post("/api/scan")
+    # the files present are looked at ONCE before the loop; what used to come on top is one such query per result
+    assert Item.objects.count() == files and sum(1 for w in widest if w >= files) <= 1
+    # and the duplicates are still found: against an earlier scan, and inside the batch
+    (sb / "inbox" / "zz-copy.pdf").write_bytes((sb / "inbox" / "h0.pdf").read_bytes())
+    api.post("/api/scan")
+    rows = {r["filename"]: r["status"] for r in api.get("/api/items").json()}
+    assert rows["zz-copy.pdf"] == "duplicate" and rows["h0.pdf"] != "duplicate"
+
+
 def test_listing_the_items_reads_the_configuration_once_not_once_per_item(api, sb, monkeypatch):
     # DOC534.59: item_dict called cfg() (which looks at the learned files) for every item of the list
     from triage import services
