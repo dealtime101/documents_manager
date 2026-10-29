@@ -12,7 +12,11 @@ FORBIDDEN = re.compile(
     '[<>:"/\\\\|?*\x00-\x1f\x7f'
     "\xad؀-؅؜۝܏࢐-࢑࣢᠎​-‏‪-‮⁠-⁤⁦-⁯﻿"
     "￹-￻\U000110bd\U000110cd\U00013430-\U0001343f\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0001\U000e0020-\U000e007f]")
-RESERVED = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+# The names Windows keeps for devices, whatever the extension: CON... LPT9, the console handles CONIN$ / CONOUT$, and COM / LPT followed
+# by a superscript 1, 2 or 3 (written with chr(): a literal superscript digit looks like a plain one in an editor).
+_SUPERSCRIPTS = (chr(0xB9), chr(0xB2), chr(0xB3))
+RESERVED = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10)),
+            *(f"COM{d}" for d in _SUPERSCRIPTS), *(f"LPT{d}" for d in _SUPERSCRIPTS)}
 # A name must satisfy BOTH limits; the one reached first wins. The file systems count BYTES (255 on ext4), not characters:
 # 180 accented or non-Latin characters can exceed that, which is why MAX_BYTES exists.
 MAX_NAME = 180  # characters: also far from the 260 of a classic Windows path

@@ -43,6 +43,14 @@ def test_a_negative_amount_written_after_the_currency_code_is_read(text, amount,
     assert found is not None and found.value == Decimal(amount) and found.currency == currency
 
 
+@pytest.mark.parametrize("device", ["CONIN$", "conout$", "CONOUT$.txt", "COM" + chr(0xB9), "com" + chr(0xB2) + ".pdf", "LPT" + chr(0xB3),
+                                    "LPT" + chr(0xB9) + ".txt", "COM9", "NUL"])
+def test_every_name_windows_keeps_for_a_device_is_made_safe(device):
+    # DOC534.115: CONIN$, CONOUT$ and COM/LPT with a superscript digit passed the filter and are devices for Windows
+    assert sanitize(device).startswith("_")                                          # prefixed: no longer a device name
+    assert not sanitize("Facture").startswith("_") and sanitize("Console") == "Console"      # and an ordinary name is left alone
+
+
 def test_the_separator_of_the_fields_never_appears_inside_a_field_of_the_name():
     # DOC534.114: "Smith - Jones" made a name whose fields could not be told apart from "<date> - <company> - <type> - ..."
     name = build_filename("2025-01-02", "Smith - Jones", "Facture - Annuelle", "a  -  b", Decimal("10"))
