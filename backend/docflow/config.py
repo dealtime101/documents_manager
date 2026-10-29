@@ -30,7 +30,8 @@ class Config:
 
     def refresh_learned(self) -> bool:
         """Pick up learned rules written (or forgotten) by ANOTHER worker or process: when a learned file changed since this
-        configuration was read, read it all again. Cheap when nothing changed (three stat calls). True if it reloaded."""
+        configuration was read, read it all again. Cheap when nothing changed: a few stat calls (the three learned files, the three
+        inherited ones in a sandbox that inherits, and the user's settings.yaml: four to seven). True if it reloaded."""
         if self.reload is None:
             return False
         stamp = _stamp_of(self.learn_dir, self.inherited_dir)  # taken BEFORE reading: a write during the read is seen next time

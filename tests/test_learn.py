@@ -170,6 +170,28 @@ def test_a_learned_type_entry_that_is_not_a_mapping_is_ignored_not_fatal(tmp_pat
     assert any("types_learned.yaml" in r.getMessage() and "2 entries" in r.getMessage() for r in caplog.records)
 
 
+def test_the_docstring_of_refresh_learned_counts_the_stat_calls_it_really_makes(tmp_path, monkeypatch):
+    # DOC534.254: it said "three stat calls"; there are four (own folder + user settings) and up to seven (a sandbox that inherits)
+    from pathlib import Path
+
+    from docflow import config
+    prod = _production_with_learned(tmp_path / "prod")
+    calls = []
+    real_stat = Path.stat
+
+    def counting(self, *a, **k):
+        calls.append(self.name)
+        return real_stat(self, *a, **k)
+    for cfg, expected in ((load_config(prod), 4), (load_config(prod, sandbox=tmp_path / "sb", inherit_learned=True), 7)):
+        calls.clear()
+        monkeypatch.setattr(Path, "stat", counting)
+        assert cfg.refresh_learned() is False
+        monkeypatch.setattr(Path, "stat", real_stat)
+        assert len([c for c in calls if c.endswith(".yaml")]) == expected, calls
+    doc = config.Config.refresh_learned.__doc__
+    assert "three stat calls" not in doc and "four to seven" in doc
+
+
 def test_a_sandbox_rehearses_with_what_production_has_learned(tmp_path):
     prod = _production_with_learned(tmp_path / "prod")
     sandbox = load_config(prod, sandbox=tmp_path / "sb", inherit_learned=True)
