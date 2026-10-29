@@ -84,8 +84,10 @@ def main(root: Path, cache: Path, fresh: bool = False, prune: bool = False) -> i
              if f.suffix.lower() == ".pdf" and f.is_file() and STD.match(f.name)
              and not any(part.startswith("@") for part in f.relative_to(root).parts)]  # @Recycle, @eaDir: the NAS's own folders
     index = cache / "index.json"
-    if not files and index.exists() and index.read_text(encoding="utf-8").strip() not in ("", "[]"):
-        print(f"ERROR: no PDF following the standard under {root}: the existing index of {cache} is kept", file=sys.stderr)
+    if not files:  # an unmounted share or the wrong folder is not "0 documents, success", whether or not an index exists already
+        has_index = index.exists() and index.read_text(encoding="utf-8").strip() not in ("", "[]")
+        kept = f"; the existing index of {cache} is kept" if has_index else ""
+        print(f"ERROR: no PDF following the standard under {root} (is the share mounted? is it the right folder?){kept}", file=sys.stderr)
         return 2
     cache.mkdir(parents=True, exist_ok=True)
     if not fresh and (adopted := adopt_old_names(cache)):

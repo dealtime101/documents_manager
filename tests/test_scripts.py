@@ -627,7 +627,9 @@ def test_build_corpus_refuses_a_bad_root_and_never_replaces_an_index_with_an_emp
     assert capsys.readouterr().err.count("ERROR") == 3                             # on stderr, with the per-file errors (DOC474.89)
     fresh_cache = tmp_path / "other-cache"
     assert corpus.main(tmp_path / "typo-in-the-path", fresh_cache) == 2 and not fresh_cache.exists()   # nothing created
-    assert corpus.main(empty, fresh_cache) == 0                                    # first run on an empty archive: fine
+    # DOC534.117: a first run on an empty archive (an unmounted share, the wrong folder) is no "0 documents, success" either
+    assert corpus.main(empty, fresh_cache) == 2 and not fresh_cache.exists()       # refused, and nothing created
+    assert "is the share mounted" in capsys.readouterr().err
 
 
 def test_an_interrupted_write_never_leaves_a_partial_text_that_looks_valid(tmp_path, monkeypatch, capsys):
