@@ -1285,17 +1285,38 @@ def test_an_unreadable_file_is_reported_as_unreadable_not_as_waiting_for_validat
     assert "validation required" not in out and "unreadable" in out and "Cannot read file" in out
 
 
-def test_every_command_line_option_and_command_explains_itself(capsys):
+def test_every_command_line_option_and_command_explains_itself(capsys, monkeypatch):
     # DOC474.47: --dry-run, --interactive, -r, the undo id and the sub-commands showed no help text
-    import argparse
-    parser = cli.build_parser()
-    commands = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
-    missing = []
-    for action in parser._actions + [a for sub in commands.choices.values() for a in sub._actions]:
-        if not action.help and not isinstance(action, (argparse._HelpAction, argparse._SubParsersAction)):
-            missing.append(action.dest)
-    assert not missing, f"no help text for: {missing}"
-    assert all(choice.help for choice in commands._choices_actions) and len(commands._choices_actions) == 3   # scan, undo, history
+    # DOC534.216: read from what `--help` prints (the public behaviour), not from argparse's private _actions / _SubParsersAction
+    import re
+
+    def helped(*words):
+        with pytest.raises(SystemExit) as stopped:
+            cli.build_parser().parse_args([*words, "--help"])
+        assert stopped.value.code == 0
+        return capsys.readouterr().out
+
+    def entries(text):
+        """{what is listed: the text after it} for the lines of the help that list an option, a command or an argument."""
+        found, current = {}, None
+        for line in text.splitlines():
+            if m := re.match(r"^ {2,4}(\S.*?)(?:\s{2,}(\S.*))?$", line):
+                current = m.group(1)
+                found[current] = m.group(2) or ""
+            elif current and line.startswith(" " * 10) and line.strip():
+                found[current] = (found[current] + " " + line.strip()).strip()
+        return found
+    monkeypatch.setenv("COLUMNS", "200")                                                 # lines are not wrapped
+    top = entries(helped())
+    expected = {"scan", "undo", "history"}                                               # the commands the program has, by name
+    assert expected <= set(top), top                                                     # each command is listed by name...
+    for name in top:
+        assert top[name] or name.startswith("{"), f"no help text for {name!r}"           # ...and every entry has its text
+    for command in sorted(expected):
+        listed = entries(helped(command))
+        assert any(k.startswith("-h") for k in listed), (command, listed)
+        missing = [k for k, v in listed.items() if not v and not k.startswith(("usage", "Analyse", "Undo", "List"))]
+        assert not missing, f"{command}: no help text for {missing}"
 
 
 def test_the_operations_of_a_document_are_found_through_an_index(tmp_path, make_db):
