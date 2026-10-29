@@ -114,6 +114,21 @@ def test_undo_across_volumes_verifies_the_copy_before_deleting_the_filed_documen
     assert db.op(None) is not None
 
 
+def library_files(cfg, tmp):
+    """The files in the library the engine writes to. The folder looked at is the configured one (DOC534.217): "nothing there" cannot
+    pass for the wrong reason, a path that is not the library."""
+    root = cfg.path("library_root")
+    assert root == tmp / "lib", root
+    return [x for x in root.rglob("*") if x.is_file()]
+
+
+def test_library_files_sees_what_the_engine_files_so_an_empty_answer_means_something(env):
+    cfg, db, tmp = env
+    assert library_files(cfg, tmp) == []                                    # nothing filed yet
+    dst = apply(propose(mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO), cfg, db, RuleBasedAnalyzer(cfg)), cfg, db)
+    assert library_files(cfg, tmp) == [dst]                                 # and the helper does see the document once it is filed
+
+
 def test_a_database_failure_after_the_undo_move_puts_the_document_back(env, monkeypatch):
     cfg, db, tmp = env
     f = mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO)
@@ -401,7 +416,7 @@ def test_a_database_failure_after_the_move_puts_the_file_back(env, monkeypatch, 
     with pytest.raises(RuntimeError):
         apply(p, cfg, db)
     assert f.exists() and f.read_bytes() == original                   # back where it was, untouched
-    assert not list((tmp / "lib").rglob("*.pdf"))                       # nothing orphaned in the library
+    assert not library_files(cfg, tmp)                                  # nothing orphaned in the library
     assert db.find_sha(p.sha256) is None                           # and no half-written history row left behind
 
 
@@ -434,7 +449,7 @@ def test_a_cross_device_move_verifies_the_copy_before_deleting_the_original(env,
     with pytest.raises(OSError, match="checksum mismatch"):
         apply(p, cfg, db)
     assert f.exists() and f.read_bytes() == original                   # the ORIGINAL was never deleted
-    assert not list((tmp / "lib").rglob("*.pdf"))                       # the bad copy was removed
+    assert not library_files(cfg, tmp)                                  # the bad copy was removed
 
 
 def test_a_file_changed_after_analysis_is_left_where_it_was(env):
@@ -446,7 +461,7 @@ def test_a_file_changed_after_analysis_is_left_where_it_was(env):
     with pytest.raises(OSError, match="checksum mismatch"):
         apply(p, cfg, db)
     assert f.exists() and f.read_bytes() == edited                     # source restored, not lost
-    assert not list((tmp / "lib").rglob("*.pdf")) and db.find_sha(p.sha256) is None
+    assert not library_files(cfg, tmp) and db.find_sha(p.sha256) is None
 
 
 @pytest.mark.parametrize("bad", ["../../escape.pdf", "sub/x.pdf", "..\\x.pdf", "a:b.pdf", "x?.pdf", "..", ".", " . ",
@@ -960,7 +975,7 @@ def test_a_cross_device_copy_that_fails_midway_leaves_no_partial_file_in_the_lib
     with pytest.raises(OSError, match="No space left"):
         apply(p, cfg, db)
     assert f.exists() and f.read_bytes() == original            # the ORIGINAL is untouched
-    assert not [x for x in (tmp / "lib").rglob("*") if x.is_file()]  # and no partial copy was left behind
+    assert not library_files(cfg, tmp)                          # and no partial copy was left behind
 
 
 def test_a_move_whose_checksum_differs_is_put_back_without_overwriting_a_file_that_reappeared(tmp_path, monkeypatch, caplog):
@@ -1018,7 +1033,7 @@ def test_a_cross_device_copy_is_removed_when_the_original_cannot_be_deleted(env,
     with pytest.raises(PermissionError):
         apply(p, cfg, db)
     assert f.exists()                                                    # the original stays
-    assert not [x for x in (tmp / "lib").rglob("*") if x.is_file()]      # and so no orphan copy in the library
+    assert not library_files(cfg, tmp)                                   # and so no orphan copy in the library
     monkeypatch.setattr(Path, "unlink", real_unlink)
     dst = apply(p, cfg, db)                                              # the retry gets the wanted name
     assert "(2)" not in dst.name and not f.exists()
@@ -1047,7 +1062,7 @@ def test_a_retry_after_a_failed_cross_device_copy_gets_the_wanted_name_not_a_suf
     with pytest.raises(OSError, match="No space left"):                  # DOC534.214: this failure, not any other I/O error
         apply(p, cfg, db)
     assert written == [100] and f.exists()                                # a partial copy was really written; the source is untouched
-    assert not list((tmp / "lib").rglob("*.pdf")), "the truncated copy was left behind"
+    assert not library_files(cfg, tmp), "the truncated copy was left behind"
     monkeypatch.setattr(shutil, "copyfileobj", real)  # the share is back
     dst = apply(p, cfg, db)
     assert "(2)" not in dst.name and dst.exists() and sha256_file(dst) == p.sha256
