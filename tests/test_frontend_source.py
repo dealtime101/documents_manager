@@ -81,6 +81,17 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_the_rules_screen_locks_a_change_with_a_ref_read_at_once_not_with_a_state_one_render_late():
+    # DOC534.120: two clicks before the re-render both read busy=false and started two requests
+    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text()
+    act = rules[rules.index("const act = "):rules.index("const dropDraft")]
+    assert "const working = useRef(false)" in rules
+    assert "if (working.current) return" in act and "if (busy) return" not in act
+    assert act.index("if (working.current) return") < act.index("working.current = true") < act.index("setBusy(true)")   # taken at once
+    assert act.rindex("working.current = false") > act.index("finally")                                                    # always let go
+    assert "setBusy(true)" in act and "setBusy(false)" in act                                                              # `busy` still drives the buttons
+
+
 def test_forgetting_a_route_also_forgets_the_unsaved_typing_for_that_company():
     # DOC534.119: the draft stayed in memory: when the company was learned again the field showed the old typing, not the destination
     rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text()

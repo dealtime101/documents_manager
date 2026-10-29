@@ -33,8 +33,10 @@ export default function Rules() {
   }), [])
   useEffect(() => { load() }, [load])
 
+  const working = useRef(false)  // the lock itself, read at once: the `busy` state is only what the buttons show, and is one render late
   const act = async (action: () => Promise<unknown>, done: string, after?: () => void) => {
-    if (busy) return  // one change at a time
+    if (working.current) return  // one change at a time, even for two clicks before the next render
+    working.current = true
     setBusy(true)
     try {
       await action()
@@ -44,6 +46,7 @@ export default function Rules() {
     } catch (e) {
       setNote({ ok: false, text: msg(errorText(e)) })
     } finally {
+      working.current = false
       setBusy(false)
     }
   }
