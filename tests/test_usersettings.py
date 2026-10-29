@@ -56,6 +56,11 @@ def test_a_docflow_home_exported_by_the_developers_shell_is_replaced_by_a_throw_
     out = subprocess.run([sys.executable, "-c", code, str(Path(__file__).parent)], capture_output=True, text=True, check=True,
                          env={**os.environ, "DOCFLOW_HOME": str(real)}).stdout.strip()
     assert out != str(real) and Path(out).name.startswith("docflow-home-")
+    # DOC534.251: the throw-away folder exists while the session runs and is removed when it ends
+    code = ("import os, sys; sys.path.insert(0, sys.argv[1]); import conftest; home = os.environ['DOCFLOW_HOME']; "
+            "os.makedirs(home, exist_ok=True); open(os.path.join(home, 'x'), 'w').close(); print(home, os.path.isdir(home))")
+    ran = subprocess.run([sys.executable, "-c", code, str(Path(__file__).parent)], capture_output=True, text=True, check=True).stdout.split()
+    assert ran[1] == "True" and not Path(ran[0]).exists(), ran
 
 
 def test_the_user_folder_is_docflow_home_when_set_and_otherwise_a_per_user_place(monkeypatch, tmp_path):

@@ -1,4 +1,6 @@
+import atexit
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -7,7 +9,9 @@ import pytest
 # No test may read or write the real user's folder (~/.config/docflow): the whole session works in a throw-away one. Set at import
 # time, because several test modules load the configuration while they are being collected. Nothing of docflow is imported
 # above this point, so no module can have resolved a path before the two variables are set.
-os.environ["DOCFLOW_HOME"] = tempfile.mkdtemp(prefix="docflow-home-")  # forced: a DOCFLOW_HOME of the developer's shell must not be used
+_HOME = tempfile.mkdtemp(prefix="docflow-home-")
+os.environ["DOCFLOW_HOME"] = _HOME  # forced: a DOCFLOW_HOME of the developer's shell must not be used
+atexit.register(shutil.rmtree, _HOME, ignore_errors=True)  # and gone when the session ends: one folder per run would pile up in /tmp
 # ...and it uses the test rules (well-known companies only), never the rules that ship with the program.
 os.environ["DOCFLOW_CONFIG_DIR"] = str(Path(__file__).parent / "fixtures" / "config")  # forced too: not the one of the developer's shell
 
