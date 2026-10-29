@@ -43,6 +43,14 @@ def test_a_negative_amount_written_after_the_currency_code_is_read(text, amount,
     assert found is not None and found.value == Decimal(amount) and found.currency == currency
 
 
+def test_the_separator_of_the_fields_never_appears_inside_a_field_of_the_name():
+    # DOC534.114: "Smith - Jones" made a name whose fields could not be told apart from "<date> - <company> - <type> - ..."
+    name = build_filename("2025-01-02", "Smith - Jones", "Facture - Annuelle", "a  -  b", Decimal("10"))
+    assert name == "2025-01-02 - Smith-Jones - Facture-Annuelle - a-b - 10.00$.pdf"
+    assert len(name[:-4].split(" - ")) == 5                                      # date, company, type, detail, amount: nothing more
+    assert build_filename("2025-01-02", "Hydro-Quebec", "Facture") == "2025-01-02 - Hydro-Quebec - Facture.pdf"   # a plain hyphen stays
+
+
 @pytest.mark.parametrize("amount,expected", [("-0.004", "0.00$"), ("-0.00", "0.00$"), ("0.004", "0.00$"), ("0", "0.00$"),
                                               ("-0.005", "-0.01$"), ("-12.5", "-12.50$"), ("12.345", "12.35$")])
 def test_an_amount_that_rounds_to_zero_has_no_minus_sign_in_the_name(amount, expected):

@@ -104,6 +104,11 @@ def format_amount(amount: Decimal, currency: str = "CAD") -> str:
     return txt + ("$" if currency == "CAD" else currency)
 
 
+def _no_separator(s: str) -> str:
+    """A field of the name, cleaned, without the " - " that separates the fields: "Smith - Jones" would otherwise read as two."""
+    return re.sub(r"\s+-\s+", "-", sanitize(s))
+
+
 def build_filename(date: str, company: str, doc_type: str, detail: str = "",
                    amount: Decimal | None = None, currency: str = "CAD", ext: str = ".pdf") -> str:
     """If the name exceeds MAX_NAME, the LONGEST of company / type / detail is shortened first (so a long detail goes
@@ -115,7 +120,7 @@ def build_filename(date: str, company: str, doc_type: str, detail: str = "",
     if amount is not None and not CURRENCY_RE.fullmatch(currency):
         raise ValueError(f"invalid currency: {currency!r}")
     tail = format_amount(amount, currency) if amount is not None else ""
-    parts = {"company": sanitize(company), "type": sanitize(doc_type), "detail": sanitize(detail)}
+    parts = {"company": _no_separator(company), "type": _no_separator(doc_type), "detail": _no_separator(detail)}
     if not parts["company"] or not parts["type"]:  # only forbidden characters or spaces: '2024-01-01 -  - Facture.pdf' is no name
         raise ValueError("company and type are required (nothing is left of one of them after cleaning)")
 
