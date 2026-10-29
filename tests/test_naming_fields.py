@@ -33,6 +33,16 @@ def test_the_usual_amount_due_labels_are_total_labels(text, amount):
     assert found is not None and found.value == Decimal(amount) and found.confidence >= 0.85    # a labelled amount, not the largest one
 
 
+@pytest.mark.parametrize("text,amount,currency", [
+    ("Note de credit\nTotal CAD -25.00", "-25.00", "CAD"), ("Credit\nTotal USD - 25,00", "-25.00", "USD"),
+    ("Credit\nTotal EUR −25.00", "-25.00", "EUR"), ("Credit note\nTotal CAD -150", "-150", "CAD"),     # whole amounts too
+    ("Facture\nTotal CAD 25.00", "25.00", "CAD")])                                                          # and no sign is still positive
+def test_a_negative_amount_written_after_the_currency_code_is_read(text, amount, currency):
+    # DOC534.77: the "$" form accepted a sign before the number, the CAD/USD/EUR prefix form did not: "Total CAD -25.00" had no amount
+    found = find_amount(text)
+    assert found is not None and found.value == Decimal(amount) and found.currency == currency
+
+
 def test_the_kinds_of_a_found_date_are_all_listed():
     # DOC534.74: the comment named six kinds; the module also produces skip, period, tax_year and month_before
     import re

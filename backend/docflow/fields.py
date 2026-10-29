@@ -161,11 +161,11 @@ def month_before(d: FoundDate) -> FoundDate:
 
 # ---------------------------------------------------------------- amounts
 _NUM = r"\d{1,3}(?:[ ,.]\d{3})*[.,]\d{2}(?!\d)|\d+[.,]\d{2}(?!\d)"  # (?!\d): "$1,200" is not 1,20 followed by a stray 0
-_AMT = re.compile(rf"(?:\$\s*[-−]?\s*({_NUM})|(?<![\d.,])({_NUM})\s*\$|\b(CAD|USD|EUR)\s*({_NUM})|(?<![\d.,])({_NUM})\s*(CAD|USD|EUR)\b)", re.IGNORECASE)  # re.I: find_amount lower-cases the lines it scans
+_AMT = re.compile(rf"(?:\$\s*[-−]?\s*({_NUM})|(?<![\d.,])({_NUM})\s*\$|\b(CAD|USD|EUR)\s*[-−]?\s*({_NUM})|(?<![\d.,])({_NUM})\s*(CAD|USD|EUR)\b)", re.IGNORECASE)  # re.I: find_amount lower-cases the lines it scans
 # Whole amounts ("150 $", "$1,200"): ONLY when stuck to a currency symbol and not followed by decimals, so "1.200 $" or
 # "150.5 $" (which cannot be read with certainty) stay unrecognised. Used only when a text holds no amount with cents.
 _INT = r"\d{1,3}(?:[ ,]\d{3})+(?![.,]?\d)|\d+(?![.,]?\d)"
-_INT_AMT = re.compile(rf"(?:\$\s*[-−]?\s*({_INT})|(?<![\d.,])({_INT})\s*\$|\b(CAD|USD|EUR)\s*({_INT})|(?<![\d.,])({_INT})\s*(CAD|USD|EUR)\b)", re.IGNORECASE)
+_INT_AMT = re.compile(rf"(?:\$\s*[-−]?\s*({_INT})|(?<![\d.,])({_INT})\s*\$|\b(CAD|USD|EUR)\s*[-−]?\s*({_INT})|(?<![\d.,])({_INT})\s*(CAD|USD|EUR)\b)", re.IGNORECASE)
 WHOLE_AMOUNT_CONFIDENCE = 0.85  # below the 0.95 of "auto": no cents means a human confirms
 _STRONG = [  # decreasing rank
     r"montant de la presente facture", r"montant total", r"total a payer", r"grand total", r"order total",
