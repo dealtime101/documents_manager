@@ -559,6 +559,27 @@ def test_cli_one_file_whose_proposal_fails_does_not_stop_the_batch(env, monkeypa
     assert "b-good.pdf" in out and "2 file(s)" in out and "1 FAILED" in out   # the next file was still handled
 
 
+def test_cli_an_unexpected_error_while_filing_one_file_does_not_stop_the_batch(env, monkeypatch, capsys, caplog):
+    # DOC534.25: apply() raising something other than OSError/ValueError/sqlite3.Error ended the scan with a traceback and no summary
+    import logging
+    cfg, db, tmp = env
+    mkpdf(tmp / "inbox" / "a-bug.pdf", HYDRO)
+    mkpdf(tmp / "inbox" / "b-fine.pdf", HYDRO)
+    real = cli.apply
+
+    def apply_or_bug(p, *a, **k):
+        if p.source.name == "a-bug.pdf":
+            raise RuntimeError("unexpected state")
+        return real(p, *a, **k)
+
+    monkeypatch.setattr(cli, "apply", apply_or_bug)
+    with caplog.at_level(logging.INFO):
+        rc = cli.scan(cfg, db, dry=False, interactive=False, ollama=False)
+    out = capsys.readouterr().out
+    assert rc == 1 and "ERROR: unexpected state" in out and "2 file(s)" in out and "1 FAILED" in out   # reported, counted, summarised
+    assert any("a-bug.pdf" in r.getMessage() and "RuntimeError" in r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR)
+
+
 def test_cli_failures_are_written_to_the_log_not_only_printed(env, monkeypatch, caplog):
     import logging
     cfg, db, tmp = env

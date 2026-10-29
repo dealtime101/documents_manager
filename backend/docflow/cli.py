@@ -6,7 +6,6 @@
 lists what each option does."""
 import argparse
 import logging
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -173,7 +172,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
             skipped += others - (f.suffix.lower() != ".pdf")
             print(f"\nInterrupted: nothing else will be filed. {f.name} may already be filed: see `docflow history`.")
             break
-        except (OSError, ValueError, sqlite3.Error) as e:  # sqlite3.Error: a locked or broken history is this file's failure, not the batch's
+        except Exception as e:  # whatever apply() raises (OSError, a locked or broken history, a bug) is this file's failure, not the batch's
             held += 1
             failed += 1
             report(f"ERROR: {e}")
