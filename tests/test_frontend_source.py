@@ -81,6 +81,16 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_the_launcher_token_stays_in_the_address_while_the_server_cannot_be_reached_and_retry_signs_in_again():
+    # DOC534.34: the token was removed from the URL even when the sign-in failed for lack of a network answer, and "Retry" only
+    # re-checked the session: the user stayed "not signed in" until the desktop application was started again
+    app = (BITS.parents[1] / "App.tsx").read_text()
+    start = app[app.index("const start = async () => {"):app.index("useEffect(() => { void start()")]
+    assert "e instanceof ApiError && e.status === undefined) throw e" in start                   # no network answer: the failure is shown
+    assert start.index("e.status === undefined") < start.index("window.history.replaceState")     # the address is cleaned after, not before
+    assert "setFailure(''); void start()" in app and "setFailure(''); refresh()" not in app        # Retry runs the whole start again
+
+
 def test_every_tab_has_a_tabpanel_inside_the_same_tabs_root():
     app = (BITS.parents[1] / "App.tsx").read_text()
     assert app.count("<Tabs ") == 1 and app.count("</Tabs>") == 1            # one root around the tab list AND the pages

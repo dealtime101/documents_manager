@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, errorText } from '@/api'
+import { api, ApiError, errorText } from '@/api'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { I18nProvider, LangSwitch, useI18n } from '@/i18n'
@@ -31,18 +31,24 @@ function Shell() {
   const [version, setVersion] = useState('')  // the program's version, from the server (written once, in pyproject.toml)
   const refresh = () => api.me().then((m) => { setAuth(m.authenticated); setVersion(m.version) })
     .catch((e) => setFailure(errorText(e)))
-  useEffect(() => {
-    // The desktop application opens the page as /?t=<token>: sign in with it, then take it out of the address at once.
-    const token = new URLSearchParams(window.location.search).get('t')
-    const start = async () => {
+  // The desktop application opens the page as /?t=<token>: sign in with it, then take it out of the address once the server answered.
+  // While the server cannot be reached the token stays in the address, so "Retry" signs in again instead of only checking the session.
+  const start = async () => {
+    try {
+      const token = new URLSearchParams(window.location.search).get('t')
       if (token) {
-        try { await api.me(); await api.localLogin(token) } catch { /* wrong token: the message below says what to do */ }
+        try {
+          await api.me(); await api.localLogin(token)
+        } catch (e) {
+          if (e instanceof ApiError && e.status === undefined) throw e  // no answer at all: keep the token in the address
+          /* the server answered and refused the token: the message below says what to do */
+        }
         window.history.replaceState(null, '', window.location.pathname + window.location.hash)
       }
       await refresh()
-    }
-    void start().catch((e) => setFailure(errorText(e)))
-  }, [])
+    } catch (e) { setFailure(errorText(e)) }
+  }
+  useEffect(() => { void start() }, [])
   // a first run (no inbox / library chosen yet) opens the Settings screen, once the user is signed in
   const [checkedSetup, setCheckedSetup] = useState(false)
   useEffect(() => {
@@ -54,7 +60,7 @@ function Shell() {
     return (
       <div role="alert" className="mx-auto max-w-md space-y-3 p-4">
         <p className="rounded bg-rose-50 p-2 text-sm text-rose-900"><span aria-hidden="true">✕ </span>{t('app.sessionFailed')} {msg(failure)}</p>
-        <Button onClick={() => { setFailure(''); refresh() }}>{t('common.retry')}</Button>
+        <Button onClick={() => { setFailure(''); void start() }}>{t('common.retry')}</Button>
       </div>
     )
   }
