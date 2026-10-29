@@ -18,9 +18,9 @@ export default function Rules() {
   const [busy, setBusy] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, string>>({})  // a destination being edited, by company
 
-  // true when the rules were read: a caller can then drop what it was holding on to (a draft) without showing a stale value
   const haveRules = useRef(false)  // the rules were read at least once: a later failed reload must not replace the whole page
   const [reloadError, setReloadError] = useState('')
+  // resolves true when the rules were read: a caller can then drop what it was holding on to (a draft) without showing a stale value
   const load = useCallback(() => api.rules().then((r) => {
     haveRules.current = true
     setRules(r); setLoadError(''); setReloadError('')

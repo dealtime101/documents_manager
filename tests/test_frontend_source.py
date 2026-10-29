@@ -897,6 +897,16 @@ def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
         assert "'rules.forgetPatternLabel'" in block and "{pattern}" in block.split("'rules.forgetPatternLabel'")[1].split("\n")[0]
 
 
+def test_each_comment_of_the_rules_loader_sits_on_the_line_it_describes():
+    # DOC534.259: the comment about the value load() resolves with stood above the haveRules ref, which has a comment of its own
+    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8").splitlines()
+    have = next(i for i, line in enumerate(rules) if "const haveRules = useRef(false)" in line)
+    load = next(i for i, line in enumerate(rules) if "const load = useCallback(" in line)
+    assert "the rules were read at least once" in rules[have]                                    # its own comment, on its own line
+    assert "resolves true when the rules were read" in rules[load - 1]                           # the load comment, right above load
+    assert "true when the rules were read" not in rules[have - 1]
+
+
 def test_enter_in_the_destination_field_saves_like_the_button_and_nothing_else_submits():
     # DOC534.258: the destination had to be saved with a click on the button
     rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
