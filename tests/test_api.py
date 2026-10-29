@@ -1718,12 +1718,14 @@ def test_the_web_services_close_every_history_connection_they_open(api, sb, monk
     opened, closed = [], []
     real_init, real_close = DBClass.__init__, DBClass.close
 
+    # DOC534.193: the connections themselves are recorded (kept alive, so that no id is reused), not a count: a connection closed twice
+    # must not make up for one that is never closed
     def counting_init(self, *a, **k):
-        opened.append(1)
+        opened.append(self)
         real_init(self, *a, **k)
 
     def counting_close(self):
-        closed.append(1)
+        closed.append(self)
         real_close(self)
     monkeypatch.setattr(DBClass, "__init__", counting_init)
     monkeypatch.setattr(DBClass, "close", counting_close)
@@ -1731,7 +1733,8 @@ def test_the_web_services_close_every_history_connection_they_open(api, sb, monk
     api.post("/api/scan")
     api.post("/api/items/approve-auto")
     services.history()
-    assert opened and len(closed) == len(opened), (len(opened), len(closed))
+    never_closed = {id(db) for db in opened} - {id(db) for db in closed}
+    assert opened and not never_closed, f"{len(never_closed)} of {len(opened)} connections were never closed"
 
 
 @pytest.mark.django_db(transaction=True)   # no wrapping test transaction: the atomic block below is the outermost one, a real BEGIN
