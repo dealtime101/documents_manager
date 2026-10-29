@@ -11,12 +11,28 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+SERVER_IDENT = "documents-manager"
 
-def free_port() -> int:
-    """A port nobody holds right now, on the loopback address only."""
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
+
+def listening_socket() -> socket.socket:
+    """A socket on the loopback address, bound AND listening, kept open until the server has taken it over: the port is never
+    given back between choosing it and using it, so nobody else can take it and be mistaken for the program's own server."""
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    s.listen(100)
+    return s
+
+
+def is_our_server(port: int) -> bool:
+    """Does the server on this loopback port say who it is? (waitress sends the `ident` we gave it in its Server header.) A bare TCP
+    connection succeeds for any program that listens: only this answer says it is OUR server that is up."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/auth/me", timeout=2) as r:
+            return str(r.headers.get("Server", "")).startswith(SERVER_IDENT)
+    except urllib.error.HTTPError as e:  # an answer of any status carries the header
+        return str(e.headers.get("Server", "")).startswith(SERVER_IDENT)
+    except OSError:
+        return False
 
 
 def program_root() -> Path:
@@ -34,8 +50,9 @@ def prepare_environment() -> str:
     return token
 
 
-def start_server(port: int) -> None:
-    """Migrate the database (created in the user's folder) and serve the site in a background thread."""
+def start_server(sock: socket.socket) -> None:
+    """Migrate the database (created in the user's folder) and serve the site in a background thread, on the socket we already hold."""
+    port = sock.getsockname()[1]
     import django
     from django.core.management import call_command
 
@@ -50,7 +67,7 @@ def start_server(port: int) -> None:
 
     def run() -> None:
         try:
-            serve(app, host="127.0.0.1", port=port, threads=6, ident="documents-manager")
+            serve(app, sockets=[sock], threads=6, ident=SERVER_IDENT)
         except BaseException as e:  # noqa: BLE001
             failure.append(e)  # kept for the main thread, which reports it
 
@@ -59,11 +76,9 @@ def start_server(port: int) -> None:
     while time.monotonic() < deadline:
         if failure:
             raise RuntimeError(f"the local server stopped: {type(failure[0]).__name__}: {failure[0]}") from failure[0]
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=1):
-                return
-        except OSError:
-            time.sleep(0.1)
+        if is_our_server(port):
+            return
+        time.sleep(0.1)
     raise RuntimeError("the local server did not start within 30 seconds")
 
 
@@ -129,9 +144,10 @@ def main(argv: list[str] | None = None) -> int:
     print(time.strftime("%Y-%m-%d %H:%M:%S"), "starting", argv, flush=True)
     try:
         token = prepare_environment()
-        port = free_port()
+        sock = listening_socket()
+        port = sock.getsockname()[1]
         print("server starting on port", port, flush=True)
-        start_server(port)
+        start_server(sock)
     except Exception as e:  # noqa: BLE001
         # a failed start (migration, port, server) must be told, not end in silence
         import traceback

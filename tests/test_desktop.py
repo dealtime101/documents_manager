@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -14,6 +16,12 @@ def _env(tmp_path):
     for key in ("DOCFLOW_SANDBOX", "DOCFLOW_SECRET_KEY", "DOCFLOW_HOSTS", "DOCFLOW_CONFIG_DIR"):
         env.pop(key, None)
     return env
+
+
+def _held_socket():
+    """What main() gets from listening_socket(): only its port is read."""
+    import types
+    return types.SimpleNamespace(getsockname=lambda: ("127.0.0.1", 1))
 
 
 def test_the_settings_describe_the_one_deployment_there_is_a_local_desktop_application():
@@ -28,10 +36,10 @@ def test_the_settings_describe_the_one_deployment_there_is_a_local_desktop_appli
 def test_the_selftest_exit_code_says_whether_it_passed(monkeypatch, capsys):
     # DOC534.35: --selftest printed the result and always returned 0: a script checking the packaged program never saw a failure
     from docflow import desktop
-    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("free_port", lambda: 1),
-                        ("start_server", lambda port: None)):
+    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("listening_socket", _held_socket),
+                        ("start_server", lambda sock: None)):
         monkeypatch.setattr(desktop, name, value)
-    good = {"signed_in": True, "interface": True, "database_in_user_folder": True, "version": "x", "ocr": []}
+    good ={"signed_in": True, "interface": True, "database_in_user_folder": True, "version": "x", "ocr": []}
     results = iter([good, {**good, "signed_in": False}, {**good, "interface": False}, {**good, "database_in_user_folder": False}])
     monkeypatch.setattr(desktop, "selftest", lambda port, token: next(results))
     assert [desktop.main(["--selftest"]) for _ in range(4)] == [0, 1, 1, 1]
@@ -44,10 +52,10 @@ def test_without_a_native_window_the_browser_fallback_stops_when_no_browser_open
     import webbrowser
 
     from docflow import desktop
-    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("free_port", lambda: 1),
-                        ("start_server", lambda port: None)):
+    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("listening_socket", _held_socket),
+                        ("start_server", lambda sock: None)):
         monkeypatch.setattr(desktop, name, value)
-    monkeypatch.setitem(sys.modules, "webview", None)                         # `import webview` raises ImportError
+    monkeypatch.setitem(sys.modules, "webview", None)                        # `import webview` raises ImportError
 
     class Interrupted:
         def wait(self):
@@ -74,26 +82,57 @@ def test_a_server_that_dies_at_start_is_reported_at_once_and_main_tells_the_user
     monkeypatch.setattr(django.core.management, "call_command", lambda *a, **k: None)   # the migration is not what is tested here
     started = time.monotonic()
     try:
-        desktop.start_server(desktop.free_port())
+        desktop.start_server(desktop.listening_socket())
     except RuntimeError as e:
         assert "port already in use" in str(e) and time.monotonic() - started < 20     # the cause, not "within 30 seconds"
     else:
         raise AssertionError("start_server should have raised")
     shown = []
-    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("free_port", lambda: 1)):
+    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("listening_socket", _held_socket)):
         monkeypatch.setattr(desktop, name, value)
     monkeypatch.setattr(desktop, "show_error", shown.append)
-    monkeypatch.setattr(desktop, "start_server", lambda port: (_ for _ in ()).throw(RuntimeError("migration failed")))
+    monkeypatch.setattr(desktop, "start_server", lambda sock: (_ for _ in ()).throw(RuntimeError("migration failed")))
     assert desktop.main([]) == 1                                                      # an exit code, not a traceback
     assert len(shown) == 1 and "migration failed" in shown[0] and "desktop.log" in shown[0]   # and a message with the log's place
 
 
-def test_a_free_local_port_is_found_and_really_free():
-    from docflow.desktop import free_port
-    port = free_port()
-    assert 1024 <= port <= 65535
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", port))                                       # nobody holds it
+def test_the_port_is_held_from_the_moment_it_is_chosen_and_only_our_own_server_counts_as_up(tmp_path):
+    # DOC534.130: the port was given back before the server bound it, and any program that listened there made the start look done
+    import http.server
+    import threading
+
+    from docflow.desktop import SERVER_IDENT, is_our_server, listening_socket
+    held = listening_socket()
+    port = held.getsockname()[1]
+    try:
+        assert 1024 <= port <= 65535 and held.getsockname()[0] == "127.0.0.1"          # loopback only
+        with socket.socket() as other, pytest.raises(OSError):
+            other.bind(("127.0.0.1", port))                                          # nobody else can take it meanwhile
+        assert is_our_server(port) is False                                          # a socket that only listens is not our server
+    finally:
+        held.close()
+
+    def serve_with(header: str):
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response_only(200)                                         # (send_response adds a Server header of its own)
+                self.send_header("Server", header)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+            def log_message(self, *a):
+                pass
+        server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server
+    ours, someone_else = serve_with(SERVER_IDENT), serve_with("something-else")
+    try:
+        assert is_our_server(ours.server_address[1]) is True and is_our_server(someone_else.server_address[1]) is False
+    finally:
+        ours.shutdown()
+        someone_else.shutdown()
+    assert is_our_server(port) is False                                              # nothing there any more: not up
 
 
 def test_the_desktop_selftest_starts_the_server_signs_in_and_keeps_every_file_in_the_users_folder(tmp_path):
