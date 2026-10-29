@@ -339,6 +339,14 @@ def test_file_names_and_folders_are_cut_on_both_separators():
     assert got["mixed"] == ["x.pdf", "C:/In"] and got["bare"] == ["c.pdf", ""] and got["root"] == ["c.pdf", "/"]
 
 
+def test_the_folder_of_a_file_at_the_root_of_a_drive_is_the_root_not_the_current_folder_of_the_drive():
+    # DOC534.180: dirName('C:\\a.pdf') was 'C:', which Windows reads as "the current folder of drive C", while '/' was kept on POSIX
+    got = _node_route("""({ backslash: m.dirName('C:\\\\a.pdf'), slash: m.dirName('c:/a.pdf'), deeper: m.dirName('C:\\\\Docs\\\\a.pdf'),
+      posix: m.dirName('/a.pdf'), two: m.dirName('ab:\\\\a.pdf') })""", module="paths")
+    assert got["backslash"] == "C:\\" and got["slash"] == "c:/" and got["deeper"] == "C:\\Docs"
+    assert got["posix"] == "/" and got["two"] == "ab:"                              # only a single drive letter is a drive
+
+
 def test_a_folder_written_with_a_trailing_separator_still_has_its_name():
     # DOC534.179: '/home/u/projet/' came back whole, the last segment being empty
     got = _node_route("""({ posix: m.baseName('/home/u/projet/'), windows: m.baseName('D:\\\\data\\\\'), several: m.baseName('/a/b//'),

@@ -5,7 +5,8 @@ export const baseName = (path: string) => path.replace(/[\\/]+$/, '').split(/[\\
 /** The folder part of a path, with either separator ('' when the path has none). */
 export const dirName = (path: string) => {
   const i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  return i < 0 ? '' : i === 0 ? path.slice(0, 1) : path.slice(0, i)
+  // the root keeps its separator, as '/' does: 'C:' alone is the current folder of the drive C, not its root 'C:\'
+  return i < 0 ? '' : i === 0 || /^[A-Za-z]:$/.test(path.slice(0, i)) ? path.slice(0, i + 1) : path.slice(0, i)
 }
 
 /** The line (counted from 1) of the `index`-th (from 0) non-empty line of a text area. The server counts the entries it was sent
