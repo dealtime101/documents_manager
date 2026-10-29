@@ -37,6 +37,7 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
   const [ticked, setTicked] = useState<ReadonlySet<number>>(new Set())  // the tick-boxes of the list: what a batch approval files
   const [minConf, setMinConf] = useState('85')
 
+  const generation = useRef(0)  // bumped by every action and every load(): a polled answer that began before it is out of date
   const itemsRef = useRef(items)  // the list as shown, for load() to find the open document again
   itemsRef.current = items
   const current = items.find((i) => i.id === sel) ?? null
@@ -46,6 +47,7 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
 
   // `stay`: a new filter, not a save: the open document and what was typed in it survive when it is still in the new list
   const load = useCallback(async (keep?: number | null, stay = false) => {
+    generation.current += 1
     const { rows: fetched, total: all } = await api.items('pending', group ?? undefined)
     // A document being edited that the new filter does not contain stays in the list, on top, with what was typed in it: the
     // filter is already in the URL, so it cannot be refused, but nothing typed is thrown away.
@@ -84,10 +86,13 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
     let timer: ReturnType<typeof setTimeout>
     const tick = async () => {
       try {
+        const started = generation.current
         const j = await api.scanStatus()
         if (cancelled) return
         const { rows: fetched, total: all } = await api.items('pending', groupRef.current ?? undefined)
         if (cancelled) return
+        // an approval or a reload ran meanwhile: this answer predates it (it still lists what was just filed): wait for the next cycle
+        if (generation.current !== started) { timer = setTimeout(tick, 3000); return }
         // as load() does: a document being edited that left the list (filed elsewhere) stays on top with what was typed in it
         const edited = dirtyRef.current && selRef.current !== null && !fetched.some((i) => i.id === selRef.current)
           ? itemsRef.current.find((i) => i.id === selRef.current) : undefined
@@ -112,6 +117,7 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
   }, [job?.state])
 
   const run = async (fn: () => Promise<string>, keep?: number | null) => {
+    generation.current += 1  // from the start of the action: a poll that began before it must not bring the list back as it was
     setBusy(true)
     try {
       const text = await fn()

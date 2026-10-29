@@ -363,6 +363,19 @@ def test_a_proposal_read_for_one_library_file_never_fills_the_form_of_another():
     assert "if (shown.current === asked) setProblem(errorText(e))" in page               # and an error for A is not shown on B
 
 
+def test_a_poll_that_began_before_an_action_never_brings_back_the_list_as_it_was():
+    # DOC534.71: a polled answer arriving after run()'s load() reinstalled the old list, which still held the document just filed
+    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text()
+    assert "const generation = useRef(0)" in queue
+    tick = queue[queue.index("const tick = async () => {"):queue.index("timer = setTimeout(tick, 3000)\n    return")]
+    assert tick.index("const started = generation.current") < tick.index("await api.scanStatus()")           # taken before any request
+    assert tick.index("if (generation.current !== started)") < tick.index("setItems(list)")                  # and compared before the state is written
+    load = queue[queue.index("const load = useCallback("):queue.index("}, [group])")]
+    assert "generation.current += 1" in load.split("await api.items")[0]
+    run = queue[queue.index("const run = async"):queue.index("const changed = ")]
+    assert run.index("generation.current += 1") < run.index("setBusy(true)")
+
+
 def test_the_scan_refresh_keeps_a_document_being_edited_even_when_it_left_the_list():
     # DOC534.20: the polled refresh dropped the open document (filed elsewhere), `dirty` fell back to false, and the next cycle replaced the form
     queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text()
@@ -495,7 +508,7 @@ def test_an_older_dashboard_answer_never_overwrites_a_newer_one():
 def test_the_scan_refresh_reselects_when_the_selected_item_left_the_list_and_forgets_its_tick():
     # DOC474.33: only "nothing selected" triggered a reselection; an item filed elsewhere left an empty panel next to a full list
     queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text()
-    tick = queue[queue.index("const tick = async"):queue.index("timer = setTimeout(tick, 3000)")]
+    tick = queue[queue.index("const tick = async"):queue.index("timer = setTimeout(tick, 3000)\n    return")]   # the end of the tick, not a retry in it
     assert "selRef.current === null || !list.some((i) => i.id === selRef.current)" in tick
     assert "!dirtyRef.current" in tick                                           # never over a form the user has edited
     assert "setTicked((t) => new Set(list.filter((i) => t.has(i.id) && approvable(i)).map((i) => i.id)))" in tick
