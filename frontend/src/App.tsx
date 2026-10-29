@@ -13,6 +13,9 @@ import Search from '@/pages/Search'
 import Queue from '@/pages/Queue'
 import { parseHash, toHash, type Page, type Route } from '@/route'
 
+const MAX_SETUP_TRIES = 4  // after the first failure, how many more times the first-run check is asked, every SETUP_RETRY_MS
+const SETUP_RETRY_MS = 5000
+
 function Shell() {
   const { t, msg } = useI18n()
   const [auth, setAuth] = useState<boolean | null>(null)
@@ -50,12 +53,23 @@ function Shell() {
   }
   useEffect(() => { void start() }, [])
   // a first run (no inbox / library chosen yet) opens the Settings screen, once the user is signed in
+  // "checked" only once the server has ANSWERED: a failed call is logged and tried again a few times, not taken for "configured"
   const [checkedSetup, setCheckedSetup] = useState(false)
+  const [setupTries, setSetupTries] = useState(0)
   useEffect(() => {
     if (!auth || checkedSetup) return
-    setCheckedSetup(true)
-    api.settings().then((s) => { if (!s.configured) window.location.hash = '#settings' }).catch(() => {})
-  }, [auth, checkedSetup])
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    api.settings().then((s) => {
+      if (cancelled) return
+      setCheckedSetup(true)
+      if (!s.configured) window.location.hash = toHash({ page: 'settings', group: null })
+    }).catch((e) => {
+      console.warn('first-run check of the settings failed:', errorText(e))
+      if (!cancelled && setupTries < MAX_SETUP_TRIES) timer = setTimeout(() => setSetupTries((n) => n + 1), SETUP_RETRY_MS)
+    })
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [auth, checkedSetup, setupTries])
   if (failure) {
     return (
       <div role="alert" className="mx-auto max-w-md space-y-3 p-4">

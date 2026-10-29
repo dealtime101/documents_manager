@@ -81,6 +81,18 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_the_first_run_check_counts_as_done_only_once_the_server_answered_and_is_tried_again():
+    # DOC534.126: checkedSetup was set before the call: a failure meant the Settings screen never opened on a first run, silently
+    app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
+    effect = app[app.index("const [checkedSetup, setCheckedSetup]"):app.index("if (failure) {")]
+    assert effect.index("api.settings().then(") < effect.index("setCheckedSetup(true)")                  # set in the answer, not before the call
+    assert effect.count("setCheckedSetup(true)") == 1
+    assert "window.location.hash = toHash({ page: 'settings', group: null })" in effect and "'#settings'" not in effect   # the route, not a hard-coded hash
+    assert "console.warn('first-run check of the settings failed:', errorText(e))" in effect                # the failure leaves a trace
+    assert "setupTries < MAX_SETUP_TRIES" in effect and "setTimeout(() => setSetupTries((n) => n + 1), SETUP_RETRY_MS)" in effect
+    assert "return () => { cancelled = true; clearTimeout(timer) }" in effect and "[auth, checkedSetup, setupTries]" in effect
+
+
 def test_an_error_of_the_extra_folders_names_its_line_and_is_tied_to_the_box():
     # DOC534.125: the box had no aria-invalid / aria-describedby and the message did not say which of the lines was refused
     got = _node_route("""({ plain: [m.lineOfEntry('a\\nb\\nc', 0), m.lineOfEntry('a\\nb\\nc', 2)],
@@ -1089,7 +1101,7 @@ def test_a_first_run_opens_the_settings_screen_where_the_folders_are_chosen():
     # product: nobody edits a YAML file to say where the inbox is; the tool asks
     src = UI.parents[1]
     app = (src / "App.tsx").read_text()
-    assert "if (!s.configured) window.location.hash = '#settings'" in app and '<TabsTrigger value="settings">' in app
+    assert "if (!s.configured) window.location.hash = toHash({ page: 'settings', group: null })" in app and '<TabsTrigger value="settings">' in app
     page = (src / "pages" / "Settings.tsx").read_text()
     for needle in ("api.saveSettings(", "api.folders(", "SettingsRefused", "aria-invalid", "settings.welcome", "dangerouslySetInnerHTML"):
         assert (needle in page) == (needle != "dangerouslySetInnerHTML"), needle
