@@ -57,14 +57,14 @@ def test_a_counted_message_has_a_singular_and_a_plural_text_in_both_languages_an
 
 def test_the_french_remove_button_says_retirer_like_its_confirmation_and_its_message():
     # DOC474.25: "Supprimer" suggested the PDF is deleted; the confirmation and the success message say it stays in place
-    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    src = I18N.read_text(encoding="utf-8")
     fr = src[src.index("const fr"):]
     assert "'queue.remove': 'Retirer de la file'" in fr and "Supprimer de la file" not in fr
 
 
 def test_the_french_interface_calls_a_company_a_societe_everywhere():
     # DOC474.26: "Compagnie" in the form and the messages, "Société" on the Rules, accuracy and selection screens
-    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    src = I18N.read_text(encoding="utf-8")
     fr = src[src.index("const fr"):]
     assert "ompagnie" not in fr
     assert "'field.company': 'Société'" in fr and "'learned.company': 'société « {v} »'" in fr
@@ -72,7 +72,7 @@ def test_the_french_interface_calls_a_company_a_societe_everywhere():
 
 def test_the_empty_queue_message_quotes_the_exact_label_of_the_scan_button_in_both_languages():
     # DOC474.27: the message said "Scan" / "Scanner" while the button reads "Scan inbox" / "Analyser la boîte de réception"
-    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    src = I18N.read_text(encoding="utf-8")
     en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
     for block in (en, fr):
         label = re.search(r"'queue\.scan': [\"'](.+?)[\"'],", block).group(1)
@@ -89,7 +89,7 @@ def test_the_french_table_reader_takes_that_table_only_and_says_clearly_when_it_
     assert "'b'" in table and "'a'" not in table and "'c'" not in table
     with pytest.raises(AssertionError, match="no longer declares"):
         fr_messages_table("const fr = {\n}\n")
-    real = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    real = I18N.read_text(encoding="utf-8")                                              # (DOC534.236: the one constant for this file)
     assert "const frSpaced" not in fr_messages_table(real) and fr_messages_table(real).count("\n") > 50   # the real table, cut at its end
     old_way = "index(" + '"const frMessages")'                                          # (built, so that this line is not its own match)
     assert not [p.name for p in Path(__file__).parent.glob("test_*.py") if old_way in p.read_text(encoding="utf-8")]
@@ -116,7 +116,7 @@ def test_every_reason_the_settings_screen_can_be_refused_with_has_a_french_text_
 def test_the_texts_name_the_inbox_the_way_the_settings_do_and_never_a_fixed_folder_called_inbox():
     # DOC534.63: the French button said "Scanner l'Inbox" and the messages sent the reader to a folder "_Inbox", while the settings
     # speak of the boîte de réception and the folder is whatever the user chose
-    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    src = I18N.read_text(encoding="utf-8")
     en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
     assert "_Inbox" not in src and "l'Inbox" not in src
     assert "'queue.scan': 'Analyser la boîte de réception'" in fr and "'dash.srcInbox': 'Boîte de réception'" in fr
@@ -137,7 +137,7 @@ def test_file_sizes_use_the_units_and_the_number_format_of_the_language():
 
 def test_the_count_of_accepted_documents_has_a_singular_and_a_plural_in_both_languages():
     # DOC534.64: one key '{n} acceptés sur {total}' gave "1 acceptés sur 1"
-    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    src = I18N.read_text(encoding="utf-8")
     en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
     assert "'acc.untouchedCount':" not in src                                       # no form without a number agreement
     assert "'acc.untouchedCount.one': '{n} accepté sur {total}'" in fr and "'acc.untouchedCount.other': '{n} acceptés sur {total}'" in fr
@@ -146,7 +146,7 @@ def test_the_count_of_accepted_documents_has_a_singular_and_a_plural_in_both_lan
 
 def test_without_a_saved_choice_the_language_follows_the_browser_and_a_saved_choice_wins():
     # DOC474.28: a fr-CA browser got the English interface until the switch was used by hand (and again in a private window)
-    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    src = I18N.read_text(encoding="utf-8")
     body = src[src.index("function readLang"):src.index("function readLang") + 600]
     assert "stored === 'fr' || stored === 'en'" in body                          # a saved choice, either one, is kept
     assert "navigator.language" in body and "startsWith('fr')" in body            # otherwise the browser's language decides
