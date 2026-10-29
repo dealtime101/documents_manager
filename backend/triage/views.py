@@ -186,8 +186,10 @@ def library_file(request):
     try:
         path = s.library_file(request.query_params.get("path", ""))
         fh = path.open("rb")  # handed to FileResponse, which closes it once sent
-    except s.ApiError as e:
+    except s.NotFound as e:
         return err(e, status.HTTP_404_NOT_FOUND)
+    except s.ApiError as e:  # refused path (out of the library, empty): not "missing", a request that cannot be served
+        return err(e)
     except OSError as e:
         log.warning("library file unavailable: %s", e)
         return err(ValueError("file unavailable"), status.HTTP_404_NOT_FOUND)

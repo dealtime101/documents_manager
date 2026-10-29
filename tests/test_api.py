@@ -2043,7 +2043,7 @@ def test_the_library_explorer_lists_folders_and_files_and_walks_up_and_down(api,
 @pytest.mark.parametrize("rel", ["..", "../", "Bills/../..", "/etc", "C:/Windows", "..\\..", "Bills/../../secret.txt"])
 def test_the_library_explorer_never_leaves_the_library(api, lib, rel):
     assert api.get("/api/library", {"path": rel}).status_code == 400
-    assert api.get("/api/library/file", {"path": rel}).status_code == 404
+    assert api.get("/api/library/file", {"path": rel}).status_code == 400      # DOC534.86: refused is a bad request, as everywhere else
 
 
 def test_a_symlink_out_of_the_library_is_refused(api, lib, sb):
@@ -2053,7 +2053,7 @@ def test_a_symlink_out_of_the_library_is_refused(api, lib, sb):
     except OSError:
         pytest.skip("symlinks are not available here")
     assert api.get("/api/library", {"path": "out"}).status_code == 400
-    assert api.get("/api/library/file", {"path": "out/secret.txt"}).status_code == 404
+    assert api.get("/api/library/file", {"path": "out/secret.txt"}).status_code == 400
 
 
 def test_a_library_pdf_is_shown_inline_and_any_other_file_is_only_a_download(api, lib):

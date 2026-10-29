@@ -337,9 +337,9 @@ def library_list(rel: str) -> dict:
 
 
 def library_file(rel: str) -> Path:
-    _, p = _library_target(rel)
+    _, p = _library_target(rel)  # a path that is refused (out of the library, empty...) is an ApiError: a bad request
     if not p.is_file():
-        raise ApiError("file not found")
+        raise NotFound("file not found")  # a good path to nothing: the only case that is a 404
     return p
 
 
