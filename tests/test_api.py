@@ -817,36 +817,44 @@ def test_two_simultaneous_scan_requests_start_one_job_not_two(api, sb, monkeypat
 
 
 def test_a_slow_file_does_not_make_a_live_scan_look_dead(api, sb, monkeypatch):
-    import time
+    # DOC534.187: no sleep and no count of beats in a time window; the slow file ends when the 4th beat has come (or after 10 s)
+    import threading
 
     from docflow import pipeline
     from triage import services
     real = pipeline.propose
-    beats = []
-    monkeypatch.setattr(services, "HEARTBEAT_SECONDS", 0.2)
-    monkeypatch.setattr(services, "_beat", lambda job: beats.append(time.monotonic()))
+    beats, enough = [], threading.Event()
+    monkeypatch.setattr(services, "HEARTBEAT_SECONDS", 0.05)
+
+    def beat(job):
+        beats.append(1)
+        if len(beats) >= 4:
+            enough.set()
+    monkeypatch.setattr(services, "_beat", beat)
 
     def slow(*a, **k):
-        time.sleep(1.2)                                   # one big scanned PDF taking a long time
+        enough.wait(timeout=10)                           # one big scanned PDF taking as long as it takes to be waited for 4 times
         return real(*a, **k)
 
     monkeypatch.setattr(services, "propose", slow)
     pdf(sb / "inbox" / "big.pdf", HYDRO)
     assert api.post("/api/scan").json()["created"] == 1
-    assert len(beats) >= 4, beats                          # alive signals while waiting, not only when a result arrives
+    assert enough.is_set() and len(beats) >= 4, beats      # alive signals while waiting, not only when a result arrives
 
 
 def test_results_are_consumed_as_they_complete_not_in_file_order(api, sb, monkeypatch):
-    import time
+    # DOC534.187: the slow file waits for the fast one to be RECORDED (an Event), not for a duration
+    import threading
 
     from docflow import pipeline
     from triage import services
     real = pipeline.propose
+    fast_recorded = threading.Event()
     monkeypatch.setattr(services, "HEARTBEAT_SECONDS", 0.2)
 
     def slow_first(path, *a, **k):
         if path.name == "a_slow.pdf":
-            time.sleep(1.5)
+            fast_recorded.wait(timeout=10)                 # if results were taken in file order this would wait for nothing
         return real(path, *a, **k)
 
     monkeypatch.setattr(services, "propose", slow_first)
@@ -854,22 +862,33 @@ def test_results_are_consumed_as_they_complete_not_in_file_order(api, sb, monkey
     pdf(sb / "inbox" / "b_fast.pdf", HYDRO)
     seen = []
     orig = Item.objects.create
-    monkeypatch.setattr(Item.objects, "create", lambda **kw: (seen.append(kw["source_path"].split("/")[-1]), orig(**kw))[1])
+
+    def create(**kw):
+        seen.append(kw["source_path"].split("/")[-1])
+        item = orig(**kw)
+        if seen[-1] == "b_fast.pdf":
+            fast_recorded.set()
+        return item
+    monkeypatch.setattr(Item.objects, "create", create)
     api.post("/api/scan")
     assert seen == ["b_fast.pdf", "a_slow.pdf"]            # the fast one is visible without waiting for the slow one
 
 
 def test_the_copy_is_the_duplicate_even_when_it_finishes_before_the_original(api, sb, monkeypatch):
-    import time
+    import threading
 
     from docflow import pipeline
     from triage import services
     real = pipeline.propose
+    copy_analysed = threading.Event()
 
     def slow_original(path, *a, **k):
         if path.name == "a_original.pdf":
-            time.sleep(1.0)                               # the original is analysed last
-        return real(path, *a, **k)
+            copy_analysed.wait(timeout=10)                # the original is analysed last: after the copy (an Event, not a delay)
+        proposal = real(path, *a, **k)
+        if path.name == "b_copy.pdf":
+            copy_analysed.set()
+        return proposal
 
     monkeypatch.setattr(services, "propose", slow_original)
     a = pdf(sb / "inbox" / "a_original.pdf", HYDRO)
