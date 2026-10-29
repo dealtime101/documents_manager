@@ -16,6 +16,15 @@ def _env(tmp_path):
     return env
 
 
+def test_the_settings_describe_the_one_deployment_there_is_a_local_desktop_application():
+    # DOC534.33: the docstring said "LOCAL site (internal network): login required" and a comment "reached directly on the LAN",
+    # while ALLOWED_HOSTS only lets 127.0.0.1 and localhost in (the server mode was removed)
+    source = (ROOT / "backend" / "webapp" / "settings.py").read_text(encoding="utf-8")
+    assert 'ALLOWED_HOSTS = ["127.0.0.1", "localhost"]' in source          # (the test settings add "testserver" at run time)
+    assert "internal network" not in source and "login required" not in source and "on the LAN" not in source
+    assert source.startswith('"""Django settings. Desktop application')
+
+
 def test_a_free_local_port_is_found_and_really_free():
     from docflow.desktop import free_port
     port = free_port()

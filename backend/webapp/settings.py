@@ -1,4 +1,5 @@
-"""Django settings. LOCAL site (internal network): login required, no telemetry, no external service."""
+"""Django settings. Desktop application: one user on this computer, served on 127.0.0.1 only, signed in by the launcher's one-time
+token; no telemetry, no external service."""
 import os
 import secrets
 import tempfile
@@ -58,7 +59,8 @@ SECRET_KEY = _secret()
 DEBUG = os.environ.get("DOCFLOW_DEBUG") == "1"
 
 
-# The application only answers on this computer: it listens on 127.0.0.1 and has no password, so nothing else may reach it.
+# The application only answers on this computer: it listens on 127.0.0.1 and has no password (the launcher's token signs the one
+# user in), so nothing else may reach it. The server mode that answered on the local network was removed: see CHANGELOG.
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 INSTALLED_APPS = [
@@ -101,8 +103,8 @@ LOGGING = {
 }
 
 REST_FRAMEWORK = {
-    # The server is reached directly on the LAN: trust REMOTE_ADDR only. With the default (None) DRF believes a client's
-    # X-Forwarded-For header, and forging it would reset every per-address limit.
+    # The server is reached directly, with no proxy in front: trust REMOTE_ADDR only. With the default (None) DRF believes a
+    # client's X-Forwarded-For header, and forging it would reset every per-address limit.
     "NUM_PROXIES": 0,
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
