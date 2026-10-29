@@ -37,6 +37,29 @@ def _is_binary_or_not_a_file(call: ast.Call) -> bool:
     return any("b" in str(m) for m in modes)
 
 
+def invisible_format_characters(text: str) -> list[str]:
+    """The Unicode 'format' characters (category Cf: bidirectional controls, zero-width characters, the soft hyphen, a byte order mark)
+    that a text holds: invisible to whoever reads it, the stuff of a 'Trojan Source' attack (DOC534.580)."""
+    import unicodedata
+    return sorted({hex(ord(c)) for c in text if unicodedata.category(c) == "Cf"})
+
+
+def test_no_source_file_holds_an_invisible_format_character():
+    assert invisible_format_characters("a" + chr(0x202E) + "b" + chr(0x200B)) == ["0x200b", "0x202e"]     # built by number, like the rule
+    assert invisible_format_characters("plain, accentuated: éà, no-break space") == []
+    folders = ("backend", "tests", "scripts", "packaging", "config", "frontend/src")
+    files = [ROOT / name for name in ("manage.py", "README.md", "CHANGELOG.md", "CHANGELOG.en.md", "pyproject.toml")]
+    for folder in folders:
+        files += [p for p in (ROOT / folder).rglob("*") if p.is_file() and "__pycache__" not in p.parts
+                  and p.suffix in {".py", ".ts", ".tsx", ".css", ".html", ".md", ".yaml", ".yml", ".bat", ".ps1", ".spec", ".txt", ".json"}]
+    found = {}
+    for path in files:
+        hits = invisible_format_characters(path.read_text(encoding="utf-8"))
+        if hits:
+            found[str(path.relative_to(ROOT))] = hits
+    assert found == {}, found
+
+
 def test_the_reader_finds_what_it_should():
     assert bare_text_reads("p.read_text()\nq.read_text(encoding='utf-8')\nopen(f)\nopen(f, 'rb')\npath.open('r')\npath.open('rb')\n"
                            "pymupdf.open()\nopen(f, encoding='utf-8')\nr = x.read_text('utf-8')") == [1, 3, 5]

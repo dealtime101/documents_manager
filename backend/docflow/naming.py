@@ -8,10 +8,17 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 # controls such as U+202E (which can make "x.pdf" LOOK like another extension), zero-width characters and the soft hyphen, which make
 # two visually identical names two different files. The Cf ranges are those of Unicode 15.1; a test compares them with the
 # Python in use, so a newer Unicode that adds one is reported.
+#
+# The format characters are listed as NUMBERS and built with chr(): a literal U+202E or U+200B in the source is invisible to a
+# reader (it is the trick of a "Trojan Source" attack), and a source file with none of them can be read and reviewed as it is.
+_FORMAT_CHARACTERS = (
+    (0xAD, 0xAD), (0x600, 0x605), (0x61C, 0x61C), (0x6DD, 0x6DD), (0x70F, 0x70F), (0x890, 0x891), (0x8E2, 0x8E2), (0x180E, 0x180E),
+    (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x2064), (0x2066, 0x206F), (0xFEFF, 0xFEFF), (0xFFF9, 0xFFFB),
+    (0x110BD, 0x110BD), (0x110CD, 0x110CD), (0x13430, 0x1343F), (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A), (0xE0001, 0xE0001),
+    (0xE0020, 0xE007F))
 FORBIDDEN = re.compile(
     '[<>:"/\\\\|?*\x00-\x1f\x7f'
-    "\xad؀-؅؜۝܏࢐-࢑࣢᠎​-‏‪-‮⁠-⁤⁦-⁯﻿"
-    "￹-￻\U000110bd\U000110cd\U00013430-\U0001343f\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0001\U000e0020-\U000e007f]")
+    + "".join(f"{chr(first)}-{chr(last)}" if last > first else chr(first) for first, last in _FORMAT_CHARACTERS) + "]")
 # The names Windows keeps for devices, whatever the extension: CON... LPT9, the console handles CONIN$ / CONOUT$, and COM / LPT followed
 # by a superscript 1, 2 or 3 (written with chr(): a literal superscript digit looks like a plain one in an editor).
 _SUPERSCRIPTS = (chr(0xB9), chr(0xB2), chr(0xB3))

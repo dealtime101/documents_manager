@@ -699,8 +699,9 @@ def test_invisible_and_bidirectional_control_characters_never_survive_in_a_file_
     import unicodedata
 
     from docflow.naming import FORBIDDEN, sanitize
-    assert sanitize("fac‮ture​ \x7f2025.pdf") == "facture 2025.pdf"
-    for char in "‮‭⁦⁩​‍﻿\xad؜\x7f":
+    # DOC534.580: the characters are named by number, never typed: a literal one is invisible in the source (and is a "Trojan Source")
+    assert sanitize(f"fac{chr(0x202E)}ture{chr(0x200B)} \x7f2025.pdf") == "facture 2025.pdf"
+    for char in map(chr, (0x202E, 0x202D, 0x2066, 0x2069, 0x200B, 0x200D, 0xFEFF, 0xAD, 0x61C, 0x7F)):
         assert FORBIDDEN.search(f"a{char}b"), hex(ord(char))
     missed = [hex(c) for c in range(sys.maxunicode + 1) if unicodedata.category(chr(c)) == "Cf" and not FORBIDDEN.search(chr(c))]
     assert not missed, f"format characters let through: {missed}"                       # the table follows Unicode, nothing forgotten

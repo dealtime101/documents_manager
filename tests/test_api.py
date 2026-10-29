@@ -1304,7 +1304,7 @@ def test_the_search_ignores_accents_and_case_wants_every_word_and_accepts_a_begi
 
 
 @pytest.mark.parametrize("query", ['"', "*", "NEAR(", "hydro AND", "a OR b NOT c", "-hydro", "col:umn", "(", ")", "'; DROP TABLE x; --",
-                                   "hydro*", '"hydro', "‮", "😀", "x" * 300, "hydro " * 30])
+                                   "hydro*", '"hydro', chr(0x202E), chr(0x1F600), "x" * 300, "hydro " * 30])      # (a bidi control, an emoji)
 def test_the_search_syntax_typed_or_pasted_never_reaches_the_index_and_never_gives_a_500(api, sb, query):
     _scan_and_file_everything(api, sb)
     r = api.get("/api/search", {"q": query})
