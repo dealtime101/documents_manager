@@ -1821,6 +1821,24 @@ def test_the_search_migration_says_how_many_filed_documents_have_no_searchable_t
         del connections["old"]
 
 
+def test_reindex_text_does_not_report_unreadable_documents_as_a_success(monkeypatch):
+    # DOC534.177: the summary was always green and the exit code 0, whatever number of documents could not be read
+    import io
+
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+    from triage import services
+    monkeypatch.setattr(services, "reindex_text", lambda report=None: {"indexed": 3, "unreadable": 0, "without_text": 1})
+    out = io.StringIO()
+    call_command("reindex_text", stdout=out)                                          # all read: a plain success, exit 0
+    assert "3 indexed, 0 unreadable" in out.getvalue()
+    monkeypatch.setattr(services, "reindex_text", lambda report=None: {"indexed": 3, "unreadable": 2, "without_text": 0})
+    out = io.StringIO()
+    with pytest.raises(CommandError, match="2 document.s. could not be read"):          # exit code 1 for a scheduled run
+        call_command("reindex_text", stdout=out, no_color=False, force_color=True)
+    assert "3 indexed, 2 unreadable" in out.getvalue() and "\x1b[32;1m" not in out.getvalue()      # the summary is not in success green
+
+
 @pytest.mark.django_db
 def test_the_state_migration_repairs_and_logs_the_unknown_states_before_adding_its_check(tmp_path, caplog):
     # DOC534.176: a row whose state is not one of the four made the CHECK fail at `migrate`, and nothing said which rows or values
