@@ -91,7 +91,8 @@ def search(q: str) -> dict:
     stopped = False
     deadline = time.monotonic() + SEARCH_SECONDS
     for here, dirs, files in os.walk(root):
-        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        # the trash is not part of the library to search: what was deleted must not come back as a hit (or use up the cap)
+        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not (Path(here) == root and d == TRASH))
         if time.monotonic() > deadline:
             stopped = True
             break

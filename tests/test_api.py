@@ -2086,6 +2086,21 @@ def test_the_library_search_finds_folders_and_files_by_name_ignoring_case_and_ac
     assert api.get("/api/library/search", {"q": "h"}).status_code == 400            # too short to mean anything
 
 
+def test_the_library_search_does_not_return_what_was_put_in_the_trash(api, lib):
+    # DOC534.100: deleted documents came back as hits, could be opened or re-filed, and used up the 300 results
+    (lib / "Voitures").mkdir()
+    (lib / "Voitures" / "Entretien Hydro.pdf").write_bytes(b"%PDF-1.4")
+    before = {h["path"] for h in api.get("/api/library/search", {"q": "hydro"}).json()["hits"]}
+    assert "Voitures/Entretien Hydro.pdf" in before
+    assert post(api, "delete", path="Voitures/Entretien Hydro.pdf").json()["permanent"] is False       # to the trash
+    assert (lib / "_Trash" / "Entretien Hydro.pdf").is_file()
+    after = {h["path"] for h in api.get("/api/library/search", {"q": "hydro"}).json()["hits"]}
+    assert after == before - {"Voitures/Entretien Hydro.pdf"} and not any(p.startswith("_Trash") for p in after)
+    assert api.get("/api/library/search", {"q": "trash"}).json()["hits"] == []                         # the folder itself is not a hit either
+    (lib / "Bills" / "_Trash").mkdir()                                                                 # a folder of that name elsewhere is ordinary
+    assert {h["path"] for h in api.get("/api/library/search", {"q": "trash"}).json()["hits"]} == {"Bills/_Trash"}
+
+
 def test_a_folder_can_be_created_renamed_moved_and_deleted_and_nothing_is_replaced(api, lib):
     assert post(api, "folder", parent="Bills", name="Eau").json() == {"path": "Bills/Eau"} and (lib / "Bills" / "Eau").is_dir()
     assert post(api, "folder", parent="Bills", name="Eau").status_code == 400          # already there
