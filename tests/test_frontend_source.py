@@ -573,6 +573,22 @@ def test_the_sidebar_focus_ring_reaches_3_to_1_on_its_background_in_both_themes(
         assert (hi + 0.05) / (lo + 0.05) >= 3, theme[:6]
 
 
+def test_the_outline_of_an_input_reaches_3_to_1_in_both_themes_and_the_tint_tokens_are_untouched():
+    # DOC534.141 (WCAG 1.4.11): --input (0.922) gave about 1.3:1 on white, white at 15% about 1.5:1 in the dark theme
+    css = (UI.parents[1] / "index.css").read_text(encoding="utf-8")
+    light, dark = css[css.index(":root {"):css.index(".dark {")], css[css.index(".dark {"):css.index("@layer base")]
+    field = float(re.search(r"--field:\s*oklch\(([\d.]+) 0 0\)", light).group(1))
+    assert (1 + 0.05) / (field ** 3 + 0.05) >= 3                                         # on the white page and cards
+    alpha = int(re.search(r"--field:\s*oklch\(1 0 0 / (\d+)%\)", dark).group(1)) / 100
+    for background in (0.145, 0.205):                                                    # the page and the cards of the dark theme
+        blended = background * (1 - alpha) + alpha                                       # a white outline over it
+        assert (blended ** 3 + 0.05) / (background ** 3 + 0.05) >= 3, background
+    assert "--color-field: var(--field)" in css
+    input_source = (UI / "input.tsx").read_text(encoding="utf-8")
+    assert "border border-field" in input_source and "border border-input" not in input_source
+    assert "disabled:bg-input/50" in input_source and "--input: oklch(0.922 0 0)" in light and "--input: oklch(1 0 0 / 15%)" in dark   # tints stay
+
+
 def test_the_notice_live_regions_are_never_hidden_while_empty():
     # DOC474.108: `empty:hidden` is display:none on the empty region, which removes it from the accessibility tree: it comes
     # back together with its text, the very case the "always in the page" comment is there to avoid
