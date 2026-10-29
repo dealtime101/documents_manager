@@ -20,7 +20,13 @@ export default function Notes() {
   const { t, msg, date, lang } = useI18n()
   const [releases, setReleases] = useState<Release[] | null>(null)
   const [error, setError] = useState('')
-  useEffect(() => { api.changelog(lang).then(setReleases).catch((e) => setError(errorText(e))) }, [lang])  // the notes follow the language
+  useEffect(() => {  // the notes follow the language
+    let cancelled = false  // a slower answer for the language the user has left must not replace the one they asked for since
+    api.changelog(lang)
+      .then((rows) => { if (!cancelled) { setReleases(rows); setError('') } })  // the new language loaded: an old failure is over
+      .catch((e) => { if (!cancelled) setError(errorText(e)) })
+    return () => { cancelled = true }
+  }, [lang])
   if (error) return <p role="alert" className="text-rose-700">{msg(error)}</p>
   if (!releases) return <p role="status" className="text-slate-500">{t('common.loading')}</p>
   if (releases.length === 0) return <p className="text-slate-500">{t('notes.none')}</p>

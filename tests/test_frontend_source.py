@@ -91,6 +91,15 @@ def test_the_launcher_token_stays_in_the_address_while_the_server_cannot_be_reac
     assert "setFailure(''); void start()" in app and "setFailure(''); refresh()" not in app        # Retry runs the whole start again
 
 
+def test_the_release_notes_ignore_a_late_answer_for_a_language_left_and_forget_an_old_failure():
+    # DOC534.44: after a failure the error stayed for ever, and a quick language switch let the slower answer win
+    notes = (BITS.parents[1] / "pages" / "Notes.tsx").read_text()
+    effect = notes[notes.index("useEffect(() => {"):notes.index("}, [lang])")]
+    assert "let cancelled = false" in effect and "return () => { cancelled = true }" in effect
+    assert "if (!cancelled) { setReleases(rows); setError('') }" in effect                  # the answer is used only if still wanted
+    assert "if (!cancelled) setError(errorText(e))" in effect                                 # and so is the failure
+
+
 def test_every_tab_has_a_tabpanel_inside_the_same_tabs_root():
     app = (BITS.parents[1] / "App.tsx").read_text()
     assert app.count("<Tabs ") == 1 and app.count("</Tabs>") == 1            # one root around the tab list AND the pages
