@@ -220,6 +220,15 @@ def test_learn_company_writes_alias_and_next_analysis_uses_it(tmp_path):
     assert "GarageTremblay" in load_config(sandbox=tmp_path).companies
 
 
+def test_the_pattern_drawn_from_a_company_name_has_word_limits_and_a_length_counted_on_the_name():
+    # DOC534.28: "Bell" matched "Isabelle", and "A-B" (a\s*b) passed the length test on its escapes and matched "about"
+    from docflow.learn import _name_pattern
+    assert _name_pattern("Bell", "Isabelle Tremblay\nFacture") is None
+    assert _name_pattern("Bell", "Facture\nBell Canada") is not None
+    assert _name_pattern("A-B", "about the thing") is None
+    assert _name_pattern("HelloFresh", "Powered by HELLO FRESH") is not None
+
+
 def test_a_company_named_in_the_text_is_learned_by_its_name_not_by_the_title_line(tmp_path):
     cfg = cfg_in(tmp_path)
     text = "Pâtes au boeuf style taco\nHelloFresh\nPour 2 personnes"

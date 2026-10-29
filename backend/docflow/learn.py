@@ -84,8 +84,10 @@ def _name_pattern(company: str, text: str) -> str | None:
     """The company's own name as a pattern ("HelloFresh" -> hello\\s*fresh) when the document really contains it: far more
     reusable than the first line, which for a recipe or a letter is its title."""
     words = re.findall(r"[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])", company)
-    pat = r"\s*".join(re.escape(w.lower()) for w in words)
-    return pat if len(pat) >= 4 and re.search(pat, norm(text).lower()) else None
+    if len("".join(words)) < 4:  # the length of the NAME, not of the regex: "A-B" is a\s*b, 6 characters of escapes for 2 letters
+        return None
+    pat = r"\b" + r"\s*".join(re.escape(w.lower()) for w in words) + r"\b"  # whole words: "bell" must not be found in "isabelle"
+    return pat if re.search(pat, norm(text).lower()) else None
 
 
 def learn_company(cfg: Config, company: str, header: str, text: str = "") -> bool:
