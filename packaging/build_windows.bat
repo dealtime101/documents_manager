@@ -12,7 +12,10 @@ rem Python 3.12+ (pyproject: requires-python): the interpreter found is checked,
 if exist ".venv-build\Scripts\python.exe" (".venv-build\Scripts\python.exe" -c "import sys; sys.exit(sys.version_info < (3, 12))" || rmdir /s /q .venv-build)
 if not exist ".venv-build\Scripts\python.exe" %PY% -m venv .venv-build || goto :fail
 ".venv-build\Scripts\python.exe" -m pip install --quiet --upgrade pip || goto :fail
-".venv-build\Scripts\python.exe" -m pip install --quiet . pyinstaller pywebview || goto :fail
+rem Every dependency (PyInstaller and pywebview included) at the version and hash of uv.lock, so two builds of one commit match.
+rem Regenerate after a change of dependencies: uv export --frozen --no-dev --group desktop --no-emit-project -o packaging/requirements-build.txt
+".venv-build\Scripts\python.exe" -m pip install --quiet --require-hashes -r packaging\requirements-build.txt || goto :fail
+".venv-build\Scripts\python.exe" -m pip install --quiet --no-deps . || goto :fail
 pushd frontend
 call npm ci || (popd & goto :fail)
 call npm run build || (popd & goto :fail)

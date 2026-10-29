@@ -54,6 +54,23 @@ def test_the_windows_build_leaves_the_calling_console_as_it_found_it():
     assert len([line for line in lines if line.startswith("exit /b")]) == 2
 
 
+def test_the_windows_build_installs_what_uv_lock_pins_with_hashes():
+    # DOC534.172: `pip install . pyinstaller pywebview` took the newest version of each at every build, so two builds of one commit differed
+    import re
+    root = PACKAGING.parent
+    script = (PACKAGING / "build_windows.bat").read_text(encoding="utf-8")
+    assert "pip install --quiet --require-hashes -r packaging\\requirements-build.txt" in script
+    assert "pip install --quiet --no-deps ." in script and "pyinstaller pywebview" not in script
+    required = (PACKAGING / "requirements-build.txt").read_text(encoding="utf-8")
+    pins = dict(re.findall(r"^([A-Za-z0-9._-]+)==([^\s;]+)", required, flags=re.M))
+    assert {"pyinstaller", "pywebview", "django"} <= set(pins)
+    assert required.count("--hash=sha256:") >= len(pins)                                  # every pin carries at least one hash
+    lock = (root / "uv.lock").read_text(encoding="utf-8")
+    locked = dict(re.findall(r'^name = "([^"]+)"\nversion = "([^"]+)"', lock, flags=re.M))
+    stale = {name: (version, locked.get(name)) for name, version in pins.items() if locked.get(name) != version}
+    assert not stale, f"packaging/requirements-build.txt is out of date with uv.lock, regenerate it (see build_windows.bat): {stale}"
+
+
 def test_the_windows_build_checks_the_python_version_and_remakes_an_old_build_venv():
     # DOC534.171: an old .venv-build, or a py/python older than 3.12, failed later with an unclear error
     import re
