@@ -438,6 +438,31 @@ def test_ocr_timeout_does_not_crash_the_document(tmp_path, monkeypatch):
     assert extract.extract_text(f).method == "ocr_unavailable"  # page not read, but no exception
 
 
+def test_a_failed_or_timed_out_orientation_check_leaves_a_warning_saying_why(monkeypatch, caplog):
+    # DOC534.84: a missing osd.traineddata or a timeout made every sideways page be read as it is, without a word in the log
+    import logging
+    monkeypatch.setattr(extract.shutil, "which", lambda _: "/usr/bin/tesseract")
+    monkeypatch.setattr(extract.subprocess, "run", lambda *a, **k: extract.subprocess.CompletedProcess(
+        a[0], 1, stdout="", stderr="Failed loading language 'osd'\nTesseract couldn't load any languages!"))
+    with caplog.at_level(logging.WARNING, logger="docflow"):
+        assert extract.detect_rotation(b"x", "tesseract") == 0
+    assert any("exit code 1" in r.getMessage() and "Failed loading language 'osd'" in r.getMessage() for r in caplog.records)
+    caplog.clear()
+
+    def slow(*a, **k):
+        raise extract.subprocess.TimeoutExpired("tesseract", 7)
+    monkeypatch.setattr(extract.subprocess, "run", slow)
+    with caplog.at_level(logging.WARNING, logger="docflow"):
+        assert extract.detect_rotation(b"x", "tesseract", 7) == 0
+    assert any("timed out after 7 s" in r.getMessage() for r in caplog.records)
+    caplog.clear()
+    monkeypatch.setattr(extract.subprocess, "run", lambda *a, **k: extract.subprocess.CompletedProcess(
+        a[0], 0, stdout="Page number: 0\nRotate: 90\nOrientation confidence: 0.50\n", stderr=""))   # a doubtful page: not an incident
+    with caplog.at_level(logging.WARNING, logger="docflow"):
+        assert extract.detect_rotation(b"x", "tesseract") == 0
+    assert not caplog.records
+
+
 def test_a_tesseract_that_cannot_be_launched_does_not_crash_the_document(tmp_path, caplog):
     broken = tmp_path / "tesseract"
     broken.write_bytes(b"\x00\x01 not an executable format")        # found by which(), but exec fails (OSError)

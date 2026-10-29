@@ -134,13 +134,18 @@ def detect_rotation(png: bytes, tesseract: str, timeout: float = OSD_TIMEOUT) ->
                                encoding="utf-8", errors="replace", timeout=timeout, env=_env_for(exe), check=False,
                                creationflags=NO_WINDOW)
         except subprocess.TimeoutExpired:
+            log.warning("%s orientation check timed out after %.0f s: the page is read as it is", exe, timeout)
             return 0
         except OSError as e:
             log.warning("could not run %s: %s", exe, e)
             return 0
     rot = re.search(r"Rotate:\s*(\d+)", r.stdout)
     conf = re.search(r"Orientation confidence:\s*([\d.]+)", r.stdout)
-    if r.returncode != 0 or not rot or not conf or float(conf.group(1)) < 2.0:
+    if r.returncode != 0:  # e.g. osd.traineddata is missing: every sideways page would be read as it is, with nothing to say why
+        log.warning("%s orientation check failed with exit code %s: %s (the page is read as it is)", exe, r.returncode,
+                    " ".join(r.stderr.split())[:300])
+        return 0
+    if not rot or not conf or float(conf.group(1)) < 2.0:
         return 0
     return int(rot.group(1)) % 360
 
