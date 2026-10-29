@@ -120,6 +120,23 @@ def _refuse_foreign_paths(settings: dict) -> None:
             raise ValueError(f"settings.{key}: {raw!r} is a Windows path, not usable on this system; write a path that exists here")
 
 
+DEFAULT_THRESHOLDS = {"auto": 0.95, "confirm": 0.80}  # as in the shipped settings.yaml
+
+
+def _thresholds(value) -> dict:
+    """The cut-offs between automatic / confirmation / manual, complete: a hand-written settings.yaml that leaves one out gets the
+    default for it; one that is not a mapping of numbers is refused with the key named (not a KeyError deep in a request)."""
+    if value is None:
+        return dict(DEFAULT_THRESHOLDS)
+    if not isinstance(value, dict):
+        raise ValueError(f"settings.yaml: thresholds must be a mapping with 'auto' and 'confirm', got {type(value).__name__}")
+    out = {**DEFAULT_THRESHOLDS, **value}
+    for key in DEFAULT_THRESHOLDS:
+        if isinstance(out[key], bool) or not isinstance(out[key], (int, float)):
+            raise ValueError(f"settings.yaml: thresholds.{key} must be a number, got {out[key]!r}")
+    return out
+
+
 def _merged(base: dict, over: dict) -> dict:
     """`over` on top of `base`, section by section (a section that is a mapping is merged, anything else is replaced)."""
     out = dict(base)
@@ -186,6 +203,7 @@ def load_config(config_dir: Path | str | None = None, sandbox: Path | None = Non
     settings = rd(cdir, "settings.yaml", {})
     if own is not None and (own / "config" / "settings.yaml").is_file():  # the user's own settings.yaml adds to / overrides the shipped one
         settings = _merged(settings, rd(own / "config", "settings.yaml", {}))
+    settings["thresholds"] = _thresholds(settings.get("thresholds"))
     if not sandbox:
         settings.update(usersettings.load())  # the folders this user chose in the Settings screen win over the shipped ones
     configured = all(settings.get(k) for k in ("inbox", "library_root"))

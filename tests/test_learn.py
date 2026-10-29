@@ -189,6 +189,26 @@ def _config_dir(tmp_path, companies_yaml: str):
     return d
 
 
+def test_the_thresholds_are_always_complete_and_a_bad_value_names_its_key(tmp_path):
+    # DOC534.87: a settings.yaml without (or with half of) `thresholds` made /api/thresholds and the engine fail with a bare KeyError
+    import pytest
+    from docflow.config import DEFAULT_THRESHOLDS
+
+    def with_settings(text: str):
+        d = tmp_path / ("cfg-" + str(abs(hash(text))))
+        d.mkdir()
+        (d / "companies.yaml").write_text("ACME: [acme]\n", encoding="utf-8")
+        (d / "settings.yaml").write_text(text, encoding="utf-8")
+        return d
+    assert load_config(with_settings("inbox: x\n"), sandbox=tmp_path / "s1").settings["thresholds"] == DEFAULT_THRESHOLDS
+    half = load_config(with_settings("thresholds:\n  auto: 0.9\n"), sandbox=tmp_path / "s2").settings["thresholds"]
+    assert half == {"auto": 0.9, "confirm": DEFAULT_THRESHOLDS["confirm"]}                 # the key left out gets its default
+    with pytest.raises(ValueError, match="thresholds must be a mapping"):
+        load_config(with_settings("thresholds: 5\n"), sandbox=tmp_path / "s3")
+    with pytest.raises(ValueError, match=r"thresholds\.confirm must be a number"):
+        load_config(with_settings("thresholds:\n  confirm: high\n"), sandbox=tmp_path / "s4")
+
+
 def test_company_patterns_accept_empty_and_single_string_values(tmp_path):
     cfg = load_config(_config_dir(tmp_path, "ACME:\nHydro: hydro-quebec\nList:\n  - a one\n  - b two\n"),
                       sandbox=tmp_path / "sb")
