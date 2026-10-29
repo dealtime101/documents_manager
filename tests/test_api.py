@@ -231,13 +231,23 @@ def test_a_second_writer_gets_through_a_write_lock_that_lasts_longer_than_the_ol
         hold.execute("COMMIT")
         hold.close()
 
-    threading.Thread(target=writer_holding_the_lock).start()
-    held.wait()
-    threading.Timer(6.0, release.set).start()                             # the lock is released after 6 s: longer than 5 s
-    start = time.time()
-    db = DB(path)
-    doc = db.add_document(sha256="s1", status="classified")                 # waits for the lock instead of "database is locked"
-    assert doc and 5.5 < time.time() - start < 15
+    # DOC534.186: nothing here may hang the suite or leave a thread behind, whatever fails. The 6 s are the point of the test (the
+    # busy timeout of DB is 20 s, fixed in db.py): a lock longer than the old 5 s default must be waited for, not refused.
+    holder = threading.Thread(target=writer_holding_the_lock, daemon=True)
+    timer = threading.Timer(6.0, release.set)
+    holder.start()
+    try:
+        assert held.wait(timeout=10), "the thread holding the lock did not get it"
+        timer.start()                                                    # the lock is released after 6 s: longer than 5 s
+        start = time.time()
+        db = DB(path)
+        doc = db.add_document(sha256="s1", status="classified")           # waits for the lock instead of "database is locked"
+        assert doc and 5.5 < time.time() - start < 15
+    finally:
+        timer.cancel()
+        release.set()                                                    # the lock is let go even when an assertion failed
+        holder.join(timeout=10)
+        assert not holder.is_alive()
 
 
 @pytest.mark.parametrize("content", ["", "   ", "\n", " \n\t "])
