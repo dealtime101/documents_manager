@@ -81,8 +81,12 @@ def main(root: Path, limit: int = 45) -> None:
         print(f"... {len(hidden)} more groups ({sum(len(n) for _, n in hidden)} files) not shown; use --limit to see more")
     if causes:
         print("\nwhy files were unreadable:")
-        for same, n in causes.most_common(5):
+        ranked_causes = causes.most_common()
+        for same, n in ranked_causes[:5]:
             print(f"{n:>3}  {example[same][:150]}  (e.g. {first_file[same]})")
+        if len(ranked_causes) > 5:  # as for the groups: say what is not shown, or the listed causes look like the whole story
+            hidden_causes = ranked_causes[5:]
+            print(f"... {len(hidden_causes)} more causes ({sum(n for _, n in hidden_causes)} files) not shown")
 
 
 if __name__ == "__main__":

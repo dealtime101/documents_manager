@@ -253,6 +253,24 @@ def test_discover_says_why_files_were_unreadable_so_a_general_failure_is_not_tak
     assert "RuntimeError: tesseract is not installed" in out and "2" in out.split("RuntimeError")[0].splitlines()[-1]
 
 
+def test_discover_says_how_many_causes_it_does_not_show(tmp_path, capsys):
+    # DOC534.134: only the 5 most frequent causes were listed, the others vanished and the listed ones looked like the whole story
+    for n in range(8):
+        make_pdf(tmp_path / f"f{n}.pdf", f"Entreprise numero {n} texte assez long pour etre lu")
+    discover = load_script("discover")
+    kinds = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel"]
+
+    def distinct_failure(path, ocr):
+        raise RuntimeError(f"failure kind {kinds[int(path.stem[1:])]}")              # eight different causes (no digits to merge them)
+
+    discover.extract_text = distinct_failure
+    discover.main(tmp_path)
+    out = capsys.readouterr().out
+    listed = out.split("why files were unreadable:")[1]
+    assert sum(1 for kind in kinds if f"failure kind {kind}" in listed) == 5          # five shown...
+    assert "... 3 more causes (3 files) not shown" in listed                          # ...and the rest accounted for
+
+
 def test_discover_says_how_many_groups_it_does_not_show(tmp_path, capsys):
     for i, word in enumerate(["Garage Tremblay", "Boutique Lavoie", "Clinique Roy", "Atelier Gagnon", "Librairie Pelletier"]):
         make_pdf(tmp_path / f"{i}.pdf", f"{word} et Fils inconnu")
