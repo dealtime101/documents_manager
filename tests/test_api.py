@@ -1761,6 +1761,28 @@ def test_the_items_have_no_second_index_on_state_alone_the_composite_one_serves_
 
 
 @pytest.mark.django_db
+def test_the_full_text_triggers_exist_and_no_migration_can_drop_them_unnoticed():
+    # DOC534.150: on SQLite an AlterField rebuilds triage_itemtext (copy, then DROP of the old table): its triggers go with it and the
+    # index drifts from the text with no error. They are checked here, and so is any migration that touches ItemText.
+    from django.db import connection
+    from django.db.migrations.loader import MigrationLoader
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'triage_itemtext'")
+        assert {r[0] for r in cursor.fetchall()} == {"item_fts_insert", "item_fts_update", "item_fts_delete"}
+    loader = MigrationLoader(None, ignore_no_migrations=True)
+    for (app, name), migration in sorted(loader.disk_migrations.items()):
+        if app != "triage" or name <= "0008_item_text_search":
+            continue
+        touches = [op for op in migration.operations if getattr(op, "model_name_lower", getattr(op, "name_lower", "")) == "itemtext"]
+        if touches:
+            sql = " ".join(str(s) for op in migration.operations if op.__class__.__name__ == "RunSQL" for s in (op.sql if isinstance(op.sql, (list, tuple)) else [op.sql]))
+            assert all(t in sql for t in ("item_fts_insert", "item_fts_update", "item_fts_delete")), (
+                f"{name} alters ItemText but does not create the full-text triggers again")
+    from triage.models import ItemText
+    assert "CONSTRAINT" in (ItemText.__doc__ or "") and "triggers" in ItemText.__doc__                  # and the model says so
+
+
+@pytest.mark.django_db
 def test_the_search_migration_says_how_many_filed_documents_have_no_searchable_text_and_what_to_run(tmp_path, caplog):
     # DOC534.149: the text table is new, so every document filed before it is unsearchable, and nothing said so or how to fix it
     import importlib

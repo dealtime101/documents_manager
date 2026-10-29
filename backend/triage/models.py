@@ -103,7 +103,12 @@ class Item(models.Model):
 class ItemText(models.Model):
     """The whole text read from a document, kept (in this local database only) so the filed archive can be searched. A separate
     table: the queue and the dashboard read thousands of items and must not drag every document's text along with them.
-    The full-text index over it (item_fts) is built by the migration and kept in step by triggers."""
+    The full-text index over it (item_fts) is built by the migration and kept in step by triggers.
+
+    CONSTRAINT: on SQLite, Django changes a table by building a copy and dropping the old one, and a dropped table takes its triggers
+    with it (item_fts_insert / _update / _delete, created by migration 0008). Any migration that alters this table must create
+    those triggers again (RunSQL, as 0008 does) and rebuild the index; tests/test_api.py checks that they exist and that no later
+    migration touches ItemText without recreating them."""
 
     item = models.OneToOneField(Item, primary_key=True, on_delete=models.CASCADE, related_name="fulltext")
     text = models.TextField(blank=True, default="")
