@@ -56,7 +56,7 @@ export default function Rules() {
 
   // the same object until its inputs change: Notice treats a new object as a new message to announce
   const shownNote = useMemo(
-    () => (reloadError ? { ok: false, text: `${note?.ok ? `${note.text} ` : ''}${msg(reloadError)}` } : note),
+    () => (reloadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(reloadError)}` } : note),
     [reloadError, note, msg])
   const filed = (n: number) => <span className="text-xs text-slate-500">{t('rules.filed', { n })}</span>
   const forgetButton = (kind: Kind, company: string, pattern?: string) => (

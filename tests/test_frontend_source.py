@@ -554,7 +554,9 @@ def test_a_failed_reload_after_a_change_keeps_the_rules_and_the_success_message_
     failure = load[load.index(".catch("):]
     assert failure.index("haveRules.current") < failure.index("setReloadError(") < failure.index("setLoadError(")   # kept list first
     assert "const haveRules = useRef(false)" in rules and "haveRules.current = true" in load
-    assert "reloadError ? { ok: false, text: `${note?.ok ? `${note.text} ` : ''}${msg(reloadError)}` } : note" in rules   # both shown
+    # both shown, whether the action succeeded or FAILED (DOC534.32: a failed action's text was hidden behind the old reload error)
+    assert "reloadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(reloadError)}` } : note" in rules
+    assert "note?.ok" not in rules
 
 
 def test_a_truncated_label_of_the_accuracy_screen_can_still_be_read_in_full():
