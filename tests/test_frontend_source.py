@@ -929,6 +929,17 @@ def test_a_failed_reload_after_an_undo_is_shown_with_the_result_of_the_undo():
     assert "[note, loadError, msg, t]" in shown                                               # (the note keeps its identity)
 
 
+def test_the_retry_button_of_the_accuracy_card_does_not_vanish_under_the_keyboard_focus():
+    # DOC534.148: the click cleared the error, the block and its button went, and the focus fell back to <body>
+    page = (BITS.parent / "Accuracy.tsx").read_text(encoding="utf-8")
+    retry = page[page.index("const retry = "):page.index("const GOOD")] if "const GOOD" in page else page
+    assert "onClick={retry}" in page and "onClick={() => { setError(''); void load() }}" not in page          # the click clears nothing
+    assert "if (retrying) return" in retry and "aria-disabled={retrying}" in page                      # and cannot be repeated meanwhile
+    assert "document.getElementById('accuracy-title')?.focus()" in retry and "if (ok)" in retry         # focus to the card title once it worked
+    assert 'id="accuracy-title" tabIndex={-1}' in page                                                  # which can take focus
+    assert "setError(''); return true" in page and "setError(errorText(e)); return false" in page      # load() says whether it worked
+
+
 def test_a_failed_load_of_the_history_can_be_tried_again_from_the_page():
     # DOC534.144: after a failed first load there was an error and an empty table, and only reloading the whole page tried again
     page = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")

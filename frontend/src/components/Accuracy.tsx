@@ -14,9 +14,18 @@ export default function Accuracy() {
   const { t, msg, percent, month } = useI18n()
   const [s, setS] = useState<Stats | null>(null)
   const [error, setError] = useState('')
-  const load = useCallback(() => api.stats().then((r) => { setS(r); setError('') })
-    .catch((e) => setError(errorText(e))), [])
-  useEffect(() => { load() }, [load])
+  const [retrying, setRetrying] = useState(false)
+  // true when the statistics were read: the caller knows whether the error block (and its button) is about to go
+  const load = useCallback(() => api.stats().then((r) => { setS(r); setError(''); return true })
+    .catch((e) => { setError(errorText(e)); return false }), [])
+  useEffect(() => { void load() }, [load])
+  // The button stays where it is while the new try runs (the error is not cleared by the click): it would otherwise vanish under the
+  // keyboard focus. Once the statistics are there the button is gone anyway, so the focus goes to the title of the card.
+  const retry = () => {
+    if (retrying) return
+    setRetrying(true)
+    void load().then((ok) => { setRetrying(false); if (ok) document.getElementById('accuracy-title')?.focus() })
+  }
 
   // decorative: the numbers beside it say the same thing. Green is a share ACCEPTED, amber a share CORRECTED.
   const bar = (ratio: number, tone: string) => (
@@ -39,7 +48,7 @@ export default function Accuracy() {
     body = (
       <div role="alert" className="space-y-2">
         <p className="text-rose-700">{msg(error)}</p>
-        <Button variant="outline" size="sm" onClick={() => { setError(''); void load() }}>{t('common.retry')}</Button>
+        <Button variant="outline" size="sm" aria-disabled={retrying} className="aria-disabled:opacity-50" onClick={retry}>{t('common.retry')}</Button>
       </div>
     )
   } else if (!s) {
@@ -74,7 +83,7 @@ export default function Accuracy() {
   }
   return (
     <Card>
-      <CardHeader><CardTitle as="h2">{t('acc.title')}</CardTitle></CardHeader>
+      <CardHeader><CardTitle as="h2" id="accuracy-title" tabIndex={-1} className="outline-none">{t('acc.title')}</CardTitle></CardHeader>
       <CardContent className="text-sm">
         {/* a live region that is in the page BEFORE its text arrives (a region that appears with its text is often not read) */}
         <p role="status" className="sr-only">{!s && !error ? t('common.loading') : s ? t('acc.loaded') : ''}</p>
