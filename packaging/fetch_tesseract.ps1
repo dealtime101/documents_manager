@@ -28,7 +28,10 @@ if (-not $install) {
   Write-Host "installer sha256: $actual"
   $install = Join-Path $work "install"
   # NSIS: /D= must come last and unquoted, so the arguments go in as ONE string
-  Start-Process -FilePath $installer -ArgumentList "/S /D=$install" -Wait
+  $proc = Start-Process -FilePath $installer -ArgumentList "/S /D=$install" -Wait -PassThru
+  # a refused or failed install (UAC, rights) must stop here with its own message, not later on a Copy-Item of a missing file
+  if ($proc.ExitCode -ne 0) { throw "The Tesseract installer failed (exit code $($proc.ExitCode)). Nothing was copied." }
+  if (-not (Test-Path (Join-Path $install "tesseract.exe"))) { throw "The Tesseract installer finished but $install has no tesseract.exe. Nothing was copied." }
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $out "tessdata") | Out-Null
 Copy-Item (Join-Path $install "tesseract.exe") $out

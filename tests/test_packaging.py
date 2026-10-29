@@ -31,6 +31,16 @@ def test_a_tesseract_folder_that_lacks_a_language_or_its_dlls_is_not_taken_for_p
     assert "$missing.Count -eq 0 -and $dlls.Count -gt 0" in first
 
 
+def test_a_failed_tesseract_install_stops_the_script_with_its_own_message():
+    # DOC534.154: the exit code was not read, so a refused install went on to a Copy-Item of a file that was not there
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    run = script.index("Start-Process -FilePath $installer")
+    line = script[run:script.index("\n", run)]
+    assert "-Wait -PassThru" in line and line.lstrip().startswith("Start-Process") is True and "$proc = " in script[run - 12:run]
+    assert script.index("$proc.ExitCode -ne 0", run) < script.index("Test-Path (Join-Path $install \"tesseract.exe\")", run)
+    assert script.index("has no tesseract.exe", run) < script.index("Copy-Item (Join-Path $install \"tesseract.exe\")")
+
+
 def test_the_tesseract_installer_is_never_run_without_a_hash_to_check_it_against():
     # DOC534.45: "SHA256_PLACEHOLDER" switched the check off and the downloaded installer was run and shipped unchecked
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
