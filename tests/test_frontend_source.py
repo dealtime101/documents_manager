@@ -81,6 +81,17 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_the_title_of_the_document_follows_the_page_shown():
+    # DOC534.128: every page had the same title: Back / Forward entries, bookmarks and screen readers could not tell them apart
+    import re
+    app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
+    route = (UI.parents[1] / "route.ts").read_text(encoding="utf-8")
+    pages = re.search(r"export type Page = ([^\n]+)", route).group(1)
+    names = dict(re.findall(r"(\w+): 'nav\.(\w+)'", app[app.index("const PAGE_NAME"):app.index("const MAX_SETUP_TRIES")]))
+    assert set(names) == set(re.findall(r"'(\w+)'", pages)) and all(k == v for k, v in names.items())   # every page has its own name
+    assert "document.title = `${t(PAGE_NAME[page])} \\u00b7 ${t('app.title')}`" in app and "}, [page, t])" in app
+
+
 def test_saving_the_settings_leaves_the_screen_only_at_the_end_of_the_first_set_up():
     # DOC534.127: every save sent the user to the queue: changing several settings meant coming back to the tab each time
     settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")

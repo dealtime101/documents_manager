@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError, errorText } from '@/api'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { I18nProvider, LangSwitch, useI18n } from '@/i18n'
+import { I18nProvider, LangSwitch, useI18n, type AskKey } from '@/i18n'
 import Dashboard, { type Target } from '@/pages/Dashboard'
 import History from '@/pages/History'
 import Library from '@/pages/Library'
@@ -13,6 +13,11 @@ import Search from '@/pages/Search'
 import Queue from '@/pages/Queue'
 import { parseHash, toHash, type Page, type Route } from '@/route'
 
+// the name of each page, as the tab shows it: the title of the document follows the page (history, bookmarks, screen readers)
+const PAGE_NAME: Record<Page, AskKey> = {
+  dashboard: 'nav.dashboard', queue: 'nav.queue', library: 'nav.library', history: 'nav.history',
+  search: 'nav.search', rules: 'nav.rules', settings: 'nav.settings', notes: 'nav.notes',
+}
 const MAX_SETUP_TRIES = 4  // after the first failure, how many more times the first-run check is asked, every SETUP_RETRY_MS
 const SETUP_RETRY_MS = 5000
 
@@ -27,6 +32,7 @@ function Shell() {
     window.addEventListener('hashchange', sync)
     return () => window.removeEventListener('hashchange', sync)
   }, [])
+  useEffect(() => { document.title = `${t(PAGE_NAME[page])} \u00b7 ${t('app.title')}` }, [page, t])
   const go = (route: Route) => { window.location.hash = toHash(route) }
   const open = (target: Target) => go({ page: target.page, group: target.page === 'queue' ? target.group ?? null : null })
   // the raw server text of a failed session check: an outage is not a logout (/auth/me answers 200 for an anonymous visitor)
