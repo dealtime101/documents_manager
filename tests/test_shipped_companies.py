@@ -7,11 +7,28 @@ from docflow.learn import NAME_RE
 
 
 @pytest.fixture
-def shipped(monkeypatch):
-    """The configuration of a new install: the rules that ship with the program (the tests normally use their own)."""
+def shipped(monkeypatch, tmp_path):
+    """The configuration of a new install: the rules that ship with the program (the tests normally use their own). The folders of the
+    person running the tests are out of reach (DOC534.247): the user's own folder, HOME and XDG_CONFIG_HOME all point into tmp_path, so
+    no personal rule or learned file can be read, whatever the machine."""
     monkeypatch.delenv("DOCFLOW_CONFIG_DIR", raising=False)
     monkeypatch.delenv("DOCFLOW_ROOT", raising=False)
+    monkeypatch.setenv("DOCFLOW_HOME", str(tmp_path / "docflow-home"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     return load_config()
+
+
+def test_the_shipped_configuration_is_read_with_no_personal_folder_in_reach(shipped, tmp_path, monkeypatch):
+    from docflow import usersettings
+    assert usersettings.user_dir().is_relative_to(tmp_path)
+    assert shipped.learn_dir.is_relative_to(tmp_path)                                  # what was learned is looked for there too...
+    assert not shipped.learn_dir.exists() or not any(shipped.learn_dir.glob("*.yaml"))   # ...and nothing is
+    # even without DOCFLOW_HOME, the places the code falls back to are inside tmp_path
+    monkeypatch.delenv("DOCFLOW_HOME")
+    assert usersettings.user_dir().is_relative_to(tmp_path)
+    monkeypatch.delenv("XDG_CONFIG_HOME")
+    assert usersettings.user_dir().is_relative_to(tmp_path)
 
 
 def test_every_shipped_name_is_a_valid_company_name_and_every_pattern_compiles(shipped):
