@@ -91,9 +91,12 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
           {KEYS.map(([key, label]) => (
             <div key={key}>
               <Field label={t(label)}>
-                <Input value={v[key]} onChange={(e) => set(key, e.target.value)} placeholder={key === 'quarantine' ? t('settings.helpQuarantine') : ''}
-                  aria-invalid={errors[key] ? true : undefined} aria-describedby={errors[key] ? `err-${key}` : undefined} />
+                <Input value={v[key]} onChange={(e) => set(key, e.target.value)}
+                  aria-invalid={errors[key] ? true : undefined}
+                  aria-describedby={[errors[key] ? `err-${key}` : '', key === 'quarantine' ? 'help-quarantine' : ''].filter(Boolean).join(' ') || undefined} />
               </Field>
+              {/* permanent text under the field, read with it: a placeholder disappears as soon as the field has a value */}
+              {key === 'quarantine' && <p id="help-quarantine" className="text-xs text-slate-600">{t('settings.helpQuarantine')}</p>}
               <Button type="button" variant="outline" size="sm" className="mt-1" onClick={() => setPicking(picking === key ? null : key)}>{t('settings.browse')}</Button>
               {errors[key] && <p id={`err-${key}`} role="alert" className="text-sm text-rose-700"><span aria-hidden="true">✕ </span>{msg(errors[key])}</p>}
               {picking === key && <Picker start={v[key]} onPick={(p) => { set(key, p); setPicking(null) }} onClose={() => setPicking(null)} />}

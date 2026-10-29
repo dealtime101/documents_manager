@@ -897,6 +897,15 @@ def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
         assert "'rules.forgetPatternLabel'" in block and "{pattern}" in block.split("'rules.forgetPatternLabel'")[1].split("\n")[0]
 
 
+def test_the_quarantine_help_is_text_under_the_field_and_not_a_placeholder():
+    # DOC534.260: a placeholder is gone as soon as the field holds a value, and screen readers do not always read it
+    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+    assert "placeholder=" not in settings
+    assert "<p id=\"help-quarantine\" className=\"text-xs text-slate-600\">{t('settings.helpQuarantine')}</p>" in settings
+    assert "key === 'quarantine' ? 'help-quarantine' : ''" in settings and "err-${key}" in settings   # tied to the field, with the error id
+    assert ".filter(Boolean).join(' ') || undefined" in settings                                     # no empty aria-describedby
+
+
 def test_each_comment_of_the_rules_loader_sits_on_the_line_it_describes():
     # DOC534.259: the comment about the value load() resolves with stood above the haveRules ref, which has a comment of its own
     rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8").splitlines()
