@@ -893,11 +893,12 @@ def test_a_saved_destination_stays_on_screen_until_the_rules_are_reloaded():
     # good if the reload failed)
     rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
     save = rules[rules.index("const saveRoute"):rules.index("const filed")]
-    assert "await api.setRoute(company, destination)" in save or "api.setRoute(company, destination)" in save
+    # DOC534.226: saveRoute hands the call to act(), which awaits it; the awaiting is read where it happens, in act
+    assert "() => api.setRoute(company, destination)" in save
     assert "dropDraft(company)" in save and save.index("api.setRoute") < save.index("dropDraft")   # (dropDraft = setDrafts without that company)
     assert "const loaded = await load()" in rules and "if (loaded) after?.()" in rules          # the draft goes only after a good reload
     act = rules[rules.index("const act"):rules.index("const forget")]
-    assert act.index("await load()") < act.index("after?.()")
+    assert act.index("await action()") < act.index("await load()") < act.index("after?.()")        # saved, THEN reloaded, THEN the draft goes
     assert "setDrafts" not in act.split("await load()")[0]                                         # and never before it
 
 
