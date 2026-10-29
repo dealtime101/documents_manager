@@ -91,6 +91,17 @@ def test_the_texts_name_the_inbox_the_way_the_settings_do_and_never_a_fixed_fold
     assert "'dash.srcInbox': 'Inbox'" in en
 
 
+def test_file_sizes_use_the_units_and_the_number_format_of_the_language():
+    # DOC534.68: the library showed "B", "KB", "MB" and a point decimal in French
+    root = Path(__file__).resolve().parents[1] / "frontend" / "src"
+    src, page = (root / "i18n.tsx").read_text(encoding="utf-8"), (root / "pages" / "Library.tsx").read_text(encoding="utf-8")
+    en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
+    assert [f"'size.{k}': '{v}'" in en for k, v in (("b", "B"), ("kb", "KB"), ("mb", "MB"))] == [True] * 3
+    assert [f"'size.{k}': '{v}'" in fr for k, v in (("b", "o"), ("kb", "Ko"), ("mb", "Mo"))] == [True] * 3
+    assert "` B`" not in page and "toFixed(" not in page and "new Intl.NumberFormat(lang" in page   # no unit or separator written in the code
+    assert "{size(f.size, t, lang)}" in page
+
+
 def test_the_count_of_accepted_documents_has_a_singular_and_a_plural_in_both_languages():
     # DOC534.64: one key '{n} acceptés sur {total}' gave "1 acceptés sur 1"
     src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")

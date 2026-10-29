@@ -14,10 +14,12 @@ const isPdf = (name: string) => name.toLowerCase().endsWith('.pdf')
 const inTrash = (path: string) => path === TRASH || path.startsWith(`${TRASH}/`)
 const EMPTY: LibraryFields = { company: '', document_type: '', date: 'XXXX', detail: '', amount: '', currency: 'CAD' }
 
-function size(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+/** A file size in the language of the page: "1,5 Mo" in French (o, Ko, Mo; decimal comma), "1.5 MB" in English. */
+function size(bytes: number, t: (k: 'size.b' | 'size.kb' | 'size.mb') => string, lang: string): string {
+  const number = (n: number, digits: number) => new Intl.NumberFormat(lang, { maximumFractionDigits: digits }).format(n)
+  if (bytes < 1024) return `${number(bytes, 0)} ${t('size.b')}`
+  if (bytes < 1024 * 1024) return `${number(bytes / 1024, 0)} ${t('size.kb')}`
+  return `${number(bytes / 1024 / 1024, 1)} ${t('size.mb')}`
 }
 
 /** One line of text to type (a new name), shown where it is needed: the browser's own prompt() is not reliable in a desktop window. */
@@ -294,7 +296,7 @@ export default function Library() {
                           className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 ${file === rel ? 'bg-slate-200' : ''}`}>
                           <span aria-hidden="true">{isPdf(f.name) ? '📄' : '📎'}</span>
                           <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                          <span className="shrink-0 text-xs text-slate-600">{size(f.size)} · {new Date(f.modified * 1000).toLocaleDateString(lang)}</span>
+                          <span className="shrink-0 text-xs text-slate-600">{size(f.size, t, lang)} ·{new Date(f.modified * 1000).toLocaleDateString(lang)}</span>
                         </button>
                       </li>
                     )
