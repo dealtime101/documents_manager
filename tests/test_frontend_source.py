@@ -889,6 +889,24 @@ def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
         assert "'rules.forgetPatternLabel'" in block and "{pattern}" in block.split("'rules.forgetPatternLabel'")[1].split("\n")[0]
 
 
+def test_the_stylesheet_passes_stylelint_with_the_projects_own_configuration():
+    # DOC534.582 and the other stylelint findings: the standard rules did not know Tailwind's at-rules and its notation of colours, and
+    # three blank lines were missing; the project now states its rules (frontend/stylelint.config.mjs) and the stylesheet follows them
+    frontend = UI.parents[2]
+    package = json.loads((frontend / "package.json").read_text(encoding="utf-8"))
+    assert package["scripts"]["lint:css"] == 'stylelint "src/**/*.css"'
+    assert {"stylelint", "stylelint-config-standard"} <= set(package["devDependencies"])
+    config = (frontend / "stylelint.config.mjs").read_text(encoding="utf-8")
+    assert "extends: ['stylelint-config-standard']" in config
+    for choice in ("'at-rule-no-unknown': [true", "'import-notation': 'string'", "'lightness-notation': null", "'hue-degree-notation': null"):
+        assert choice in config, choice
+    binary = frontend / "node_modules" / "stylelint" / "bin" / "stylelint.mjs"
+    if not shutil.which("node") or not binary.exists():
+        pytest.skip("node or stylelint is not installed")
+    done = run_node(["node", str(binary), "src/index.css"], cwd=frontend)
+    assert done.returncode == 0, done.stdout + done.stderr                                    # the stylesheet follows its rules
+
+
 def test_the_pages_are_listed_once_and_the_page_type_is_read_from_the_list():
     # DOC534.264: the type and the array were written twice; a page in the type but not in the array compiled and could not be reached
     route = (UI.parents[1] / "route.ts").read_text(encoding="utf-8")

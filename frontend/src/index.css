@@ -108,16 +108,19 @@
 @layer base {
   * {
     @apply border-border;
-    }
+  }
+
   /* Native focus indicator for everything that does not draw its own ring (links, list items, the preview frame):
      full-strength colour, never faded to 50 %, which made it nearly invisible. Components with `outline-none` keep their ring. */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
-    }
+  }
+
   body {
     @apply bg-background text-foreground;
-    }
+  }
+
   html {
     @apply font-sans;
-    }
+  }
 }

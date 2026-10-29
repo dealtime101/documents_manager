@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "lint:css": "stylelint \"src/**/*.css\"",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -28,6 +29,8 @@
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
     "shadcn": "^4.21.1",
+    "stylelint": "^17.16.0",
+    "stylelint-config-standard": "^40.0.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }
