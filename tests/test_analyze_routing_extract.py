@@ -110,22 +110,21 @@ def test_routing():
     assert route({"A": {"T": {"destination": "x"}}}, "A", "Autre") is None
 
 
-@pytest.mark.parametrize("date", ["20", "202", "12345", "2025 ", "٢٠٢٥-01-01", "²⁰²⁵", "２０２５", "abcd", "XXXX", "", "2025/10/07"])
+@pytest.mark.parametrize("date", ["2025-foo", "2025-99", "2025-02-30", "2025-1", "20250", "٢٠٢٥", "20", "202", "12345", "2025 ", "٢٠٢٥-01-01", "²⁰²⁵", "２０２５", "abcd", "XXXX", "", "2025/10/07"])
 def test_an_incomplete_or_non_ascii_year_never_fills_a_year_template(date):
     """'{year}' becomes a folder: only four ASCII digits that START the date (YYYY, YYYY-MM, YYYY-MM-DD) may name one."""
     assert fill("Amazon/{year}", date) is None
 
 
-@pytest.mark.parametrize("date", ["2025", "2025-10", "2025-10-07"])
+@pytest.mark.parametrize("date", ["2025", "2025-10", "2025-10-07", "2026", "2026-01-08"])
 def test_a_well_formed_date_fills_the_year_template(date):
-    assert fill("Amazon/{year}", date) == "Amazon/2025"
+    assert fill("Amazon/{year}", date) == f"Amazon/{date[:4]}"
 
 
-def test_fill_year():
-    assert fill("Amazon/{year}", "2026-01-08") == "Amazon/2026"
-    assert fill("Amazon/{year}", "2026") == "Amazon/2026"
-    assert fill("Amazon/{year}", "XXXX") is None
-    assert fill("Assurances/X", "XXXX") == "Assurances/X"
+@pytest.mark.parametrize("date", ["XXXX", "2025-foo", ""])
+def test_a_template_without_a_year_does_not_read_the_date(date):
+    # (DOC534.219: the three tests that checked the year template by hand are the two above, one table of valid and invalid dates)
+    assert fill("Assurances/X", date) == "Assurances/X"
 
 
 @pytest.mark.parametrize("bad", ["../x", "a/../../x", "/etc", "C:/Windows", "a/b:c", "a\\..\\x"])
@@ -808,16 +807,6 @@ def test_a_page_of_extreme_size_is_rendered_within_a_pixel_budget_or_counted_unr
     seen.clear()
     e = extract.extract_text(absurd)
     assert e.missing_pages == 1 and not seen                    # refused cleanly: counted, never rendered, never sent
-
-
-def test_a_year_folder_is_only_filled_from_a_real_date():
-    # DOC474.199: "2025-foo" and "2025-99" were taken for a date and filed under 2025
-    from docflow.routing import fill
-    for bad in ("2025-foo", "2025-99", "2025-02-30", "2025-1", "20250", "", "XXXX", "٢٠٢٥"):
-        assert fill("Impots/{year}", bad) is None, bad
-    for good, year in (("2025", "2025"), ("2025-10", "2025"), ("2025-10-07", "2025")):
-        assert fill("Impots/{year}", good) == f"Impots/{year}", good
-    assert fill("Impots", "2025-foo") == "Impots"                                 # no {year} in the template: the date is not read
 
 
 def test_a_destination_folder_cannot_be_a_windows_device_name_or_end_with_a_dot_or_a_space(tmp_path):
