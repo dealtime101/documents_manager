@@ -86,8 +86,12 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
       try {
         const j = await api.scanStatus()
         if (cancelled) return
-        const { rows: list, total: all } = await api.items('pending', groupRef.current ?? undefined)
+        const { rows: fetched, total: all } = await api.items('pending', groupRef.current ?? undefined)
         if (cancelled) return
+        // as load() does: a document being edited that left the list (filed elsewhere) stays on top with what was typed in it
+        const edited = dirtyRef.current && selRef.current !== null && !fetched.some((i) => i.id === selRef.current)
+          ? itemsRef.current.find((i) => i.id === selRef.current) : undefined
+        const list = edited ? [edited, ...fetched] : fetched
         setJob(j)
         setItems(list)  // the list only: never reset a form the user is typing in
         setTotal(all)

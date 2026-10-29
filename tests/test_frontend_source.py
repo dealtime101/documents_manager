@@ -339,6 +339,15 @@ def test_a_proposal_read_for_one_library_file_never_fills_the_form_of_another():
     assert "if (shown.current === asked) setProblem(errorText(e))" in page               # and an error for A is not shown on B
 
 
+def test_the_scan_refresh_keeps_a_document_being_edited_even_when_it_left_the_list():
+    # DOC534.20: the polled refresh dropped the open document (filed elsewhere), `dirty` fell back to false, and the next cycle replaced the form
+    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text()
+    tick = queue[queue.index("const tick = async () => {"):queue.index("timer = setTimeout(tick, 3000)\n    return")]
+    assert "dirtyRef.current && selRef.current !== null && !fetched.some((i) => i.id === selRef.current)" in tick
+    assert "itemsRef.current.find((i) => i.id === selRef.current)" in tick and "const list = edited ? [edited, ...fetched] : fetched" in tick
+    assert tick.index("const list = edited") < tick.index("setItems(list)")          # the kept document is in the list that is shown
+
+
 def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html():
     got = _node_route("({ search: m.parseHash('#search'), write: m.toHash({ page: 'search', group: null }) })")
     assert got["search"] == {"page": "search", "group": None} and got["write"] == "#search"
