@@ -87,7 +87,7 @@ def validate(values: dict) -> dict[str, str]:
     quarantine = folder("quarantine", must_exist=False) if "quarantine" in values else None
     if inbox and library and inbox.resolve() == library.resolve():
         errors["library_root"] = "must be a different folder from the inbox (filed documents would be scanned again)"
-    if library and quarantine and library.resolve() in quarantine.resolve().parents:
+    if library and quarantine and (library.resolve() == quarantine.resolve() or library.resolve() in quarantine.resolve().parents):
         errors["quarantine"] = "must be outside the library (duplicates would be filed into it)"
     if library and not os.access(library, os.W_OK):
         errors.setdefault("library_root", "is not writable")
