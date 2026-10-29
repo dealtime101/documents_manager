@@ -26,13 +26,26 @@ def mkpdf(path: Path, text: str) -> Path:
 
 
 @pytest.fixture
-def env(tmp_path):
+def make_db():
+    """History databases for a test; each one is closed when the test ends (DOC534.213), not whenever the garbage collector comes."""
+    opened = []
+
+    def make(path):
+        opened.append(DB(path))
+        return opened[-1]
+    yield make
+    for db in opened:
+        db.close()
+
+
+@pytest.fixture
+def env(tmp_path, make_db):
     cfg = load_config()
     cfg.root = tmp_path
     cfg.settings = {**cfg.settings, "inbox": "inbox", "quarantine": "q", "db": "d.db", "log": "l.log",
                     "library_root": str(tmp_path / "lib")}
     (tmp_path / "inbox").mkdir()
-    return cfg, DB(":memory:"), tmp_path
+    return cfg, make_db(":memory:"), tmp_path
 
 
 def test_propose_is_read_only_and_auto(env):
@@ -1164,9 +1177,9 @@ def test_a_sandbox_scan_refuses_a_source_outside_the_sandbox_unless_it_is_a_dry_
     assert not g.exists() and list((sb / "library").rglob("*.pdf"))                    # ...and files into the SANDBOX library
 
 
-def test_the_same_content_cannot_be_filed_twice_even_by_two_scans_racing(tmp_path):
+def test_the_same_content_cannot_be_filed_twice_even_by_two_scans_racing(tmp_path, make_db):
     # DOC474.170: both scans saw "sha not filed" and both inserted; the database itself now refuses the second
-    db = DB(tmp_path / "h.db")
+    db = make_db(tmp_path / "h.db")
     db.add_document(sha256="abc", status="classified", original_filename="a.pdf")
     with pytest.raises(ValueError, match="already filed"):
         db.add_document(sha256="abc", status="classified", original_filename="b.pdf")
@@ -1175,7 +1188,7 @@ def test_the_same_content_cannot_be_filed_twice_even_by_two_scans_racing(tmp_pat
     assert db.c.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 3
 
 
-def test_a_database_that_already_holds_duplicates_still_opens(tmp_path):
+def test_a_database_that_already_holds_duplicates_still_opens(tmp_path, make_db):
     import sqlite3
 
     from docflow.db import SCHEMA
@@ -1185,7 +1198,7 @@ def test_a_database_that_already_holds_duplicates_still_opens(tmp_path):
     raw.executemany("INSERT INTO documents (sha256, status) VALUES (?, 'classified')", [("same",), ("same",)])
     raw.commit()
     raw.close()
-    db = DB(path)                                                                       # must not raise: the guard is just not installed
+    db = make_db(path)                                                                  # must not raise: the guard is just not installed
     assert db.c.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 2
 
 
@@ -1281,9 +1294,9 @@ def test_every_command_line_option_and_command_explains_itself(capsys):
     assert all(choice.help for choice in commands._choices_actions) and len(commands._choices_actions) == 3   # scan, undo, history
 
 
-def test_the_operations_of_a_document_are_found_through_an_index(tmp_path):
+def test_the_operations_of_a_document_are_found_through_an_index(tmp_path, make_db):
     # DOC474.69: mark_undone, forget_document and the foreign-key check on documents scanned the whole operations table
-    db = DB(tmp_path / "h.db")
+    db = make_db(tmp_path / "h.db")
     for q in ("SELECT 1 FROM operations WHERE document_id=? AND undone=0", "DELETE FROM operations WHERE document_id=?"):
         plan = " ".join(r[3] for r in db.c.execute(f"EXPLAIN QUERY PLAN {q}", (1,)))
         assert "USING INDEX ix_op_doc" in plan or "USING COVERING INDEX ix_op_doc" in plan, (q, plan)
@@ -1294,14 +1307,14 @@ def test_the_operations_of_a_document_are_found_through_an_index(tmp_path):
     raw.executescript("\n".join(line for line in SCHEMA.splitlines() if "ix_op_doc" not in line and "ix_doc_logical" not in line))
     assert not raw.execute("SELECT name FROM sqlite_master WHERE name IN ('ix_op_doc', 'ix_doc_logical')").fetchall()
     raw.close()
-    opened = DB(old)                                                                    # an existing database gets both indexes too
+    opened = make_db(old)                                                               # an existing database gets both indexes too
     got = {r[0] for r in opened.c.execute("SELECT name FROM sqlite_master WHERE name IN ('ix_op_doc', 'ix_doc_logical')")}
     assert got == {"ix_op_doc", "ix_doc_logical"}, got                                  # DOC534.212: the second one was never looked for
 
 
-def test_the_logical_duplicate_lookup_uses_an_index(tmp_path):
+def test_the_logical_duplicate_lookup_uses_an_index(tmp_path, make_db):
     # DOC474.70: every analysed document ran find_logical, which scanned the whole documents table
-    db = DB(tmp_path / "h.db")
+    db = make_db(tmp_path / "h.db")
     plan = " ".join(r[3] for r in db.c.execute(
         "EXPLAIN QUERY PLAN SELECT * FROM documents WHERE status='classified' AND company=? AND invoice_number=? "
         "AND document_date IS ? AND amount IS ?", ("Hydro-Quebec", "123", "2025-10-07", "158.98")))
@@ -1311,7 +1324,7 @@ def test_the_logical_duplicate_lookup_uses_an_index(tmp_path):
     assert db.find_logical("Hydro-Quebec", "124", "2025-10-07", "158.98") is None
 
 
-def test_a_history_connection_can_be_closed_deterministically(tmp_path):
+def test_a_history_connection_can_be_closed_deterministically(tmp_path, make_db):
     # DOC474.71: DB had no close() nor context manager; connections lived until the garbage collector reached them
     import sqlite3
     with DB(tmp_path / "h.db") as db:
@@ -1319,10 +1332,11 @@ def test_a_history_connection_can_be_closed_deterministically(tmp_path):
         assert db.find_sha("a")
     with pytest.raises(sqlite3.ProgrammingError):                          # closed on leaving the block
         db.c.execute("SELECT 1")
-    again = DB(tmp_path / "h.db")
+    again = make_db(tmp_path / "h.db")
     again.close()
-    again.close()                                                          # closing twice is harmless
-    assert DB(tmp_path / "h.db").find_sha("a")                             # and nothing was lost
+    again.close()                                                          # closing twice is harmless (and the fixture closes it a third time)
+    with DB(tmp_path / "h.db") as reopened:
+        assert reopened.find_sha("a")                                      # and nothing was lost
 
 
 

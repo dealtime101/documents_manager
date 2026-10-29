@@ -166,9 +166,9 @@ def test_the_site_database_waits_for_a_locked_file_and_uses_the_write_ahead_log(
 
 def test_the_engine_database_has_the_same_waiting_time_and_log_mode(tmp_path):
     from docflow.db import DB
-    db = DB(tmp_path / "engine.db")
-    assert db.c.execute("PRAGMA busy_timeout").fetchone()[0] == 20000
-    assert db.c.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    with DB(tmp_path / "engine.db") as db:                                  # closed on leaving (DOC534.213)
+        assert db.c.execute("PRAGMA busy_timeout").fetchone()[0] == 20000
+        assert db.c.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
 
 
 @pytest.mark.parametrize("kind", ["RuntimeError", "FzErrorFormat", "KeyError"])
@@ -201,7 +201,8 @@ def test_many_connections_opened_at_once_on_a_new_database_all_succeed(tmp_path,
     def open_one():                                # the scan's workers each open their own connection, at the same moment
         start.wait()
         try:
-            modes.append(DB(path).c.execute("PRAGMA journal_mode").fetchone()[0])
+            with DB(path) as one:
+                modes.append(one.c.execute("PRAGMA journal_mode").fetchone()[0])
         except Exception as e:
             errors.append(f"{type(e).__name__}: {e}")
 
@@ -220,7 +221,7 @@ def test_a_second_writer_gets_through_a_write_lock_that_lasts_longer_than_the_ol
 
     from docflow.db import DB
     path = tmp_path / "shared.db"
-    DB(path).c.close()                                                      # creates the file and its tables
+    DB(path).close()                                                        # creates the file and its tables
     held, release = threading.Event(), threading.Event()
 
     def writer_holding_the_lock():                                         # e.g. the background scan saving its results
@@ -240,8 +241,8 @@ def test_a_second_writer_gets_through_a_write_lock_that_lasts_longer_than_the_ol
         assert held.wait(timeout=10), "the thread holding the lock did not get it"
         timer.start()                                                    # the lock is released after 6 s: longer than 5 s
         start = time.time()
-        db = DB(path)
-        doc = db.add_document(sha256="s1", status="classified")           # waits for the lock instead of "database is locked"
+        with DB(path) as db:
+            doc = db.add_document(sha256="s1", status="classified")       # waits for the lock instead of "database is locked"
         assert doc and 5.5 < time.time() - start < 15
     finally:
         timer.cancel()
