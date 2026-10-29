@@ -48,11 +48,16 @@ _KIND_WORDS = {
 }
 
 
+# Every value FoundDate.kind can take: the words that name a date in the text (invoice, order, due...), "skip", and what the
+# fall-backs produce when there is no full date (month_only, period, tax_year, month_before).
+DATE_KINDS = ("invoice", "order", "label", "other", "due", "skip", "month_only", "period", "tax_year", "month_before")
+
+
 @dataclass
 class FoundDate:
     text: str          # YYYY-MM-DD / YYYY-MM / YYYY
     confidence: float
-    kind: str          # invoice | order | label | other | due | month_only
+    kind: str          # one of DATE_KINDS
 
 
 def _month(s: str) -> int:

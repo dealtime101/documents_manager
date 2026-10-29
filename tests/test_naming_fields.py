@@ -11,6 +11,21 @@ from docflow.fields import (
 from docflow.naming import build_filename, sanitize, token
 
 
+def test_the_kinds_of_a_found_date_are_all_listed():
+    # DOC534.74: the comment named six kinds; the module also produces skip, period, tax_year and month_before
+    import re
+    from pathlib import Path
+
+    from docflow import fields
+    source = Path(fields.__file__).read_text(encoding="utf-8")
+    produced = set(re.findall(r'FoundDate\([^\n]*?, "(\w+)"\)', source))                          # the fall-backs
+    produced |= set(re.findall(r'"(\w+)": \d+[,}]', source[source.index("tier = {"):source.index("tier = {") + 120]))   # the tiers of the scan
+    produced |= {"invoice", "order", "label", "other", "due"}                                    # named by _KIND_WORDS
+    assert produced <= set(fields.DATE_KINDS), produced - set(fields.DATE_KINDS)
+    assert {"skip", "period", "tax_year", "month_before", "month_only"} <= set(fields.DATE_KINDS)
+    assert "one of DATE_KINDS" in source and "| month_only" not in source                       # no second, incomplete list
+
+
 def test_sanitize_windows():
     assert sanitize('a<b>c:d"e/f\\g|h?i*j') == "abcdefghij"
     assert sanitize("nom. ") == "nom"
