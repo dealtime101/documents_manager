@@ -376,6 +376,15 @@ def test_the_library_apply_button_needs_a_preview_computed_for_what_is_typed_now
     assert "disabled={busy || !ready} onClick={apply}" in page and "{plan && ready &&" in page   # Apply AND the preview wait for it
 
 
+def test_a_proposal_for_a_library_file_does_not_start_a_second_plan_request_for_the_same_inputs():
+    # DOC534.66: after "Suggest" the form changed, the effect ran again and asked the server for the plan it had just been given
+    page = (UI.parents[1] / "pages" / "Library.tsx").read_text()
+    effect = page[page.index("// the name and folder they give, recomputed shortly after each change"):page.index("const set = ")]
+    assert "if (planned === asked) return" in effect and "[file, form, relDir, finalName, touched, planned]" in effect
+    assert effect.index("if (planned === asked) return") < effect.index("api.libraryPlan(")   # before any request is scheduled
+    assert "setPlan(null); setPlanned('')" in effect                                        # a failed plan is asked again for the same inputs
+
+
 def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html():
     got = _node_route("({ search: m.parseHash('#search'), write: m.toHash({ page: 'search', group: null }) })")
     assert got["search"] == {"page": "search", "group": None} and got["write"] == "#search"

@@ -88,15 +88,16 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
   // the name and folder they give, recomputed shortly after each change
   useEffect(() => {
     if (!touched) return
-    let current = true
     const asked = JSON.stringify([form, relDir, finalName])
+    if (planned === asked) return  // the plan shown is already for these inputs (a proposal just brought it): no second request
+    let current = true
     const timer = setTimeout(() => {
       api.libraryPlan(file, form, relDir, finalName)
         .then((p) => { if (current) { setPlan(p); setPlanned(asked); setProblem('') } })
-        .catch((e) => { if (current) { setPlan(null); setProblem(errorText(e)) } })
+        .catch((e) => { if (current) { setPlan(null); setPlanned(''); setProblem(errorText(e)) } })
     }, 400)
     return () => { current = false; clearTimeout(timer) }
-  }, [file, form, relDir, finalName, touched])
+  }, [file, form, relDir, finalName, touched, planned])
 
   const set = (k: keyof LibraryFields) => (e: { target: { value: string } }) => { setForm({ ...form, [k]: e.target.value }); setTouched(true) }
   const suggest = async () => {
