@@ -264,6 +264,20 @@ def test_a_document_is_undone_only_when_all_its_operations_are(env):
     assert db.find_sha("s1") is None                             # now nothing is left: no longer filed
 
 
+def test_only_a_uniqueness_violation_is_reported_as_an_identical_document(env):
+    # DOC534.111: every IntegrityError was "an identical document is already filed", with its real cause hidden by `from None`
+    import sqlite3
+    cfg, db, tmp = env
+    db.add_document(sha256="same", company="A", status="classified")
+    with pytest.raises(ValueError, match="identical document is already filed") as dup:
+        db.add_document(sha256="same", company="B", status="classified")
+    assert isinstance(dup.value.__cause__, sqlite3.IntegrityError) and "UNIQUE" in str(dup.value.__cause__)   # and the cause is kept
+    with pytest.raises(sqlite3.IntegrityError, match="NOT NULL"):                       # no checksum: not a duplicate, its own error
+        db.add_document(company="C", status="classified")
+    assert not db.c.in_transaction                                                       # both rolled back: the connection is usable
+    db.add_document(sha256="other", company="D", status="classified")
+
+
 def test_the_same_operation_cannot_be_marked_undone_twice(env):
     cfg, db, tmp = env
     doc = db.add_document(sha256="s2", status="classified")

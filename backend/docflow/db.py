@@ -108,9 +108,11 @@ class DB:
         cols = ",".join(f)
         try:
             cur = self.c.execute(f"INSERT INTO documents ({cols}) VALUES ({','.join('?' * len(f))})", list(f.values()))
-        except sqlite3.IntegrityError:  # the unique index above: another scan filed this content a moment ago
+        except sqlite3.IntegrityError as e:
             self.c.rollback()
-            raise ValueError("an identical document is already filed (SHA-256)") from None
+            if "UNIQUE" in str(e).upper():  # the unique index above: another scan filed this content a moment ago
+                raise ValueError("an identical document is already filed (SHA-256)") from e
+            raise  # any other constraint (a NOT NULL, say): its own message, not a false "duplicate"
         self.c.commit()
         return _row_id(cur)
 
