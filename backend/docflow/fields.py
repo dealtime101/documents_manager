@@ -105,7 +105,7 @@ def find_date(text: str, prefer: str = "invoice") -> FoundDate | None:
             ctx = (prev[-40:] + " " if use_prev else "") + before[-60:]
             ctx = ctx.lower()
             # a "due date" label closer than "invoice" wins
-            last = {k: max((m.start() for m in rx.finditer(ctx)), default=-1) for k, rx in _KIND_WORDS.items()}
+            last = {k: max((km.start() for km in krx.finditer(ctx)), default=-1) for k, krx in _KIND_WORDS.items()}  # (own names: `m` and `rx` are the loop's)
             # the bare word "date" is the label of LAST resort: "Invoice Date" is an invoice date, "Due Date" a due date
             specific = [k for k in last if k != "label" and last[k] >= 0]
             kind = max(specific, key=lambda k: last[k]) if specific else ("label" if last["label"] >= 0 else "other")

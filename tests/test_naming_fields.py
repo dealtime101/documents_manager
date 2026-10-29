@@ -406,6 +406,36 @@ def test_text_that_only_looks_a_little_like_an_item_row_is_not_one():
     assert find_items("Livraison gratuite pour 2 jours 19,99") == []                # no currency sign
 
 
+def reused_loop_names(source: str) -> dict[str, list[str]]:
+    """{function: names} where a comprehension variable has the name of a `for` loop variable of the same function (DOC534.252): it
+    works because a comprehension has its own scope, until someone turns it into a loop and the loop's variable is overwritten."""
+    import ast
+
+    def names(target):
+        return {n.id for n in ast.walk(target) if isinstance(n, ast.Name)}
+    found = {}
+    for function in ast.walk(ast.parse(source)):
+        if isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef):
+            loops, comprehensions = set(), set()
+            for node in ast.walk(function):
+                if isinstance(node, ast.For):
+                    loops |= names(node.target)
+                elif isinstance(node, ast.comprehension):
+                    comprehensions |= names(node.target)
+            if loops & comprehensions:
+                found[function.name] = sorted(loops & comprehensions)
+    return found
+
+
+def test_a_comprehension_of_fields_py_never_reuses_the_name_of_a_loop_variable_around_it():
+    from pathlib import Path
+
+    import docflow.fields
+    assert reused_loop_names("def f(xs):\n    for m in xs:\n        a = [m for m in xs]\n") == {"f": ["m"]}         # the checker works
+    assert reused_loop_names("def f(xs):\n    for m in xs:\n        a = [k for k in xs]\n") == {}
+    assert reused_loop_names(Path(docflow.fields.__file__).read_text(encoding="utf-8")) == {}
+
+
 def test_find_date_stays_fast_on_a_long_statement_with_a_date_on_every_line():
     # DOC534.230: the GROWTH is measured, not a time in seconds that a loaded CI runner or a coverage run would exceed. Four times the
     # lines must cost about four times as much (a few lines x dates loop makes it sixteen); the best of several runs removes the noise.
