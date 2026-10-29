@@ -9,7 +9,7 @@ import pytest
 # above this point, so no module can have resolved a path before the two variables are set.
 os.environ["DOCFLOW_HOME"] = tempfile.mkdtemp(prefix="docflow-home-")  # forced: a DOCFLOW_HOME of the developer's shell must not be used
 # ...and it uses the test rules (well-known companies only), never the rules that ship with the program.
-os.environ.setdefault("DOCFLOW_CONFIG_DIR", str(Path(__file__).parent / "fixtures" / "config"))
+os.environ["DOCFLOW_CONFIG_DIR"] = str(Path(__file__).parent / "fixtures" / "config")  # forced too: not the one of the developer's shell
 
 
 SUBPROCESS_TIMEOUT = 180  # seconds; read at each call, so a test can lower it

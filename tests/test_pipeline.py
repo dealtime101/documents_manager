@@ -735,6 +735,17 @@ def test_the_summary_adds_up_to_the_number_of_files_and_counts_the_skipped_ones(
     assert summary == "5 file(s); 1 processed, 2 pending, 2 skipped (not PDF), 1 FAILED"
 
 
+def test_the_env_fixture_reads_the_versioned_test_configuration_never_the_users(env):
+    # DOC534.208: load_config() in the fixture must not depend on what the person running the tests has configured
+    import os
+    import tempfile
+
+    from docflow.config import shipped_dir
+    assert shipped_dir() == Path(__file__).parent / "fixtures" / "config"                    # the thresholds and rules are the checked-in ones
+    assert Path(os.environ["DOCFLOW_HOME"]).is_relative_to(tempfile.gettempdir())            # and the user's own files are somewhere else
+    assert env[0].settings["thresholds"] == load_config().settings["thresholds"]
+
+
 def test_table_mode_is_one_line_per_file_with_the_outcome_as_a_column(env, monkeypatch, capsys):
     cfg, db, tmp = env
     mkpdf(tmp / "inbox" / "a-filed.pdf", HYDRO)
