@@ -22,7 +22,8 @@ def same_company(answer: str | None, expected: str) -> bool:
     return bool(a) and a == e
 
 
-def main(cache: Path, model: str, n: int) -> None:
+def main(cache: Path, model: str, n: int) -> int:
+    """0 = measured; 1 = stopped, the model server looks unreachable (nothing was measured, no score is given)."""
     if n < 1:  # before anything is read or measured: random.sample would raise a traceback on a negative size
         raise ValueError(f"N must be a whole number of at least 1, got {n}")
     rows = load(cache)
@@ -45,8 +46,8 @@ def main(cache: Path, model: str, n: int) -> None:
             in_a_row += 1
             print(f"  ! server problem, document left out: {type(e).__name__}: {str(e)[:60]}", flush=True)
             if in_a_row >= MAX_UNREACHABLE_IN_A_ROW:
-                print(f"\nstopped: the model server looks unreachable ({in_a_row} failures in a row), no score is given.")
-                return
+                print(f"\nstopped: the model server looks unreachable ({in_a_row} failures in a row), no score is given.", file=sys.stderr)
+                return 1  # a script or a CI must not take a run that measured nothing for a success
             continue
         except BadModelAnswer as e:  # the model answered, with something unusable: that IS a failure of the model
             in_a_row = 0
@@ -73,6 +74,7 @@ def main(cache: Path, model: str, n: int) -> None:
           f" | amount {stats['amount']}/{stats['amount_n']}"
           f" | infrastructure errors {unreachable} (left out of every score)"
           f" | mean time {sum(secs) / max(len(secs), 1):.1f}s (max {max(secs, default=0):.0f}s)")
+    return 0
 
 
 if __name__ == "__main__":
@@ -86,4 +88,4 @@ if __name__ == "__main__":
     except ValueError as e:  # a bad N is a usage error: say it on stderr, exit 2, no traceback
         print(f"usage error: N must be a whole number of at least 1 ({e})", file=sys.stderr)
         sys.exit(2)
-    main(Path(sys.argv[1]), sys.argv[2], sample_size)
+    sys.exit(main(Path(sys.argv[1]), sys.argv[2], sample_size))

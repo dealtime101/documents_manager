@@ -1048,10 +1048,12 @@ def test_the_evaluation_stops_when_the_model_server_is_clearly_down(tmp_path, mo
     llm_eval = load_script("llm_eval")
     _llm_corpus(tmp_path, 8)
     calls = _model_that(monkeypatch, llm_eval, [OllamaError("Ollama HTTP 503")] * 8)
-    llm_eval.main(tmp_path, "fake-model", 8)
-    out = capsys.readouterr().out
+    code = llm_eval.main(tmp_path, "fake-model", 8)
+    captured = capsys.readouterr()
+    out = captured.out
     assert len(calls) == 3                                          # three in a row: no point asking the other five
-    assert "stopped" in out and "unreachable" in out
+    assert "stopped" in captured.err and "unreachable" in captured.err        # DOC534.147: said on stderr...
+    assert code == 1                                                # ...and a non-zero code: a run that measured nothing is no success
     assert "valid JSON" not in out                                  # no score at all: nothing was judged, so none is invented
 
 
@@ -1516,6 +1518,17 @@ def test_llm_eval_with_the_wrong_number_of_arguments_prints_the_usage_not_a_trac
     run = subprocess.run([sys.executable, str(SCRIPTS / "llm_eval.py"), *extra], capture_output=True, text=True, env=env, timeout=60)
     assert run.returncode == 2 and "Traceback" not in run.stderr and "IndexError" not in run.stderr
     assert run.stderr.strip().startswith("usage: PYTHONPATH=backend uv run python scripts/llm_eval.py CACHE MODEL N"), run.stderr
+
+
+def test_llm_eval_exits_non_zero_when_it_stopped_because_the_server_is_down_and_zero_when_it_measured(tmp_path, monkeypatch, capsys):
+    # DOC534.147: the script ended with code 0 after measuring nothing, so a CI chaining evaluations saw a success
+    llm_eval = load_script("llm_eval")
+    _llm_corpus(tmp_path, 2)
+    _model_that(monkeypatch, llm_eval, ["ok", "ok"])
+    assert llm_eval.main(tmp_path, "fake-model", 2) == 0                           # measured: 0 (the stopped case, 1, is in the test above)
+    capsys.readouterr()
+    source = (SCRIPTS / "llm_eval.py").read_text(encoding="utf-8")
+    assert "sys.exit(main(Path(sys.argv[1]), sys.argv[2], sample_size))" in source  # and the command line passes the code on
 
 
 def test_llm_eval_measures_durations_with_a_monotonic_clock(tmp_path, monkeypatch, capsys):
