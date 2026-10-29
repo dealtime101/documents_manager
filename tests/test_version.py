@@ -18,14 +18,42 @@ def test_the_version_is_written_once_in_pyproject_and_the_code_reads_it():
     assert __version__ == _pyproject_version()
 
 
-def test_the_changelog_starts_with_the_released_version_and_every_release_has_a_date():
-    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    releases = re.findall(r"^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})$", text, re.MULTILINE)
+def changelog_releases(text: str) -> list[tuple[str, str]]:
+    return re.findall(r"^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})$", text, re.MULTILINE)
+
+
+def dates_problem(releases: list[tuple[str, str]]) -> str:
+    """'' when every date is a real calendar date and no release is dated before the one under it (newest first, so the dates only
+    go down, or stay the same on a day with several releases); otherwise what is wrong (DOC534.244)."""
+    from datetime import date
+    days = []
+    for version, written in releases:
+        try:
+            days.append(date.fromisoformat(written))
+        except ValueError:
+            return f"{version}: {written} is not a date"
+    for (newer, _), (older, _), later, earlier in zip(releases, releases[1:], days, days[1:], strict=False):
+        if later < earlier:
+            return f"{newer} is dated {later}, before {older} ({earlier}) which is older"
+    return ""
+
+
+def test_the_dates_of_the_changelog_are_real_dates_and_never_go_back_in_time():
+    assert dates_problem([("0.3.0", "2026-10-07"), ("0.2.0", "2026-10-07"), ("0.1.0", "2026-02-28")]) == ""
+    assert "not a date" in dates_problem([("0.3.0", "2026-13-45")]) and "not a date" in dates_problem([("0.3.0", "2026-02-30")])
+    assert "before 0.2.0" in dates_problem([("0.3.0", "2026-10-01"), ("0.2.0", "2026-10-07")])           # a newer version dated earlier
+
+
+@pytest.mark.parametrize("name", ["CHANGELOG.md", "CHANGELOG.en.md"])
+def test_the_changelog_starts_with_the_released_version_and_every_release_has_a_real_date(name):
+    text = (ROOT / name).read_text(encoding="utf-8")
+    releases = changelog_releases(text)
     assert releases, "no release heading like '## [0.2.0] - 2026-10-05'"
-    assert releases[0][0] == __version__, "the newest entry of CHANGELOG.md must be the version in pyproject.toml"
+    assert releases[0][0] == __version__, f"the newest entry of {name} must be the version in pyproject.toml"
     versions = [tuple(map(int, v.split("."))) for v, _ in releases]
     assert versions == sorted(versions, reverse=True) and len(set(versions)) == len(versions)   # newest first, none twice
     assert text.count("## [") == len(releases)                                                   # no heading in another shape
+    assert dates_problem(releases) == ""
 
 
 def test_the_command_line_says_its_version(capsys):
