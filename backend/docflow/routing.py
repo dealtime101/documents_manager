@@ -40,10 +40,12 @@ def _entry(routing: dict, company: str | None):
 
 
 def type_destination_unusable(routing: dict, company: str | None, doc_type: str | None) -> bool:
-    """The table HAS an entry for this company and type, but its destination is empty, '.' or not text: a configuration mistake
+    """The table HAS an entry for this company and type (or, the type being absent, its default), but its destination is empty, '.' or not text: a configuration mistake
     (route() then refuses to guess a folder, and the note must say why rather than 'no rule')."""
     c = _entry(routing, company)
     e = _entry(c, doc_type) if isinstance(c, dict) and doc_type else None
+    if e is None and isinstance(c, dict):
+        e = _entry(c, "default")  # the type is not in the table: the company's default is what route() would use (or refuse)
     return e is not None and not (isinstance(e, dict) and _is_folder(e.get("destination")))
 
 
@@ -58,8 +60,8 @@ def route(routing: dict, company: str | None, doc_type: str | None) -> str | Non
                 continue  # this type is not in the table: next, the company's default
             if isinstance(e, dict) and _is_folder(e.get("destination")):
                 return e["destination"]
-            if key == doc_type:
-                return None  # the type IS configured but its destination is unusable (empty, ".", not text): a mistake to show, not a folder to guess
+            if key == doc_type or key == "default":
+                return None  # the type (or the company's default) IS configured but its destination is unusable (empty, ".", not text): a mistake to show, not a folder to guess
         if _is_folder(c.get("destination")):
             return c["destination"]
     return None

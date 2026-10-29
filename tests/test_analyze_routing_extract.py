@@ -947,7 +947,9 @@ def test_a_configured_type_with_an_unusable_destination_is_reported_not_sent_to_
     assert route(good, "Acme", "Facture") == "Acme/Factures" and route(good, "Acme", "Releve") == "Acme/Divers"   # unchanged
     no_default = {"Acme": {"Facture": {"destination": ""}, "destination": "Acme/Tout"}}
     assert route(no_default, "Acme", "Facture") is None                              # nor to the company-wide destination
-    assert route({"Acme": {"default": {"destination": ""}, "destination": "Acme/Tout"}}, "Acme", "Releve") == "Acme/Tout"   # default unusable: as before
+    # DOC534.137: the company's default is treated like a type: configured but unusable is a mistake to show, not a reason to guess
+    assert route({"Acme": {"default": {"destination": ""}, "destination": "Acme/Tout"}}, "Acme", "Releve") is None
+    assert route({"Acme": {"destination": "Acme/Tout"}}, "Acme", "Releve") == "Acme/Tout"       # no default at all: the company-wide one
 
 
 def test_the_note_says_when_a_configured_type_has_an_unusable_destination(tmp_path):
@@ -963,6 +965,23 @@ def test_the_note_says_when_a_configured_type_has_an_unusable_destination(tmp_pa
     assert rel == "Acme/Divers" and not notes                                           # an unknown type: the default, unchanged
     cfg.routing = {}
     assert resolve_destination(cfg, Analysis(date="2025-10-07", company="Zzz", document_type="Facture"))[2] == ["No destination rule."]
+
+
+def test_an_unusable_default_destination_is_reported_as_a_configuration_mistake_not_as_no_rule(tmp_path):
+    # DOC534.137: with a type that is not in the table, a default with an empty destination was passed over and the note said "No rule"
+    from docflow.analyze import Analysis
+    from docflow.config import load_config
+    from docflow.pipeline import resolve_destination
+    from docflow.routing import type_destination_unusable
+    table = {"Acme": {"Facture": {"destination": "Acme/Factures"}, "default": {"destination": "."}}}
+    assert type_destination_unusable(table, "Acme", "Releve") is True                       # absent type: its default is the one that fails
+    assert type_destination_unusable(table, "Acme", "Facture") is False                     # a usable type entry
+    assert type_destination_unusable({"Acme": {"default": {"destination": "Acme/Divers"}}}, "Acme", "Releve") is False
+    assert type_destination_unusable({"Acme": {"Facture": {"destination": "A"}}}, "Acme", "Releve") is False   # no default: just no rule
+    cfg = load_config(sandbox=tmp_path)
+    cfg.routing = table
+    rel, confidence, notes = resolve_destination(cfg, Analysis(date="2025-10-07", company="Acme", document_type="Releve"))
+    assert rel is None and confidence == 0.0 and any("not usable" in n for n in notes) and "No destination rule." not in notes
 
 
 def test_a_company_written_with_decomposed_accents_finds_the_entry_written_with_composed_ones():
