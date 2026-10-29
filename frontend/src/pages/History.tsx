@@ -38,16 +38,19 @@ export default function History() {
   const undo = async (id: number) => {
     if (undoing !== null || !confirm(t('hist.confirmUndo'))) return
     setUndoing(id)
+    let undone = false
     try {
       const r = await api.undo(id)
       setNote({ ok: true, detail: r.restored })
+      undone = true
     } catch (e) {
       setNote({ ok: false, detail: errorText(e) })
     }
     await load()
     setUndoing(null)
-    // the button that was pressed is gone (replaced by "undone"): put the focus on its row, or it falls back to <body>
-    requestAnimationFrame(() => document.getElementById(`op-${id}`)?.focus())
+    // after a success the button that was pressed is gone (replaced by "undone"): put the focus on its row, or it falls back to
+    // <body>. After a failure the button is still there and keeps the focus, so the keyboard user can simply try again.
+    if (undone) requestAnimationFrame(() => document.getElementById(`op-${id}`)?.focus())
   }
 
   return (

@@ -962,6 +962,9 @@ def test_keyboard_focus_stays_in_the_history_row_during_and_after_an_undo():
     assert "tabIndex={-1}" in history and "id={`op-${o.id}`}" in history                                       # the row can take focus
     undo = history[history.index("const undo = "):history.index("return (", history.index("const undo = "))]
     assert undo.index("await load()") < undo.index("document.getElementById(`op-${id}`)?.focus()")             # after the reload
+    # DOC534.145: only after a SUCCESS (the button is gone then); after a failure the button is still there and keeps the focus
+    assert "let undone = false" in undo and "undone = true" in undo and "if (undone) requestAnimationFrame(" in undo
+    assert undo.index("undone = true") < undo.index("catch (e)") and undo.rindex("undone") > undo.index("setUndoing(null)")
 
 
 def test_the_undone_label_is_an_inline_block_so_the_struck_through_row_does_not_strike_it():
