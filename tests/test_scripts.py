@@ -1,5 +1,6 @@
 """Tests for the helper scripts in scripts/ (measurement tools, not part of the application)."""
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -420,6 +421,9 @@ def test_compare_names_an_extraction_failure_of_any_class_and_still_reads_the_ot
 
 
 def test_compare_works_on_a_read_only_sample_folder_and_says_it_could_not_save_the_texts(tmp_path, capsys):
+    # DOC534.197: root (a CI container) and Windows write into a folder of mode 555: the text would be saved and the test would fail
+    if os.name == "nt" or os.geteuid() == 0:
+        pytest.skip("a read-only folder still accepts writes from root and on Windows")
     std = tmp_path / "std"
     std.mkdir()
     make_pdf(std / "000__2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf",
