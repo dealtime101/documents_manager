@@ -1086,7 +1086,29 @@ def test_the_extraction_fingerprint_is_unchanged_but_no_longer_reads_the_whole_p
     monkeypatch.setattr(Path, "read_bytes", lambda self: (_ for _ in ()).throw(AssertionError("read whole")) if self == pdf
                         else real_read_bytes(self))
     monkeypatch.setattr(extract, "find_tesseract", lambda name: "")                    # the formula without a Tesseract part
+    # DOC534.222: forbidding read_bytes still lets open(pdf, "rb").read() through; every read of the PDF is recorded instead
+    import builtins
+    sizes = []
+
+    class Spy:
+        def __init__(self, f):
+            self._f = f
+
+        def read(self, size=-1):
+            sizes.append(size)
+            return self._f.read(size)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self._f.close()
+
+    real_open = builtins.open
+    monkeypatch.setattr(extract, "open", lambda file, *a, **k: Spy(real_open(file, *a, **k)) if Path(file) == pdf else real_open(file, *a, **k),
+                        raising=False)                                                 # (the module's own name `open`, ahead of the builtin)
     assert extract.extraction_fingerprint(pdf, ocr) == old.hexdigest()
+    assert len(sizes) >= 4 and all(0 < s <= 1 << 20 for s in sizes[:-1]) and sizes[-1] > 0, sizes   # blocks of at most 1 MB, until the end
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the fake Tesseract is a shell script")
