@@ -81,7 +81,8 @@ export default function History() {
           ))}
         </tbody>
       </table>
-      {ops === null && !loadError && <p role="status" className="text-slate-500">{t('common.loading')}</p>}
+      {/* the status region is in the page BEFORE its text (a region that arrives with its text is often not announced) */}
+      <div role="status">{ops === null && !loadError && <p className="text-slate-500">{t('common.loading')}</p>}</div>
       {ops?.length === 0 && <p className="text-slate-500">{t('hist.none')}</p>}   {/* only after a load that succeeded */}
     </div>
   )

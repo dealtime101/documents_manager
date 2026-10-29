@@ -929,6 +929,13 @@ def test_a_failed_reload_after_an_undo_is_shown_with_the_result_of_the_undo():
     assert "[note, loadError, msg, t]" in shown                                               # (the note keeps its identity)
 
 
+def test_the_loading_region_of_the_history_is_in_the_page_before_its_text():
+    # DOC534.143: <p role="status"> appeared together with "Loading...": a live region added with its content is often not announced
+    page = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
+    assert """<div role="status">{ops === null && !loadError && <p className="text-slate-500">{t('common.loading')}</p>}</div>""" in page
+    assert """{ops === null && !loadError && <p role="status\"""" not in page            # the region itself is no longer the conditional element
+
+
 def test_the_result_of_an_undo_is_worded_when_shown_so_it_follows_a_change_of_language():
     # DOC534.142: the sentence was built in the language of the moment and kept: after a switch it stayed in the old one
     history = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
