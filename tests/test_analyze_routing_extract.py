@@ -1173,7 +1173,13 @@ def test_a_tesseract_bundled_with_the_application_is_preferred_and_gets_its_own_
     monkeypatch.setattr(extract.shutil, "which", lambda name: "/usr/bin/tesseract")           # one on the PATH too: the bundled one wins
     assert extract.find_tesseract("tesseract") == str(exe)
     assert extract._env_for(str(exe))["TESSDATA_PREFIX"] == str(root / "tesseract" / "tessdata")
-    assert "TESSDATA_PREFIX" not in extract._env_for("/usr/bin/tesseract") or extract._env_for("/usr/bin/tesseract").get("TESSDATA_PREFIX") != str(root)
+    # DOC534.220: a Tesseract of the PATH never gets the bundle's language data: nothing is set, or only what the environment had
+    bundled_data = str(root / "tesseract" / "tessdata")
+    monkeypatch.delenv("TESSDATA_PREFIX", raising=False)
+    assert "TESSDATA_PREFIX" not in extract._env_for("/usr/bin/tesseract")
+    monkeypatch.setenv("TESSDATA_PREFIX", "/inherited/tessdata")
+    assert extract._env_for("/usr/bin/tesseract")["TESSDATA_PREFIX"] == "/inherited/tessdata" != bundled_data
+    assert extract._env_for(str(exe))["TESSDATA_PREFIX"] == bundled_data                      # and the bundled one overrides what was inherited
     assert extract._env_for(str(exe))["OMP_THREAD_LIMIT"] == "1"                              # the one-thread rule still applies
     monkeypatch.setenv("DOCFLOW_ROOT", str(tmp_path / "elsewhere"))
     assert extract.find_tesseract("tesseract") == "/usr/bin/tesseract"                        # no bundle: the PATH, as before
