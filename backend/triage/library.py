@@ -112,11 +112,18 @@ def search(q: str) -> dict:
 
 
 # ------------------------------------------------------------------ folders and files
+def _refuse_the_trash_name(root: Path, dst: Path, src: Path | None = None) -> None:
+    """`_Trash` at the root is the trash, and deleting inside it is for good: no ordinary folder may take that name (any case)."""
+    if dst.parent == root and dst.name.lower() == TRASH.lower() and src != root / TRASH:
+        raise s.ApiError(f"{TRASH} is reserved for the trash: use Delete to put something there")
+
+
 def make_folder(parent: str, name: str) -> dict:
     root, folder = s._library_target(parent)
     if not folder.is_dir():
         raise s.ApiError("folder refused")
     new = folder / _clean_name(name)
+    _refuse_the_trash_name(root, new)
     try:
         new.mkdir()
     except FileExistsError:
@@ -133,6 +140,7 @@ def rename(rel: str, name: str) -> dict:
     if p.is_file() and p.suffix.lower() != Path(n).suffix.lower():
         raise s.ApiError("the extension of a file cannot be changed")
     dst = p.with_name(n)
+    _refuse_the_trash_name(root, dst, p)
     _move(p, dst)
     return {"path": _rel(root, dst)}
 
@@ -148,6 +156,7 @@ def move(rel: str, to: str) -> dict:
     dst = folder / p.name
     if dst == p:
         raise s.ApiError("it is already there")
+    _refuse_the_trash_name(root, dst, p)
     _move(p, dst)
     return {"path": _rel(root, dst)}
 

@@ -2086,6 +2086,19 @@ def test_the_library_search_finds_folders_and_files_by_name_ignoring_case_and_ac
     assert api.get("/api/library/search", {"q": "h"}).status_code == 400            # too short to mean anything
 
 
+@pytest.mark.parametrize("name", ["_Trash", "_trash", "_TRASH"])
+def test_no_ordinary_folder_can_take_the_name_of_the_trash_at_the_root(api, lib, name):
+    # DOC534.101: renaming a first-level folder to _Trash made it the trash: everything deleted inside it became permanent
+    assert post(api, "folder", parent="", name=name).status_code == 400                       # created
+    assert post(api, "rename", path="Bills", name=name).status_code == 400                   # renamed
+    (lib / "Autre").mkdir()
+    (lib / "Bills" / name).mkdir()
+    assert post(api, "move", path=f"Bills/{name}", to="").status_code == 400                 # moved up to the root
+    assert (lib / "Bills").is_dir() and not (lib / "_Trash").exists() and (lib / "Bills" / name).is_dir()
+    assert post(api, "folder", parent="Autre", name=name).json() == {"path": f"Autre/{name}"}   # below the root the name means nothing special
+    assert post(api, "delete", path="Bills/Hydro").json() == {"path": "_Trash/Hydro", "permanent": False}   # and the real trash still works
+
+
 def test_the_library_search_does_not_return_what_was_put_in_the_trash(api, lib):
     # DOC534.100: deleted documents came back as hits, could be opened or re-filed, and used up the 300 results
     (lib / "Voitures").mkdir()
