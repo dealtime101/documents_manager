@@ -199,7 +199,8 @@ def test_an_unusable_currency_keeps_the_amount_but_not_the_trust_in_it():
     assert a.company == "Amazon"
 
 
-@pytest.mark.parametrize("confidence", ["NaN", "Infinity", "-Infinity", '"nan"', '"inf"', "-3", "null", '"high"', "[0.9]"])
+@pytest.mark.parametrize("confidence", ["NaN", "Infinity", "-Infinity", '"nan"', '"inf"', "-3", "null", '"high"', "[0.9]",
+                                         "true", "false"])  # DOC534.78: float(True) is 1.0: "confidence": true was the maximum, capped
 def test_a_model_confidence_that_is_not_a_sane_number_is_never_trusted(confidence):
     a = parse_llm_json('{"date":"2025-01-02","company":"Amazon","document_type":"Facture","amount":"5.00","confidence":%s}'
                        .replace("%s", confidence))

@@ -192,6 +192,8 @@ def _names(doc_type: str | None) -> str:
 
 
 def _llm_confidence(v) -> float:
+    if isinstance(v, bool):
+        return 0.0  # `true` is not a degree of confidence (float(True) is 1.0): nothing is trusted, as with a boolean amount
     try:
         c = float(v if v is not None else 0)
     except (TypeError, ValueError):
