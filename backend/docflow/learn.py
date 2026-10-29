@@ -90,7 +90,7 @@ def _locked(cfg: Config):
     """One writer at a time across workers and processes: the read-check-write of a learned file must not interleave,
     or the last writer silently erases the other correction. (flock: POSIX, which is where the service runs.)"""
     cfg.learn_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.learn_dir / ".learn.lock", "a+") as lock:
+    with open(cfg.learn_dir / ".learn.lock", "a+", encoding="utf-8") as lock:
         if sys.platform == "win32":
             import msvcrt
             if os.fstat(lock.fileno()).st_size == 0:  # a byte to lock (Windows locks a byte range, not the whole file), written ONCE

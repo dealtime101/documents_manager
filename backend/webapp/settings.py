@@ -43,7 +43,7 @@ def load_or_create_secret(f: Path) -> str:
                 pass  # another process published its key first: use that one
         finally:
             os.unlink(tmp)
-    key = f.read_text().strip()
+    key = f.read_text(encoding="utf-8").strip()  # as written (ASCII today): never the encoding of the machine
     if not key:  # never a blank key (it would sign sessions with nothing): and never silently replaced either, a race
         raise RuntimeError(f"{f} is empty: delete it so that a new key is generated")
     return key

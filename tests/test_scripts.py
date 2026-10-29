@@ -146,11 +146,11 @@ def test_build_corpus_does_not_reuse_the_text_of_a_pdf_replaced_at_the_same_path
     build = load_script("build_corpus")
     make_pdf(pdf, "FIRST version of the document, long enough to be read")
     build.main(root, cache)
-    assert "FIRST" in next(cache.glob("*.txt")).read_text()
+    assert "FIRST" in next(cache.glob("*.txt")).read_text(encoding="utf-8")
     pdf.unlink()
     make_pdf(pdf, "SECOND version replaced at the very same path")                      # same name, same entry, other bytes
     build.main(root, cache)
-    texts = [p.read_text() for p in cache.glob("*.txt")]
+    texts = [p.read_text(encoding="utf-8") for p in cache.glob("*.txt")]
     assert len(texts) == 1 and "SECOND" in texts[0] and "FIRST" not in texts[0]         # the cache followed the file
 
 
@@ -160,7 +160,7 @@ def test_build_corpus_keeps_the_message_of_an_extraction_error_and_names_the_fai
     root.mkdir()
     (root / "2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf").write_bytes(b"this is not a pdf")
     load_script("build_corpus").main(root, cache)
-    (entry,) = json.loads((cache / "index.json").read_text())
+    (entry,) = json.loads((cache / "index.json").read_text(encoding="utf-8"))
     assert entry["error"] == "PdfiumError"                                            # the type stays: readers test "error" in r
     assert "Failed to load document" in entry["message"]                                 # and the real cause is now kept too
     err = capsys.readouterr().err
@@ -175,7 +175,7 @@ def test_build_corpus_survives_a_file_whose_error_is_not_a_runtime_error_and_sti
     (root / "2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 50)
     make_pdf(root / "2025-10-08 - Telus - ReleveMobilite.pdf", "Telus releve du mois, texte suffisant pour etre lu")
     assert load_script("build_corpus").main(root, cache) == 1                                # done, one entry failed (DOC474.90)
-    rows = {r["name"]: r for r in json.loads((cache / "index.json").read_text())}
+    rows = {r["name"]: r for r in json.loads((cache / "index.json").read_text(encoding="utf-8"))}
     assert rows["2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf"]["error"] == "PdfiumError"
     assert "error" not in rows["2025-10-08 - Telus - ReleveMobilite.pdf"]                 # the next file was still read
     assert "PdfiumError" in capsys.readouterr().err
@@ -190,7 +190,7 @@ def test_build_corpus_gives_every_file_an_index_entry_whatever_happens_to_it(tmp
     (root / "2025-10-09 - Bell - Facture.pdf").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 50)
     build = load_script("build_corpus")
     assert build.main(root, cache) == 1                                                       # two entries failed (DOC474.90)
-    rows = json.loads((cache / "index.json").read_text())
+    rows = json.loads((cache / "index.json").read_text(encoding="utf-8"))
     assert len(rows) == 3 and sum("error" in r for r in rows) == 2                    # none is left out, the two failures say so
     assert "done: 3 entries, 2 errors" in capsys.readouterr().out
     assert build.one.__annotations__["return"] is dict                                # and the type says it (never None)
@@ -217,7 +217,7 @@ def test_build_corpus_names_its_entries_with_sha256_and_adopts_a_cache_made_unde
     build.extract_text = lambda *a, **k: (calls.append(1), real(*a, **k))[1]
     assert build.main(root, cache) == 0
     new = hashlib.sha256(pdf.name.encode()).hexdigest()[:16]
-    assert [r["key"] for r in json.loads((cache / "index.json").read_text())] == [new]
+    assert [r["key"] for r in json.loads((cache / "index.json").read_text(encoding="utf-8"))] == [new]
     assert (cache / f"{new}.txt").read_text(encoding="utf-8") == "TEXT EXTRACTED BY THE PREVIOUS VERSION"
     assert not (cache / f"{old}.txt").exists() and not (cache / f"{old}.txt.key").exists()   # moved, not copied
     assert calls == []                                                                        # and nothing was extracted again
@@ -226,7 +226,7 @@ def test_build_corpus_names_its_entries_with_sha256_and_adopts_a_cache_made_unde
     (cache / f"{new}.txt.key").replace(cache / f"{old}.txt.key")
     (cache / "index.json").write_text(json.dumps([{"key": old, "rel": pdf.name, "name": pdf.name}]), encoding="utf-8")
     assert build.adopt_old_names(cache) == 1
-    assert [r["key"] for r in json.loads((cache / "index.json").read_text())] == [new] and (cache / f"{new}.txt").exists()
+    assert [r["key"] for r in json.loads((cache / "index.json").read_text(encoding="utf-8"))] == [new] and (cache / f"{new}.txt").exists()
     assert build.adopt_old_names(cache) == 0                                                  # idempotent
 
 
@@ -480,7 +480,7 @@ def test_compare_never_leaves_a_half_written_text_that_a_later_run_would_trust(t
                        + "ligne de detail " * 20)
     compare.main(tmp_path)
     saved = pdf_path.with_name(pdf_path.name + ".txt")
-    complete = saved.read_text()
+    complete = saved.read_text(encoding="utf-8")
     real_write = Path.write_text
 
     def dies_halfway(self, data, *a, **k):
@@ -493,7 +493,7 @@ def test_compare_never_leaves_a_half_written_text_that_a_later_run_would_trust(t
     compare.main(tmp_path, fresh=True)                                  # an interrupted rebuild: not fatal, only not saved
     monkeypatch.setattr(Path, "write_text", real_write)
     compare.main(tmp_path)
-    assert saved.read_text() == complete                                # never the half text with a still-valid key
+    assert saved.read_text(encoding="utf-8") == complete                                # never the half text with a still-valid key
     assert sorted(p.name for p in std.iterdir() if p.suffix != ".pdf") == sorted([saved.name, saved.name + ".key"])  # no temp
     capsys.readouterr()
 
@@ -700,8 +700,8 @@ def test_build_corpus_text_cache_follows_the_pdf_at_the_same_path_and_can_be_for
     make_pdf(pdf, "Garage Tremblay entretien complet du vehicule total 80,00 $")   # another archive, same relative path
     corpus.main(root, cache)
     assert len(calls) == 2
-    (key,) = [r["key"] for r in __import__("json").loads((cache / "index.json").read_text())]
-    assert "Garage Tremblay" in (cache / f"{key}.txt").read_text()   # the new text, not the old PDF's
+    (key,) = [r["key"] for r in __import__("json").loads((cache / "index.json").read_text(encoding="utf-8"))]
+    assert "Garage Tremblay" in (cache / f"{key}.txt").read_text(encoding="utf-8")   # the new text, not the old PDF's
     corpus.main(root, cache, fresh=True)
     assert len(calls) == 3                                          # forced
     capsys.readouterr()
@@ -713,13 +713,13 @@ def test_build_corpus_refuses_a_bad_root_and_never_replaces_an_index_with_an_emp
     root.mkdir()
     make_pdf(root / "2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf", "Hydro-Quebec facture")
     assert corpus.main(root, cache) == 0
-    index = (cache / "index.json").read_text()
+    index = (cache / "index.json").read_text(encoding="utf-8")
     assert corpus.main(tmp_path / "typo-in-the-path", cache) == 2                  # does not exist
     assert corpus.main(root / "2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf", cache) == 2   # not a folder
     empty = tmp_path / "empty-archive"
     empty.mkdir()
     assert corpus.main(empty, cache) == 2                                          # valid folder, nothing found, index exists
-    assert (cache / "index.json").read_text() == index                             # the existing index was never touched
+    assert (cache / "index.json").read_text(encoding="utf-8") == index                             # the existing index was never touched
     assert capsys.readouterr().err.count("ERROR") == 3                             # on stderr, with the per-file errors (DOC474.89)
     fresh_cache = tmp_path / "other-cache"
     assert corpus.main(tmp_path / "typo-in-the-path", fresh_cache) == 2 and not fresh_cache.exists()   # nothing created
@@ -736,8 +736,8 @@ def test_an_interrupted_write_never_leaves_a_partial_text_that_looks_valid(tmp_p
     make_pdf(root / "2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf",
              "Hydro-Quebec facture du 7 octobre 2025 montant 158,98 $ " + "ligne de detail " * 20)
     corpus.main(root, cache)
-    (key,) = [r["key"] for r in json.loads((cache / "index.json").read_text())]
-    complete = (cache / f"{key}.txt").read_text()
+    (key,) = [r["key"] for r in json.loads((cache / "index.json").read_text(encoding="utf-8"))]
+    complete = (cache / f"{key}.txt").read_text(encoding="utf-8")
 
     real_write = Path.write_text
 
@@ -751,7 +751,7 @@ def test_an_interrupted_write_never_leaves_a_partial_text_that_looks_valid(tmp_p
     corpus.main(root, cache, fresh=True)                            # interrupted rebuild
     monkeypatch.setattr(Path, "write_text", real_write)
     corpus.main(root, cache)                                        # next run
-    assert (cache / f"{key}.txt").read_text() == complete           # the complete text, never the half one
+    assert (cache / f"{key}.txt").read_text(encoding="utf-8") == complete           # the complete text, never the half one
     assert sorted(p.name for p in cache.iterdir()) == sorted([f"{key}.txt", f"{key}.txt.key", "index.json"])  # no leftovers
     capsys.readouterr()
 
@@ -1137,16 +1137,16 @@ def test_benchmark_counts_an_unrecognised_field_as_an_error_but_not_a_missing_re
 def test_the_projects_dev_tools_include_mypy_and_the_stubs_of_the_untyped_libraries_it_imports():
     import tomllib
     root = Path(__file__).resolve().parents[1]
-    dev = [d.lower() for d in tomllib.loads((root / "pyproject.toml").read_text())["dependency-groups"]["dev"]]
+    dev = [d.lower() for d in tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["dependency-groups"]["dev"]]
     assert any(d.startswith("mypy") for d in dev)                                    # `uv run mypy` is a supported check
     assert any(d.startswith("types-pyyaml") for d in dev)                            # yaml ships no type information
-    assert "import yaml" in (root / "backend" / "docflow" / "config.py").read_text()  # (and it is imported: the stubs are needed)
+    assert "import yaml" in (root / "backend" / "docflow" / "config.py").read_text(encoding="utf-8")  # (and it is imported: the stubs are needed)
 
 
 def test_manage_py_has_no_shebang_because_it_is_run_through_uv():
     """`python` does not exist on every machine and the system interpreter has no Django: the documented way is
     `uv run python manage.py ...`, so the file must not pretend to be directly executable."""
-    first = (Path(__file__).resolve().parents[1] / "manage.py").read_text().splitlines()[0]
+    first = (Path(__file__).resolve().parents[1] / "manage.py").read_text(encoding="utf-8").splitlines()[0]
     assert not first.startswith("#!")
 
 
@@ -1161,7 +1161,7 @@ def test_the_yaml_rule_files_pass_the_projects_yamllint_line_length():
     instead of the 80 columns of the default, and the files must respect it."""
     import re
     root = Path(__file__).resolve().parents[1]
-    config = (root / ".yamllint").read_text()
+    config = (root / ".yamllint").read_text(encoding="utf-8")
     limit = int(re.search(r"max:\s*(\d+)", config).group(1))
     assert 100 <= limit <= 160
     too_long = [(f.name, n) for f in sorted((root / "config").glob("*.yaml"))
@@ -1604,7 +1604,7 @@ def test_an_index_row_that_is_not_an_object_does_not_stop_the_adoption_of_old_na
     rows = [None, 7, "text", ["x"], {"key": "oldkey", "rel": "a.pdf", "name": "a.pdf"}]
     (cache / "index.json").write_text(json.dumps(rows), encoding="utf-8")
     assert build.adopt_old_names(cache) == 1
-    assert rows[:4] == json.loads((cache / "index.json").read_text())[:4]      # the odd rows are left as they were
+    assert rows[:4] == json.loads((cache / "index.json").read_text(encoding="utf-8"))[:4]      # the odd rows are left as they were
 
 
 def test_discover_says_how_far_it_got_on_stderr_and_keeps_its_report_on_stdout(tmp_path, monkeypatch, capsys):

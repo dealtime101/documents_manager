@@ -126,7 +126,7 @@ def test_secret_key_creation_never_overwrites_a_key_published_by_another_process
 
     monkeypatch.setattr(webapp_settings.secrets, "token_urlsafe", other_process_wins_the_race)
     assert webapp_settings.load_or_create_secret(target) == "KEY-OF-THE-OTHER-PROCESS"
-    assert target.read_text() == "KEY-OF-THE-OTHER-PROCESS"
+    assert target.read_text(encoding="utf-8") == "KEY-OF-THE-OTHER-PROCESS"
 
 
 def test_secret_key_file_is_never_readable_by_others_not_even_for_an_instant(tmp_path, monkeypatch):
@@ -258,7 +258,7 @@ def test_an_empty_secret_key_file_is_refused_with_a_clear_message_never_used(tmp
     target.write_text(content)                                    # e.g. left by an old start that was interrupted
     with pytest.raises(RuntimeError, match="empty.*delete"):
         webapp_settings.load_or_create_secret(target)
-    assert target.read_text() == content                          # and nothing was overwritten behind anybody's back
+    assert target.read_text(encoding="utf-8") == content                          # and nothing was overwritten behind anybody's back
 
 
 def test_eight_workers_starting_together_all_end_up_with_the_same_key(tmp_path):
@@ -285,7 +285,7 @@ def test_secret_key_file_is_private_complete_and_leaves_nothing_behind(tmp_path)
     from webapp import settings as webapp_settings
     target = tmp_path / "storage" / ".django_secret"
     key = webapp_settings.load_or_create_secret(target)
-    assert len(key) >= 64 and target.read_text() == key
+    assert len(key) >= 64 and target.read_text(encoding="utf-8") == key
     assert target.stat().st_mode & 0o777 == 0o600
     assert webapp_settings.load_or_create_secret(target) == key               # stable on the next start
     assert [p.name for p in target.parent.iterdir()] == [".django_secret"]    # no temporary file left
@@ -1777,7 +1777,7 @@ def test_a_new_secret_key_is_on_the_disk_before_it_is_published_and_the_publicat
     monkeypatch.setattr(webapp_settings.os, "link", lambda a, b: (events.append("link"), real_link(a, b))[1])
     target = tmp_path / "storage" / ".django_secret"
     key = webapp_settings.load_or_create_secret(target)
-    assert key and target.read_text().strip() == key
+    assert key and target.read_text(encoding="utf-8").strip() == key
     assert events == ["fsync", "link", "fsync"], events           # the file first, then the link, then the folder that holds it
     events.clear()
     assert webapp_settings.load_or_create_secret(target) == key   # an existing key: read as is, nothing written
@@ -1818,7 +1818,7 @@ def test_engine_status_is_a_closed_list_in_the_model_and_in_the_database(sb):
         Item.objects.create(source_path="/x/typo.pdf", sha256="typo", engine_status="confrim")
     assert set(Item._meta.get_field("engine_status").choices and dict(Item._meta.get_field("engine_status").choices)) == {
         "auto", "confirm", "manual", "duplicate", "logical_duplicate", "error"}
-    pipeline = (Path(__file__).resolve().parents[1] / "backend" / "docflow" / "pipeline.py").read_text()
+    pipeline = (Path(__file__).resolve().parents[1] / "backend" / "docflow" / "pipeline.py").read_text(encoding="utf-8")
     allowed = {"auto", "confirm", "manual", "duplicate", "logical_duplicate", "error"}
     produced = _statuses_written(pipeline) - {"classified", "quarantine", "move"}                           # (the status of a stored document)
     assert produced and produced <= allowed, produced                                                       # the engine writes no other
@@ -1834,7 +1834,7 @@ def test_the_database_constraints_are_built_from_the_choices_not_copied_from_the
     from pathlib import Path
 
     from triage.models import ScanJob
-    source = (Path(__file__).resolve().parents[1] / "backend" / "triage" / "models.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "backend" / "triage" / "models.py").read_text(encoding="utf-8")
     assert not re.search(r'__in=\[\s*"', source), "a constraint still carries a typed list of values"
     assert 'state="pending"' not in source and 'state="running"' not in source
     def listed(model, name):

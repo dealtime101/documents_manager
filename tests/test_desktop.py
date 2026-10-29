@@ -107,14 +107,14 @@ def test_desktop_log_is_rotated_at_launch_when_it_has_grown_too_large(monkeypatc
     desktop.log_to_file()
     sys.stdout.write("new line\n")
     sys.stdout.close()
-    assert log.read_text().endswith("new line\n") and log.read_text().startswith("old line") and not (tmp_path / "desktop.log.1").exists()
+    assert log.read_text(encoding="utf-8").endswith("new line\n") and log.read_text(encoding="utf-8").startswith("old line") and not (tmp_path / "desktop.log.1").exists()
     monkeypatch.setattr(sys, "stdout", None)
     monkeypatch.setattr(sys, "stderr", None)
     log.write_bytes(b"x" * (desktop.LOG_MAX_BYTES + 1))                              # too large: kept as .1, a fresh log starts
     desktop.log_to_file()
     sys.stdout.write("fresh start\n")
     sys.stdout.close()
-    assert log.read_text() == "fresh start\n" and (tmp_path / "desktop.log.1").stat().st_size == desktop.LOG_MAX_BYTES + 1
+    assert log.read_text(encoding="utf-8") == "fresh start\n" and (tmp_path / "desktop.log.1").stat().st_size == desktop.LOG_MAX_BYTES + 1
 
 
 def test_the_interface_check_reads_enough_of_the_page_and_looks_at_the_title_only():

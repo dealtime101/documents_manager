@@ -31,7 +31,7 @@ def test_saving_learned_config_replaces_the_file_atomically_and_survives_a_failu
     target.chmod(0o640)
     first_inode = target.stat().st_ino
     _save(target, {"A": ["old", "new"]})
-    assert yaml.safe_load(target.read_text()) == {"A": ["old", "new"]} and target.stat().st_ino != first_inode
+    assert yaml.safe_load(target.read_text(encoding="utf-8")) == {"A": ["old", "new"]} and target.stat().st_ino != first_inode
     assert target.stat().st_mode & 0o777 == 0o640                                  # an existing file keeps its mode
 
     def interrupted(*a, **k):
@@ -44,7 +44,7 @@ def test_saving_learned_config_replaces_the_file_atomically_and_survives_a_failu
         pass
     else:
         raise AssertionError("the failure was swallowed")
-    assert yaml.safe_load(target.read_text()) == {"A": ["old", "new"]}          # the earlier corrections are intact
+    assert yaml.safe_load(target.read_text(encoding="utf-8")) == {"A": ["old", "new"]}          # the earlier corrections are intact
     assert [p.name for p in target.parent.iterdir()] == ["company_aliases.yaml"]  # and no temporary file is left
 
 
@@ -207,14 +207,14 @@ def test_a_learned_destination_can_be_corrected_but_a_hand_written_one_never(tmp
     assert learn_route(cfg, "Voisin", "Divers/Voisin") is True                   # first correction: learned
     assert learn_route(cfg, "Voisin", "Divers/Voisin") is False                  # the same again: nothing new
     assert learn_route(cfg, "Voisin", "Amis/Voisin") is True                     # a LATER correction replaces it (was ignored)
-    assert yaml.safe_load(routes.read_text())["Voisin"]["default"]["destination"] == "Amis/Voisin"
+    assert yaml.safe_load(routes.read_text(encoding="utf-8"))["Voisin"]["default"]["destination"] == "Amis/Voisin"
     assert cfg.routing["Voisin"]["default"]["destination"] == "Amis/Voisin"      # and the running engine uses it at once
     again = load_config(sandbox=tmp_path)                                        # after a restart it is still the corrected one
     assert again.routing["Voisin"]["default"]["destination"] == "Amis/Voisin" and "Voisin" in again.learned_routes
     hand_written = next(iter(cfg.routing.keys() - cfg.learned_routes))           # a company of routing_rules.yaml
-    before = routes.read_text()
+    before = routes.read_text(encoding="utf-8")
     assert learn_route(cfg, hand_written, "Quelque/Part") is False               # never overwritten
-    assert routes.read_text() == before and "Quelque/Part" not in str(cfg.routing[hand_written])
+    assert routes.read_text(encoding="utf-8") == before and "Quelque/Part" not in str(cfg.routing[hand_written])
 
 
 def test_a_hand_written_rule_added_later_wins_over_an_old_learned_one(tmp_path):
@@ -225,7 +225,7 @@ def test_a_hand_written_rule_added_later_wins_over_an_old_learned_one(tmp_path):
     assert cfg.routing["Voisin"]["default"]["destination"] == "Manuel/Voisin"    # the hand-written rule wins, as before
     assert "Voisin" not in cfg.learned_routes                                     # so it is NOT treated as correctable
     assert learn_route(cfg, "Voisin", "Autre/Voisin") is False
-    assert "Appris/Voisin" in (d / "routing_learned.yaml").read_text()           # and the learned file is left alone
+    assert "Appris/Voisin" in (d / "routing_learned.yaml").read_text(encoding="utf-8")           # and the learned file is left alone
 
 
 def test_simultaneous_learning_does_not_lose_either_correction(tmp_path, monkeypatch):
@@ -253,7 +253,7 @@ def test_simultaneous_learning_does_not_lose_either_correction(tmp_path, monkeyp
         w.start()
     for w in workers:
         w.join()
-    saved = yaml.safe_load((cfg.learn_dir / "company_aliases.yaml").read_text())
+    saved = yaml.safe_load((cfg.learn_dir / "company_aliases.yaml").read_text(encoding="utf-8"))
     assert results == {"GarageTremblay": True, "BoutiqueLavoie": True}
     assert set(saved) == {"GarageTremblay", "BoutiqueLavoie"}                 # both are on disk, not just the last writer's
 
@@ -310,7 +310,7 @@ def test_learn_company_writes_alias_and_next_analysis_uses_it(tmp_path):
     assert RuleBasedAnalyzer(cfg).analyze("Garage Tremblay & Fils\nFacture").company is None
     assert learn_company(cfg, "GarageTremblay", "garage tremblay & fils") is True
     assert RuleBasedAnalyzer(cfg).analyze("GARAGE  TREMBLAY & Fils\nFacture").company == "GarageTremblay"
-    saved = yaml.safe_load((tmp_path / "learned" / "company_aliases.yaml").read_text())
+    saved = yaml.safe_load((tmp_path / "learned" / "company_aliases.yaml").read_text(encoding="utf-8"))
     assert "GarageTremblay" in saved
     # reloaded from disk: learning survives a restart
     assert "GarageTremblay" in load_config(sandbox=tmp_path).companies
@@ -323,7 +323,7 @@ def test_a_correction_back_to_a_value_another_worker_replaced_is_not_refused_as_
     worker_b = load_config(sandbox=tmp_path)                       # another worker, same learned folder
     assert learn_type(worker_b, "Voisin", "Facture") is True       # replaces Lettre in the file; worker A still remembers Lettre
     assert learn_type(worker_a, "Voisin", "Lettre") is True        # the user corrects back: A must see the file, not its memory
-    saved = yaml.safe_load((tmp_path / "learned" / "types_learned.yaml").read_text())
+    saved = yaml.safe_load((tmp_path / "learned" / "types_learned.yaml").read_text(encoding="utf-8"))
     assert [r["type"] for r in saved if r["company"] == "Voisin"] == ["Lettre"]
     assert learn_type(worker_b, "Voisin", "Lettre") is False       # and now B sees it is already there
 
@@ -369,7 +369,7 @@ def test_a_later_type_correction_replaces_the_earlier_learned_one(tmp_path):
     assert learn_type(cfg, "GarageTremblay", "FactureEntretien") is True
     assert learn_type(cfg, "GarageTremblay", "FacturePneus") is True           # the user changed their mind
     assert RuleBasedAnalyzer(cfg).analyze(text).document_type == "FacturePneus"   # the NEW correction is the one used
-    saved = yaml.safe_load((tmp_path / "learned" / "types_learned.yaml").read_text())
+    saved = yaml.safe_load((tmp_path / "learned" / "types_learned.yaml").read_text(encoding="utf-8"))
     assert [r["type"] for r in saved if r["company"] == "GarageTremblay"] == ["FacturePneus"]
     assert learn_type(cfg, "GarageTremblay", "FactureEntretien") is True       # and back again
     assert RuleBasedAnalyzer(cfg).analyze(text).document_type == "FactureEntretien"
@@ -396,10 +396,10 @@ def test_learn_route_never_overwrites_a_hand_written_rule_but_replaces_a_learned
 
 def test_learned_files_never_touch_hand_written_yaml(tmp_path):
     cfg = cfg_in(tmp_path)
-    base = (cfg.root / "config" / "companies.yaml").read_text()
+    base = (cfg.root / "config" / "companies.yaml").read_text(encoding="utf-8")
     learn_company(cfg, "GarageTremblay", "garage tremblay")
-    assert (cfg.root / "config" / "companies.yaml").read_text() == base
-    assert re.search(r"garage", (tmp_path / "learned" / "company_aliases.yaml").read_text())
+    assert (cfg.root / "config" / "companies.yaml").read_text(encoding="utf-8") == base
+    assert re.search(r"garage", (tmp_path / "learned" / "company_aliases.yaml").read_text(encoding="utf-8"))
 
 
 def test_a_relative_config_folder_does_not_make_paths_depend_on_the_current_directory(tmp_path, monkeypatch):

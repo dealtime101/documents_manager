@@ -64,7 +64,7 @@ def test_undo_refuses_to_overwrite(env):
     f.write_text("something else")
     with pytest.raises(FileExistsError):
         undo(db)
-    assert f.read_text() == "something else"
+    assert f.read_text(encoding="utf-8") == "something else"
 
 
 def test_undo_refuses_to_restore_a_file_that_is_no_longer_the_one_that_was_filed(env):
@@ -1304,7 +1304,7 @@ def test_the_missing_tesseract_note_reads_naturally_and_old_stored_notes_stay_tr
     p = propose(tmp / "inbox" / "scan.pdf", cfg, db, RuleBasedAnalyzer(cfg))
     assert "This page is an image and Tesseract was not found: OCR is unavailable." in p.notes
     assert not any(n.startswith("Image page and") for n in p.notes)
-    table = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text()
+    table = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
     fr = table[table.index("const frMessages"):]
     assert "'This page is an image and Tesseract was not found: OCR is unavailable.'" in fr     # the new text is translated...
     assert "'Image page and Tesseract not found: OCR unavailable.'" in fr                       # ...and so are the notes already stored
