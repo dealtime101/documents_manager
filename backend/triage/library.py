@@ -11,6 +11,7 @@ import time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from django.db import transaction
 from docflow import learn
 from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.extract import extract_text
@@ -54,10 +55,13 @@ def _rel(root: Path, p: Path) -> str:
 def _retarget(old: Path, new: Path) -> None:
     """Items already filed here keep a working "open document" link after the file or folder moved."""
     prefix = str(old)
+    moved = []
     for it in Item.objects.filter(result_path__startswith=prefix):
         if it.result_path == prefix or it.result_path.startswith(prefix + os.sep):
             it.result_path = str(new) + it.result_path[len(prefix):]
-            it.save(update_fields=["result_path"])
+            moved.append(it)
+    with transaction.atomic():  # all the links follow, or none does: a moved folder is never left half pointing at the old place
+        Item.objects.bulk_update(moved, ["result_path"], batch_size=500)  # a few statements, not one per document
 
 
 def _move(src: Path, dst: Path) -> None:

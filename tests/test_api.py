@@ -2095,6 +2095,40 @@ def test_an_amount_typed_the_usual_way_is_read_when_a_library_pdf_is_planned(api
     assert plan.status_code == 200 and f"{shown}$" in plan.json()["final_name"], plan.content
 
 
+def test_moving_a_folder_updates_the_links_of_its_documents_in_a_few_statements_all_or_none(api, lib, monkeypatch):
+    # DOC534.104: one UPDATE per document, outside any transaction: slow on a big folder, and half done if interrupted
+    from django.db import connection
+    from triage import library
+    (lib / "Gros").mkdir()
+    rows = []
+    for n in range(30):
+        f = lib / "Gros" / f"{n}.pdf"
+        f.write_bytes(b"%PDF-1.4")
+        rows.append(Item.objects.create(source_path=f"/inbox/{n}.pdf", sha256=f"h{n}", engine_status="auto", state="approved",
+                                        result_path=str(f)))
+    updates = []
+
+    def watch(execute, sql, params, many, context):
+        if sql.startswith('UPDATE "triage_item"'):
+            updates.append(sql)
+        return execute(sql, params, many, context)
+    with connection.execute_wrapper(watch):
+        assert post(api, "move", path="Gros", to="Bills").json() == {"path": "Bills/Gros"}
+    assert len(updates) <= 2                                                                   # 30 documents, not 30 statements
+    assert {Item.objects.get(pk=r.pk).result_path for r in rows} == {str(lib / "Bills" / "Gros" / f"{n}.pdf") for n in range(30)}
+    # a failure while the links are written changes none of them
+    before = {r.pk: Item.objects.get(pk=r.pk).result_path for r in rows}
+    real = Item.objects.bulk_update
+
+    def fails_after_the_first_batch(objs, fields, batch_size=None):
+        real(objs[:1], fields)
+        raise RuntimeError("interrupted")
+    monkeypatch.setattr(type(Item.objects), "bulk_update", lambda self, objs, fields, batch_size=None: fails_after_the_first_batch(objs, fields))
+    with pytest.raises(RuntimeError):
+        library._retarget(lib / "Bills" / "Gros", lib / "Bills" / "Autre")
+    assert {r.pk: Item.objects.get(pk=r.pk).result_path for r in rows} == before
+
+
 @pytest.mark.parametrize("typed", ["a:b.pdf", "x?y.pdf", "con.pdf", "..pdf.", "nom/sous.pdf"])
 def test_a_typed_final_name_that_would_have_to_be_cleaned_is_refused_not_changed_in_silence(api, lib, typed):
     # DOC534.103: the name filed was not the one the person typed and saw ("a:b.pdf" became "ab.pdf")
