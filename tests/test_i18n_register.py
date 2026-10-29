@@ -24,7 +24,7 @@ def french_values() -> list[tuple[str, str]]:
 
 def test_the_extraction_really_reads_the_french_strings():
     values = dict(french_values())
-    assert len(values) > 80 and values["queue.scan"] == "Scanner l'Inbox"           # a silent miss would make the next test vacuous
+    assert len(values) > 80 and values["queue.scan"] == "Analyser la boîte de réception"         # a silent miss would make the next test vacuous
 
 
 def test_french_interface_text_never_addresses_the_user_in_the_second_person():
@@ -71,13 +71,24 @@ def test_the_french_interface_calls_a_company_a_societe_everywhere():
 
 
 def test_the_empty_queue_message_quotes_the_exact_label_of_the_scan_button_in_both_languages():
-    # DOC474.27: the message said "Scan" / "Scanner" while the button reads "Scan inbox" / "Scanner l'Inbox"
+    # DOC474.27: the message said "Scan" / "Scanner" while the button reads "Scan inbox" / "Analyser la boîte de réception"
     src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text()
     en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
     for block in (en, fr):
         label = re.search(r"'queue\.scan': [\"'](.+?)[\"'],", block).group(1)
         empty = re.search(r"'queue\.empty': (.+),\n", block).group(1)
         assert label in empty, (label, empty)
+
+
+def test_the_texts_name_the_inbox_the_way_the_settings_do_and_never_a_fixed_folder_called_inbox():
+    # DOC534.63: the French button said "Scanner l'Inbox" and the messages sent the reader to a folder "_Inbox", while the settings
+    # speak of the boîte de réception and the folder is whatever the user chose
+    src = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "i18n.tsx").read_text()
+    en, fr = src[src.index("const en"):src.index("const fr")], src[src.index("const fr"):]
+    assert "_Inbox" not in src and "l'Inbox" not in src
+    assert "'queue.scan': 'Analyser la boîte de réception'" in fr and "'dash.srcInbox': 'Boîte de réception'" in fr
+    assert "boîte de réception" in re.search(r"'queue\.empty': (.+),\n", fr).group(1)
+    assert "'dash.srcInbox': 'Inbox'" in en
 
 
 def test_without_a_saved_choice_the_language_follows_the_browser_and_a_saved_choice_wins():
