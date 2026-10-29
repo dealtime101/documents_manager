@@ -43,6 +43,27 @@ def test_the_data_is_synced_before_the_swap_and_the_folder_after_it(tmp_path, mo
     assert target.read_text(encoding="utf-8") == "text" and [p.name for p in tmp_path.iterdir()] == ["index.json"]
 
 
+def test_the_file_keeps_its_permissions_and_a_symbolic_link_is_followed(tmp_path):
+    # DOC534.182: the new file got the umask's rights, and a link to the file was replaced by a plain file
+    import os
+    if os.name == "nt":
+        return                                                                          # modes and links are not the same there
+    real = tmp_path / "real.json"
+    real.write_text("old", encoding="utf-8")
+    real.chmod(0o600)
+    link = tmp_path / "link.json"
+    link.symlink_to(real)
+    write_atomic(link, "new")
+    assert link.is_symlink() and real.read_text(encoding="utf-8") == "new"             # the file behind the link was updated
+    assert (real.stat().st_mode & 0o777) == 0o600                                       # and kept its private mode
+    script = tmp_path / "run.sh"
+    script.write_text("old", encoding="utf-8")
+    script.chmod(0o750)
+    write_atomic(script, "new")
+    assert (script.stat().st_mode & 0o777) == 0o750                                     # an executable bit is not lost
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["link.json", "real.json", "run.sh"]
+
+
 def test_a_failed_write_leaves_the_old_text_and_no_temporary_file(tmp_path, monkeypatch):
     import os
 
