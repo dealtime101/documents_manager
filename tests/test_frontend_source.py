@@ -582,6 +582,18 @@ def test_saving_the_settings_goes_through_request_so_a_lost_network_is_a_transla
     assert "e.status === 400" in save and "throw new SettingsRefused(errors)" in save and save.rstrip().endswith("},")
 
 
+def test_the_language_asked_of_the_changelog_is_encoded_like_every_other_query_value():
+    # DOC534.94: `?lang=${lang}` was the one query built by hand: a value with & or # would have corrupted the request
+    setup = """
+      globalThis.document = { cookie: '' }
+      globalThis.asked = []
+      globalThis.fetch = async (url) => { asked.push(url); return { ok: true, status: 200, json: async () => [], headers: { get: () => null } } }
+    """
+    got = _node_route("""(async () => { await m.api.changelog('fr'); await m.api.changelog('fr&x=1#top'); return asked })()""",
+                      module="api", setup=setup)
+    assert got == ["/api/changelog?lang=fr", "/api/changelog?lang=fr%26x%3D1%23top"]               # one parameter, whatever the value
+
+
 def test_saving_the_settings_behaves_the_same_whatever_goes_wrong_with_the_answer():
     # DOC534.93 (and .92), run for real: an HTML page with status 200 (captive portal), a lost network and a refusal
     setup = """
@@ -952,7 +964,7 @@ def test_the_release_notes_have_a_tab_a_route_and_a_screen():
     src = UI.parents[1]
     app = (src / "App.tsx").read_text()
     assert '<TabsTrigger value="notes">{t(\'nav.notes\')}</TabsTrigger>' in app and '<TabsContent value="notes"' in app
-    assert "'notes'" in (src / "route.ts").read_text() and "changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?lang=${lang}`)" in (src / "api.ts").read_text()
+    assert "'notes'" in (src / "route.ts").read_text() and "changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?${new URLSearchParams({ lang })}`)" in (src / "api.ts").read_text()
     page = (src / "pages" / "Notes.tsx").read_text()
     assert "dangerouslySetInnerHTML" not in page                     # the text is turned into elements, never injected as HTML
     assert 'role="status"' in page and 'role="alert"' in page        # loading and failure are announced like on the other pages

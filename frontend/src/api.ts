@@ -222,7 +222,7 @@ export const api = {
   approveSelected: (ids: number[]) => call<Batch>('POST', '/api/items/approve-selected', { ids }),
   dashboard: () => call<Dashboard>('GET', '/api/dashboard'),
   history: () => call<Operation[]>('GET', '/api/history'),
-  changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?lang=${lang}`),
+  changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?${new URLSearchParams({ lang })}`),
   thresholds: () => call<Thresholds>('GET', '/api/thresholds'),
   settings: () => call<FolderSettings>('GET', '/api/settings'),
   saveSettings: async (values: Omit<FolderSettings, 'configured'>) => {
