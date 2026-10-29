@@ -2086,6 +2086,22 @@ def test_the_library_search_finds_folders_and_files_by_name_ignoring_case_and_ac
     assert api.get("/api/library/search", {"q": "h"}).status_code == 400            # too short to mean anything
 
 
+@pytest.mark.parametrize("typed,shown", [("80", "80.00"), ("158,98", "158.98"), ("1 234,56", "1234.56"), ("1.234,56", "1234.56"),
+                                         ("1,234.56", "1234.56"), ("1 234,56", "1234.56"), ("25.5", "25.50"), ("-12,50", "-12.50")])
+def test_an_amount_typed_the_usual_way_is_read_when_a_library_pdf_is_planned(api, lib, typed, shown):
+    # DOC534.102: "1 234,56" and "1.234,56" were rejected with "value rejected: [<class 'decimal.ConversionSyntax'>]"
+    fields = {"company": "Acme", "document_type": "Facture", "date": "2025-03-05", "detail": "", "amount": typed, "currency": "CAD"}
+    plan = post(api, "plan", path="top.pdf", fields=fields)
+    assert plan.status_code == 200 and f"{shown}$" in plan.json()["final_name"], plan.content
+
+
+@pytest.mark.parametrize("typed", ["abc", "12,3456", "1,2,3", "$$", "12 euros"])
+def test_an_amount_that_cannot_be_read_is_refused_with_a_plain_message(api, lib, typed):
+    fields = {"company": "Acme", "document_type": "Facture", "date": "2025-03-05", "detail": "", "amount": typed, "currency": "CAD"}
+    refused = post(api, "plan", path="top.pdf", fields=fields)
+    assert refused.status_code == 400 and refused.json()["detail"] == "invalid amount"                 # not a Decimal syntax error
+
+
 @pytest.mark.parametrize("name", ["_Trash", "_trash", "_TRASH"])
 def test_no_ordinary_folder_can_take_the_name_of_the_trash_at_the_root(api, lib, name):
     # DOC534.101: renaming a first-level folder to _Trash made it the trash: everything deleted inside it became permanent

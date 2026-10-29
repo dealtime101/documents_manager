@@ -5,6 +5,7 @@ existing file or folder, and "delete" moves to a `_Trash` folder at the library'
 is removed for good.
 """
 import os
+import re
 import shutil
 import time
 from decimal import Decimal, InvalidOperation
@@ -13,7 +14,7 @@ from pathlib import Path
 from docflow import learn
 from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.extract import extract_text
-from docflow.fields import header_line
+from docflow.fields import header_line, parse_number
 from docflow.naming import build_filename, sanitize, strip_accents
 from docflow.pipeline import _link_or_rename, _unique
 from docflow.routing import fill, route, safe_join
@@ -179,6 +180,20 @@ def delete(rel: str) -> dict:
 
 
 # ------------------------------------------------------------------ re-filing a PDF from its fields
+def _typed_amount(raw) -> Decimal:
+    """An amount as a person writes it: "80", "158,98", "1 234,56", "1.234,56", "1,234.56" (blanks of any kind ignored). A clear
+    ApiError, not a Decimal syntax error, when it cannot be read."""
+    t = "".join(str(raw).split())  # str.split() cuts on every blank, the no-break and narrow no-break spaces included
+    if re.fullmatch(r"-?\d+", t):
+        return Decimal(t)
+    if re.fullmatch(r"-?\d+[.,]\d", t):  # one decimal: "25.5"
+        return Decimal(t.replace(",", "."))
+    number = parse_number(t)  # the last separator followed by two digits is the decimal one; the others group thousands
+    if number is None:
+        raise s.ApiError("invalid amount")
+    return number
+
+
 def _plan_from(fields: dict, rel_dir: str, final_name: str) -> dict:
     c = s.cfg()
     d: dict = {k: fields.get(k) for k in FIELDS if fields.get(k) not in (None, "")}
@@ -186,7 +201,7 @@ def _plan_from(fields: dict, rel_dir: str, final_name: str) -> dict:
     amount = d.pop("amount", None)
     try:
         if amount is not None:
-            amount = Decimal(str(amount).replace(",", "."))
+            amount = _typed_amount(amount)
         a = Analysis.model_validate({**d, "amount": amount, "include_amount": amount is not None})
     except (InvalidOperation, ValueError) as e:
         raise s.ApiError(f"value rejected: {e}") from None
