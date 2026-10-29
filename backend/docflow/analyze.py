@@ -262,6 +262,9 @@ def _excerpt(text: str, limit: int) -> str:
     return text[:head] + gap + text[len(text) - (keep - head):]
 
 
+_CLOSING_TAG = re.compile(r"<\s*/\s*document\s*>", re.IGNORECASE)  # "</document>", "</DOCUMENT>", "</document >", "< / document >"
+
+
 class OllamaAnalyzer:
     PROMPT = ("Extract the following fields from the document and answer ONLY with JSON: "
               '{"date":"YYYY-MM-DD or YYYY-MM or YYYY or XXXX","company":"","document_type":"CamelCase",'
@@ -273,7 +276,7 @@ class OllamaAnalyzer:
     def prompt_for(self, text: str) -> str:
         """The instructions, then the document as one delimited block. A closing tag written inside the text is defused, so the
         text cannot end the block and speak as if it were the instructions that follow."""
-        body = _excerpt(text, self.max_chars).replace("</document>", "<\\/document>")
+        body = _CLOSING_TAG.sub(lambda _m: "<\\/document>", _excerpt(text, self.max_chars))  # any case, any spacing
         return f"{self.PROMPT}<document>\n{body}\n</document>"
 
     def __init__(self, model: str, host: str = "http://127.0.0.1:11434", max_chars: int = 6000, types: list[dict] | None = None):
