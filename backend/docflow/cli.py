@@ -66,10 +66,16 @@ def ask(cfg: Config, p: Proposal) -> str | None:
             print("  Please answer A, M or I.")  # a mistyped key is told, not swallowed
 
 
-def row(p: Proposal) -> str:
+def row(p: Proposal, root: Path | None = None) -> str:
+    """One line of the table. The file is named by its path from the source folder (`root`): with -r two files of the same name in
+    different sub-folders would otherwise give two identical lines; a file directly in the folder shows just its name."""
     a = p.analysis
+    try:
+        shown = p.source.relative_to(root).as_posix() if root else p.source.name
+    except ValueError:
+        shown = p.source.name
     return (f"{p.status:<17} {p.confidence:>4.0%} | {a.company if a else '-'} | {a.document_type if a else '-'} | "
-            f"{a.date if a else '-'} | {a.amount if a and a.amount is not None else '-'} | {p.source.name}")
+            f"{a.date if a else '-'} | {a.amount if a and a.amount is not None else '-'} | {shown}")
 
 
 def _left_over(files: list[Path], i: int) -> tuple[int, int]:
@@ -132,7 +138,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
 
         def report(outcome: str, p: Proposal = p) -> None:  # p bound at definition: it is this file's, whatever the loop does later
             """Table mode: ONE line per file, the outcome as its last column. Otherwise the detail block, then '-> outcome'."""
-            print(f"{row(p)} | {outcome}", flush=True) if table else print(f"  -> {outcome}")
+            print(f"{row(p, inbox)} | {outcome}", flush=True) if table else print(f"  -> {outcome}")
 
         if not table:
             show(p, cfg)

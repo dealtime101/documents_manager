@@ -754,6 +754,19 @@ def test_cli_dry_run_flags_duplicates_inside_the_batch(env, capsys):
     assert "auto" in out.split("\n")[0] and "duplicate" in out.split("\n")[1]
 
 
+def test_the_table_of_a_recursive_scan_names_the_file_by_its_folder_so_same_names_are_told_apart(env, capsys):
+    # DOC534.90: two "facture.pdf" in different sub-folders gave two identical lines
+    cfg, db, tmp = env
+    for sub in ("2024", "2025"):
+        (tmp / "inbox" / sub).mkdir()
+        mkpdf(tmp / "inbox" / sub / "facture.pdf", HYDRO)
+    mkpdf(tmp / "inbox" / "top.pdf", HYDRO)
+    cli.scan(cfg, db, dry=True, interactive=False, ollama=False, recursive=True, table=True)
+    lines = [ln for ln in capsys.readouterr().out.splitlines() if ln.startswith(("auto", "duplicate", "confirm", "manual"))]
+    names = sorted(ln.split(" | ")[5].split(" | ")[0].strip() for ln in lines)
+    assert names == ["2024/facture.pdf", "2025/facture.pdf", "top.pdf"]               # distinct, and a file at the top shows its name
+
+
 def test_ollama_option_misconfiguration_is_a_clear_message_not_a_traceback(env, capsys):
     cfg, db, tmp = env
     mkpdf(tmp / "inbox" / "ok.pdf", HYDRO)
