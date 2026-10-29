@@ -1507,6 +1507,17 @@ def test_llm_eval_refuses_a_sample_size_that_is_not_a_positive_whole_number_with
     assert run.returncode == 2 and "Traceback" not in run.stderr and "N" in run.stderr and "whole number" in run.stderr, run.stderr
 
 
+@pytest.mark.parametrize("extra", [[], ["only-a-cache"], ["cache", "model"], ["cache", "model", "5", "surplus"]])
+def test_llm_eval_with_the_wrong_number_of_arguments_prints_the_usage_not_a_traceback(extra):
+    # DOC534.146: without its three arguments the script ended in an IndexError traceback instead of the usage it declares
+    import os
+    import subprocess
+    env = {**os.environ, "PYTHONPATH": f"{SCRIPTS.parent / 'backend'}:{SCRIPTS}"}
+    run = subprocess.run([sys.executable, str(SCRIPTS / "llm_eval.py"), *extra], capture_output=True, text=True, env=env, timeout=60)
+    assert run.returncode == 2 and "Traceback" not in run.stderr and "IndexError" not in run.stderr
+    assert run.stderr.strip().startswith("usage: PYTHONPATH=backend uv run python scripts/llm_eval.py CACHE MODEL N"), run.stderr
+
+
 def test_llm_eval_measures_durations_with_a_monotonic_clock(tmp_path, monkeypatch, capsys):
     # DOC474.190: time.time() jumps (NTP correction, DST, manual change): a negative duration would corrupt the mean and the max
     llm_eval = load_script("llm_eval")

@@ -76,6 +76,9 @@ def main(cache: Path, model: str, n: int) -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 4:  # three arguments, no more, no less: the usage line of the header, on stderr, exit 2
+        print(next(line for line in (__doc__ or "").splitlines() if line.startswith("usage:")), file=sys.stderr)
+        sys.exit(2)
     try:
         sample_size = int(sys.argv[3])
         if sample_size < 1:
