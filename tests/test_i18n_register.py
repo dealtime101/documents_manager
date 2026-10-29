@@ -207,6 +207,18 @@ def test_the_accuracy_summary_has_a_singular_form_chosen_by_the_total():
     assert "n: s.total" in (root / "components" / "Accuracy.tsx").read_text(encoding="utf-8")           # the count that picks the form
 
 
+def api_error_literals(api_source: str) -> list[str]:
+    """The texts of `new ApiError('...')` in api.ts, whichever quote they are written with: ' " or ` (DOC534.239: a message with an
+    apostrophe is naturally written between double quotes, and was not read)."""
+    return [text for _, text in re.findall(r"new ApiError\(\s*(['\"`])(.+?)\1", api_source)]
+
+
+def test_the_api_error_reader_takes_every_kind_of_quote():
+    sample = ("throw new ApiError('single')\nthrow new ApiError(\"it's double\")\nthrow new ApiError(`tick ${x}`)\n"
+              "throw new ApiError(\n  \"on the next line\", 400)\n")
+    assert api_error_literals(sample) == ["single", "it's double", "tick ${x}", "on the next line"]
+
+
 def test_every_error_message_written_in_api_ts_has_a_french_translation():
     # DOC474.59 claimed the client's error messages stay in English: they go through msg(), which needs an entry for each
     root = Path(__file__).resolve().parents[1] / "frontend" / "src"
@@ -215,7 +227,7 @@ def test_every_error_message_written_in_api_ts_has_a_french_translation():
     table = fr_messages_table(i18n)
     keys = re.findall(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", table, re.MULTILINE)
     keys = [a or b for a, b in keys]
-    literals = [text for _, text in re.findall(r"new ApiError\(\s*(['`])(.+?)\1", api)]
+    literals = api_error_literals(api)
     literals.append("HTTP error: ${status}")                               # errorMessage()'s fallback, built just above
     assert len(literals) >= 3, "the extraction really sees the messages"
     for text in literals:
