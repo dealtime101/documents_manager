@@ -73,7 +73,13 @@ def main(root: Path, fresh: bool = False) -> int:
         amt_tot += expected_amount is not None
         comp_tot += expect_company
         cache = f.with_suffix(".txt")  # OCR is slow: text kept next to the sample (local, disposable)
-        key_file, key = cache.with_name(cache.name + ".key"), cache_key(f, cfg.settings["ocr"])
+        key_file = cache.with_name(cache.name + ".key")
+        try:
+            key = cache_key(f, cfg.settings["ocr"])
+        except Exception as e:  # a locked, unreadable or truncated PDF: a miss named in the report, like a failed extraction
+            meth["error"] += 1
+            failures.append((name, f"{type(e).__name__}: {str(e)[:80]}"))
+            continue
         saved = None if fresh else saved_method(cache, key_file, key)  # the ORIGINAL method of a still-valid saved text
         if saved is not None:
             try:

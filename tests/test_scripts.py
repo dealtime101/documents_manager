@@ -427,6 +427,28 @@ def test_compare_says_so_when_the_sample_folder_has_no_std_folder(tmp_path, caps
     assert out.count("ERROR") == 2 and "std" in out
 
 
+def test_compare_counts_a_file_whose_cache_key_cannot_be_computed_as_a_failure_and_goes_on(tmp_path, capsys, monkeypatch):
+    # DOC534.30: cache_key sat outside the try, so one locked or unreadable PDF ended the comparison with a traceback
+    compare = load_script("compare")
+    std = tmp_path / "std"
+    std.mkdir()
+    make_pdf(std / "000__2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf",
+             "Hydro-Quebec\nFacture d'electricite du 7 octobre 2025\nMontant de la presente facture : 158,98 $")
+    make_pdf(std / "001__2025-10-08 - Telus - ReleveMobilite.pdf", "Telus releve du mois, texte suffisant pour etre lu")
+    real = compare.cache_key
+
+    def locked(pdf, ocr):
+        if pdf.name.startswith("000__"):
+            raise PermissionError("locked by another program")
+        return real(pdf, ocr)
+
+    monkeypatch.setattr(compare, "cache_key", locked)
+    assert compare.main(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert "EXTRACTION ERRORS (1" in out and "PermissionError" in out and "FactureElectricite" in out   # named, with its cause
+    assert "'error': 1, 'text': 1" in out and "company (config)     : 1/2 = 50%" in out                   # a miss, and the other is read
+
+
 def test_compare_names_the_files_whose_extraction_failed_and_why(tmp_path, capsys):
     std = tmp_path / "std"
     std.mkdir()
