@@ -20,6 +20,19 @@ def test_the_euro_sign_is_read_as_the_currency_eur(text, amount):
     assert found is not None and found.value == Decimal(amount) and found.currency == "EUR"
 
 
+@pytest.mark.parametrize("text,amount", [
+    ("Facture\nSous-total 100,00 $\nMontant du : 114,98 $\nAutre 5,00 $", "114.98"),
+    ("Releve\nSolde du 87,50 $\nPaiement recu 10,00 $", "87.50"),
+    ("Releve\nSolde a payer 42,10 $\nPaiement recu 10,00 $", "42.10"),
+    ("Facture\nMontant du\n63,25 $\nSolde precedent 700,00 $", "63.25"),                   # the amount on the next line
+    ("Invoice\nBalance due $19.99\nShipping 100.00 $", "19.99"),
+    ("Facture\nMontant du rabais 5,00 $\nTotal 80,00 $", "80.00")])                        # "du rabais" is not the label of the total
+def test_the_usual_amount_due_labels_are_total_labels(text, amount):
+    # DOC534.76: "Montant dû" (normalised "montant du") and "Solde dû" found no label: the largest amount was taken at 0.6
+    found = find_amount(text)
+    assert found is not None and found.value == Decimal(amount) and found.confidence >= 0.85    # a labelled amount, not the largest one
+
+
 def test_the_kinds_of_a_found_date_are_all_listed():
     # DOC534.74: the comment named six kinds; the module also produces skip, period, tax_year and month_before
     import re

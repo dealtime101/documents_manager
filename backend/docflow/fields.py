@@ -169,7 +169,11 @@ _INT_AMT = re.compile(rf"(?:\$\s*[-−]?\s*({_INT})|(?<![\d.,])({_INT})\s*\$|\b(
 WHOLE_AMOUNT_CONFIDENCE = 0.85  # below the 0.95 of "auto": no cents means a human confirms
 _STRONG = [  # decreasing rank
     r"montant de la presente facture", r"montant total", r"total a payer", r"grand total", r"order total",
-    r"amount due", r"montant a payer", r"total de la facture", r"\btotal\b",
+    r"amount due", r"montant a payer", r"total de la facture",
+    # "Montant du" / "Solde du" (accents removed: "du" is also the article, so only the label forms: followed by a colon, a sign,
+    # a digit or the end of the line, never "montant du rabais"), and its English counterpart
+    r"montant du\s*(?:[:$\d]|$)", r"solde du\s*(?:[:$\d]|$)", r"solde a payer", r"balance due",
+    r"\btotal\b",
 ]
 # sub-totals and totals that are NOT what has to be paid (before a discount or before taxes)
 _SUBTOTAL = re.compile(r"sous-total|sub-?total|avant (?:la )?remise|before discount|avant taxes?|before tax(?:es)?"
