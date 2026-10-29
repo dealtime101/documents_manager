@@ -140,28 +140,26 @@ def test_the_saved_folders_override_the_shipped_settings_and_a_change_is_picked_
     assert load_config().settings["quarantine"] == str(f["quarantine"])
 
 
-def test_the_users_own_rule_files_and_learned_rules_live_in_their_folder_not_in_the_program(home, tmp_path):
+def test_the_users_own_rule_files_and_learned_rules_live_in_their_folder_not_in_the_program(home, tmp_path, monkeypatch):
     # a new install starts from the shipped (generic) rules; what the user wrote or learned is kept in THEIR folder
     shipped = tmp_path / "shipped"
     shipped.mkdir()
     (shipped / "companies.yaml").write_text("Shipped:\n- shipped\n", encoding="utf-8")
-    import os
-    os.environ["DOCFLOW_CONFIG_DIR"] = str(shipped)
-    try:
-        assert set(load_config().companies) == {"Shipped"}
-        (home / "config").mkdir(parents=True)
-        (home / "config" / "companies.yaml").write_text("Mine:\n- mine\n", encoding="utf-8")
-        assert set(load_config().companies) == {"Mine"}                                    # the user's copy replaces the shipped one
-        (home / "learned").mkdir()
-        (home / "learned" / "company_aliases.yaml").write_text("Learned:\n- learned\n", encoding="utf-8")
-        assert set(load_config().companies) == {"Mine", "Learned"}                         # learned rules come from the user's folder
-        cfg = load_config()
-        from docflow.learn import learn_company
-        learn_company(cfg, "Fresh", "texte fresh unique")
-        assert (home / "learned" / "company_aliases.yaml").is_file() and cfg.learn_dir == home / "learned"
-        assert not list(shipped.glob("*learned*"))                                          # nothing is ever written next to the program
-    finally:
-        del os.environ["DOCFLOW_CONFIG_DIR"]
+    # DOC534.241: monkeypatch puts back the value the session had (conftest sets it for every test); the old `del` in a finally left the
+    # whole rest of the session without it, so the tests that followed read the real rules
+    monkeypatch.setenv("DOCFLOW_CONFIG_DIR", str(shipped))
+    assert set(load_config().companies) == {"Shipped"}
+    (home / "config").mkdir(parents=True)
+    (home / "config" / "companies.yaml").write_text("Mine:\n- mine\n", encoding="utf-8")
+    assert set(load_config().companies) == {"Mine"}                                    # the user's copy replaces the shipped one
+    (home / "learned").mkdir()
+    (home / "learned" / "company_aliases.yaml").write_text("Learned:\n- learned\n", encoding="utf-8")
+    assert set(load_config().companies) == {"Mine", "Learned"}                         # learned rules come from the user's folder
+    cfg = load_config()
+    from docflow.learn import learn_company
+    learn_company(cfg, "Fresh", "texte fresh unique")
+    assert (home / "learned" / "company_aliases.yaml").is_file() and cfg.learn_dir == home / "learned"
+    assert not list(shipped.glob("*learned*"))                                          # nothing is ever written next to the program
 
 
 def test_a_fresh_install_starts_empty_in_the_users_folder_and_says_it_is_not_configured(home, monkeypatch):
