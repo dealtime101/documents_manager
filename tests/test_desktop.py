@@ -96,6 +96,18 @@ def test_a_server_that_dies_at_start_is_reported_at_once_and_main_tells_the_user
     assert len(shown) == 1 and "migration failed" in shown[0] and "desktop.log" in shown[0]   # and a message with the log's place
 
 
+def test_the_interface_check_reads_enough_of_the_page_and_looks_at_the_title_only():
+    # DOC534.132: 400 bytes were read, so a title after many meta / preload tags was a false failure; and two tests said one thing
+    import inspect
+
+    from docflow import desktop
+    head = "".join(f'<link rel="modulepreload" href="/assets/chunk-{n}.js">\n' for n in range(120))                  # about 6 KB of tags
+    page = f"<!doctype html><html><head>{head}<title>Documents Manager</title></head><body></body></html>"
+    assert page.index("<title>") > 400 and desktop.interface_is_ours(page)                    # the title is found far from the start
+    assert not desktop.interface_is_ours("<html><head><title>Other</title></head><body>Documents Manager</body></html>")   # not the name anywhere
+    assert desktop.INTERFACE_READ_BYTES >= 16 * 1024 and "read(INTERFACE_READ_BYTES)" in inspect.getsource(desktop.selftest)   # and enough is read
+
+
 def test_the_port_is_held_from_the_moment_it_is_chosen_and_only_our_own_server_counts_as_up(tmp_path):
     # DOC534.130: the port was given back before the server bound it, and any program that listened there made the start look done
     import http.server

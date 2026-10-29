@@ -98,6 +98,14 @@ def ocr_languages() -> list[str]:
     return sorted(line.strip() for line in out.splitlines()[1:] if line.strip())
 
 
+INTERFACE_READ_BYTES = 64 * 1024  # the head of index.html: room for any number of meta and preload tags before the title
+
+
+def interface_is_ours(page: str) -> bool:
+    """Is this the page of the application? Its <title>, not any mention of the name further down."""
+    return "<title>Documents Manager</title>" in page
+
+
 def selftest(port: int, token: str) -> dict:
     """What the window would do, without it: open the page, sign in with the token, read the version."""
     import http.cookiejar
@@ -113,10 +121,10 @@ def selftest(port: int, token: str) -> dict:
         signed_in = json.load(opener.open(f"{base}/api/auth/me", timeout=15))["authenticated"]
     except urllib.error.HTTPError:
         signed_in = False
-    page = opener.open(f"{base}/", timeout=15).read(400).decode("utf-8", "replace")
+    page = opener.open(f"{base}/", timeout=15).read(INTERFACE_READ_BYTES).decode("utf-8", "replace")
     from docflow.usersettings import user_dir
     return {"ocr": ocr_languages(), "version": me["version"], "signed_in": signed_in, "database_in_user_folder": (user_dir() / "docflow.db").is_file(),
-            "interface": "<title>Documents Manager</title>" in page or "Documents Manager" in page}
+            "interface": interface_is_ours(page)}
 
 
 def log_to_file() -> None:
