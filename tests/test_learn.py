@@ -476,7 +476,11 @@ def test_a_hand_written_rule_cannot_be_forgotten_through_the_learned_files(tmp_p
     assert forget_alias(cfg, "Hydro-Quebec") is False and forget_type(cfg, "Hydro-Quebec") is False
     assert forget_route(cfg, "Hydro-Quebec") is False
     assert cfg.companies["Hydro-Quebec"] == hand_written["patterns"] and "Hydro-Quebec" in cfg.routing   # untouched
-    assert not (tmp_path / "learned").exists() or not any((tmp_path / "learned").glob("*_learned.yaml"))
+    # DOC534.232: none of the three learned files, company_aliases.yaml included (the old glob "*_learned.yaml" did not match it)
+    from docflow.config import LEARNED_FILES
+    assert set(LEARNED_FILES) == {"company_aliases.yaml", "types_learned.yaml", "routing_learned.yaml"}
+    assert not any((cfg.learn_dir / name).exists() for name in LEARNED_FILES)
+    assert not cfg.learn_dir.exists() or {p.name for p in cfg.learn_dir.iterdir()} <= {".learn.lock"}   # and nothing else but the lock
 
 
 def test_another_worker_sees_what_this_one_learned_and_forgot(tmp_path):
