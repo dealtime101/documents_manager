@@ -16,6 +16,10 @@ extra).
 - The **Dashboard** also lists the documents that did not come: for a company and type filed at a steady rhythm (at least four
   documents, a gap of 7 to 400 days, say a monthly bill), it says when the next one was expected once it is more than a quarter
   of the gap (a week at least) late. **Stop reporting** hides one that no longer matters; it can be brought back there.
+- **Backup and restore** (Settings, or `docflow backup FILE [--encrypt]` and `docflow restore FILE [--settings]`): one zip with the
+  database (a whole copy even while the program runs), the learned corrections and your own rules, optionally encrypted with a
+  password (AES-256, openable with 7-Zip). A restore keeps a copy of what it replaces in the `backups` folder of the user's folder.
+  The documents are not in it: back up the library like any other folder.
 - Interface in English and French. Command line available (`docflow`).
 
 > The program's internal name — used by its command, its services and its settings folder — is `docflow`.

@@ -19,6 +19,8 @@ urlpatterns = [
     path("items/<int:pk>/<str:action>", v.item_action),
     path("scan", v.scan_view),
     path("scan/status", v.scan_status),
+    path("backup", v.backup_download),
+    path("backup/restore", v.backup_restore),
     path("missing", v.missing),
     path("missing/ignore", v.missing_ignore),
     path("missing/restore", v.missing_restore),

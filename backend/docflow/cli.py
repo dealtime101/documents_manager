@@ -2,15 +2,18 @@
   scan [--dry-run] [--interactive] [--ollama] [--source DIR] [-r | --recursive] [--table]
   undo [ID]
   history
+  backup FILE [--encrypt]
+  restore FILE [--settings]
 --sandbox DIR works on a throw-away copy (inbox/, library/, quarantine/ and the database live in DIR); `docflow COMMAND --help`
 lists what each option does."""
 import argparse
+import getpass
 import logging
 import sqlite3
 import sys
 from pathlib import Path
 
-from . import __version__
+from . import __version__, backup
 from .analyze import OllamaAnalyzer, RuleBasedAnalyzer
 from .config import Config, load_config
 from .db import DB
@@ -220,7 +223,51 @@ def build_parser() -> argparse.ArgumentParser:
     w = sub.add_parser("watch", help="analyse the PDFs that arrive in the Inbox as they come (nothing is moved)",
                        description="Keep looking at the Inbox and analyse each PDF that arrives, as a dry run: nothing is filed or moved.")
     w.add_argument("--interval", type=float, default=POLL_SECONDS, help="seconds between two looks at the folder (default %(default)s)")
+    b = sub.add_parser("backup", help="save the database, the learned corrections and the settings in one archive",
+                       description="Write one zip with the database (a whole copy, even while the program runs), the folders chosen in "
+                                   "Settings, the learned corrections and your own rules. The documents are not in it.")
+    b.add_argument("file", type=Path, help="the archive to write (a .zip)")
+    b.add_argument("--encrypt", action="store_true", help="ask for a password (typed, not shown) and encrypt the archive with it (AES-256)")
+    r = sub.add_parser("restore", help="put a backup back (what it replaces is kept first)",
+                       description="Restore the database, the learned corrections and your own rules from an archive made by 'backup'. "
+                                   "A copy of what is replaced is kept in the 'backups' folder of the user's folder. Stop the program first.")
+    r.add_argument("file", type=Path, help="the archive made by 'backup'")
+    r.add_argument("--settings", action="store_true",
+                   help="also restore the folders chosen in Settings (only those that exist on this computer)")
     return ap
+
+
+def backup_command(cfg: Config, args: argparse.Namespace) -> int:
+    """DOC534.11: `docflow backup FILE [--encrypt]` and `docflow restore FILE [--settings]`."""
+    if args.cmd == "backup":
+        password = None
+        if args.encrypt:
+            password = getpass.getpass("Password for the archive: ")
+            if not password or password != getpass.getpass("Again: "):
+                print("The passwords are empty or differ: nothing written.")
+                return 1
+        if args.file.exists():
+            print(f"{args.file} exists already: choose another name (nothing is overwritten).")
+            return 1
+        try:
+            names = backup.create(cfg, args.file, password, __version__)
+        except (OSError, sqlite3.Error) as e:
+            args.file.unlink(missing_ok=True)  # never leave half an archive that looks like a backup
+            print(f"Cannot write the backup: {e}")
+            return 1
+        print(f"Backup written: {args.file} ({len(names)} files{', encrypted' if password else ''})")
+        return 0
+    try:
+        password = getpass.getpass("Password of the archive: ") if backup.encrypted(args.file) else None
+        result = backup.restore(cfg, args.file, password, args.settings)
+    except (backup.BackupError, OSError, sqlite3.Error) as e:
+        print(f"Cannot restore: {e}")
+        return 1
+    print(f"Restored from the backup of {result['created'] or '?'}: {', '.join(result['restored']) or 'nothing'}")
+    for key, why in result["settings_skipped"].items():
+        print(f"  setting not restored: {key}: {why}")
+    print(f"The previous state is kept in {result['safety_copy']}")
+    return 0
 
 
 def watch_inbox(cfg: Config, db: DB, interval: float = POLL_SECONDS, stop=None) -> int:
@@ -265,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=log_path, level=logging.INFO, format="%(asctime)s %(message)s")
     db = DB(cfg.path("db"))
+    if args.cmd in ("backup", "restore"):
+        return backup_command(cfg, args)
     if args.cmd == "scan":
         return scan(cfg, db, args.dry_run, args.interactive, args.ollama, args.source, args.recursive, args.table)
     if args.cmd == "watch":

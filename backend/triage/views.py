@@ -3,12 +3,15 @@ import logging
 import os
 import re
 import secrets
+import sqlite3
+import tempfile
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model, login
 from django.http import FileResponse
 from django.middleware.csrf import get_token
+from django.utils import timezone
 from docflow import __version__, usersettings
 from docflow.changelog import parse as parse_changelog
 from docflow.extract import image_to_pdf, is_image
@@ -17,8 +20,10 @@ from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
+    parser_classes,
     permission_classes,
 )
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
@@ -318,6 +323,39 @@ def rules_forget(request):
 def rules_route(request):
     try:
         return Response(s.set_route(request.data))
+    except s.ApiError as e:
+        return err(e)
+
+
+@api_view(["POST"])
+def backup_download(request):
+    """DOC534.11: the archive of the database, the learned corrections and the settings, as a download. The password (optional) is
+    in the body, never in the address."""
+    body = request.data if isinstance(request.data, dict) else {}
+    out = tempfile.TemporaryFile()  # noqa: SIM115  (the response closes it after the download, and the file is deleted then)
+    try:
+        s.backup_to(out, body.get("password"))
+    except s.ApiError as e:
+        out.close()
+        return err(e)
+    except (OSError, sqlite3.Error):
+        out.close()
+        log.exception("backup failed")
+        return err(s.ApiError("the backup could not be written"), status.HTTP_500_INTERNAL_SERVER_ERROR)
+    out.seek(0)
+    response = FileResponse(out, content_type="application/zip", as_attachment=True,
+                            filename=f"documents-manager-backup-{timezone.localdate()}.zip")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@api_view(["POST"])
+@parser_classes([MultiPartParser])
+def backup_restore(request):
+    """DOC534.11: put an uploaded archive back; what it replaces is kept in the user's folder first."""
+    try:
+        return Response(s.restore_backup(request.FILES.get("file"), request.data.get("password"),
+                                         request.data.get("settings") == "true"))
     except s.ApiError as e:
         return err(e)
 

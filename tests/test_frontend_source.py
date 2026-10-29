@@ -726,12 +726,14 @@ def test_the_dashboard_comment_does_not_promise_that_two_requests_are_never_in_f
 
 
 def test_a_network_failure_reaches_the_screens_as_a_translated_api_error_never_as_a_raw_typeerror():
-    # DOC474.78 feared "TypeError: Failed to fetch" in English on the dashboard: request() converts the fetch rejection first
+    # DOC474.78 feared "TypeError: Failed to fetch" in English on the dashboard: send() (which request() and download() go through)
+    # converts the fetch rejection first (DOC534.11 moved the fetch there so a file can be uploaded and downloaded the same way)
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
-    body = api[api.index("async function request"):api.index("const data = await r.json()")]
-    assert "r = await fetch(" in body and "catch (e) {" in body                                # the rejection is caught here...
+    body = api[api.index("async function send"):api.index("const data = await r.json()")]
+    assert "await fetch(" in body and "catch (e) {" in body                                    # the rejection is caught here...
     assert "throw new ApiError('Network error: the server cannot be reached.')" in body        # ...and becomes an ApiError
-    assert body.index("r = await fetch(") < body.index("catch (e) {") < body.index("throw new ApiError('Network error")
+    assert body.index("await fetch(") < body.index("catch (e) {") < body.index("throw new ApiError('Network error")
+    assert "await send(method, url, body, timeoutMs)" in body and "await send('POST', url, body, timeoutMs)" in api
     # DOC534.269: and the message has its French text (the one test of this, merged from a twin that only checked the same sentence)
     from conftest import fr_messages_table
     french = fr_messages_table((UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8"))

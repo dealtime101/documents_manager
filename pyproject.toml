@@ -52,7 +52,7 @@ mypy_path = "backend"
 
 [[tool.mypy.overrides]]
 # Django, Django REST framework and pypdfium2.raw ship no type stubs (django-stubs is not a dependency): their imports are "Any", on purpose
-module = ["django.*", "rest_framework.*", "pypdfium2.*", "waitress.*", "webview.*"]
+module = ["django.*", "rest_framework.*", "pypdfium2.*", "waitress.*", "webview.*", "pyzipper.*"]
 ignore_missing_imports = true
 
 [tool.ruff.lint]

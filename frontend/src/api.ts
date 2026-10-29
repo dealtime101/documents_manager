@@ -32,6 +32,14 @@ export interface Dashboard {
   history: Operation[]
 }
 
+/** What a restore did: the files put back, the settings it left alone (with why), and where the previous state was kept. */
+export interface RestoreResult {
+  restored: string[]
+  settings_skipped: Record<string, string>
+  safety_copy: string
+  created: string
+}
+
 /** Documents that come on a rhythm (a monthly bill) and have not come, and the series the person asked not to hear about. */
 export interface Missing {
   missing: { company: string; document_type: string; every_days: number; last_date: string; expected_date: string; days_late: number;
@@ -200,20 +208,25 @@ async function call<T>(method: string, url: string, body?: unknown, timeoutMs = 
   return (await request<T>(method, url, body, timeoutMs)).data
 }
 
-async function request<T>(method: string, url: string, body?: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<{ data: T; total: number | null }> {
-  let r: Response
+/** The request itself: JSON, or a form (a file to upload: the browser writes its own Content-Type, with the boundary). */
+async function send(method: string, url: string, body: unknown, timeoutMs: number): Promise<Response> {
+  const form = body instanceof FormData
   try {
-    r = await fetch(url, {
+    return await fetch(url, {
       method,
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { ...(form ? {} : { 'Content-Type': 'application/json' }), 'X-CSRFToken': csrf() },
+      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     })
   } catch (e) {  // fetch rejects with a bare TypeError ("Failed to fetch") when the server cannot be reached at all
     if (e instanceof DOMException && e.name === 'TimeoutError') throw new ApiError('Request timed out: the server did not answer.')
     throw new ApiError('Network error: the server cannot be reached.')
   }
+}
+
+async function request<T>(method: string, url: string, body?: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<{ data: T; total: number | null }> {
+  const r = await send(method, url, body, timeoutMs)
   // `undefined` when the body is not JSON (HTML from a proxy or captive portal, truncated answer, empty body)
   const data = await r.json().catch(() => undefined)
   if (!r.ok) throw new ApiError(errorMessage(data, r.status), r.status, data)
@@ -221,6 +234,17 @@ async function request<T>(method: string, url: string, body?: unknown, timeoutMs
   const total = r.headers.get('X-Total-Count')
   // a whole number, or null: '' is 0 and 'abc' is NaN for Number(), and `?? data.length` replaces neither
   return { data: data as T, total: total !== null && /^\d+$/.test(total) ? Number(total) : null }
+}
+
+/** A file the server builds (the backup): its bytes and the name it proposes. Errors are the same ApiErrors as everywhere. */
+async function download(url: string, body: unknown, timeoutMs: number): Promise<{ blob: Blob; name: string }> {
+  const r = await send('POST', url, body, timeoutMs)
+  if (!r.ok) {
+    const data = await r.json().catch(() => undefined)
+    throw new ApiError(errorMessage(data, r.status), r.status, data)
+  }
+  const name = /filename="?([^";]+)"?/.exec(r.headers.get('Content-Disposition') ?? '')?.[1] ?? 'documents-manager-backup.zip'
+  return { blob: await r.blob(), name }
 }
 
 export const api = {
@@ -249,6 +273,14 @@ export const api = {
   setRoute: (company: string, destination: string) => call('POST', '/api/rules/route', { company, destination }),
   approveSelected: (ids: number[]) => call<Batch>('POST', '/api/items/approve-selected', { ids }, SLOW_REQUEST_TIMEOUT_MS),
   dashboard: () => call<Dashboard>('GET', '/api/dashboard'),
+  backup: (password: string) => download('/api/backup', { password }, SLOW_REQUEST_TIMEOUT_MS),
+  restore: (file: File, password: string, settings: boolean) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('password', password)
+    form.append('settings', String(settings))
+    return call<RestoreResult>('POST', '/api/backup/restore', form, SLOW_REQUEST_TIMEOUT_MS)
+  },
   missing: () => call<Missing>('GET', '/api/missing'),
   ignoreMissing: (company: string, document_type: string) => call<Missing>('POST', '/api/missing/ignore', { company, document_type }),
   restoreMissing: (company: string, document_type: string) => call<Missing>('POST', '/api/missing/restore', { company, document_type }),

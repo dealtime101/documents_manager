@@ -7,6 +7,7 @@ import Dashboard, { type Target } from '@/pages/Dashboard'
 import History from '@/pages/History'
 import Library from '@/pages/Library'
 import Notes from '@/pages/Notes'
+import BackupRestore from '@/components/BackupRestore'
 import Settings from '@/pages/Settings'
 import Rules from '@/pages/Rules'
 import Search from '@/pages/Search'
@@ -116,7 +117,10 @@ function Shell() {
       <TabsContent value="history" className="text-base"><History /></TabsContent>
       <TabsContent value="search" className="text-base"><Search /></TabsContent>
       <TabsContent value="rules" className="text-base"><Rules /></TabsContent>
-      <TabsContent value="settings" className="text-base"><Settings onSaved={() => go({ page: 'queue', group: null })} /></TabsContent>
+      <TabsContent value="settings" className="text-base">
+        <Settings onSaved={() => go({ page: 'queue', group: null })} />
+        <BackupRestore />
+      </TabsContent>
       <TabsContent value="notes" className="text-base"><Notes /></TabsContent>
     </Tabs>
   )

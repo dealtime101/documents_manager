@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import statistics
 import threading
 import time
@@ -20,7 +21,7 @@ from django.conf import settings
 from django.db import IntegrityError, OperationalError, connection, connections, transaction
 from django.db.models import Q
 from django.utils import timezone
-from docflow import learn
+from docflow import __version__, backup, learn
 from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.db import DB
 from docflow.extract import extract_text, find_tesseract, is_scannable
@@ -1050,6 +1051,43 @@ def restore_series(body: object) -> dict:
     company, kind = _series_body(body)
     IgnoredSeries.objects.filter(company=company, document_type=kind).delete()
     return missing()
+
+
+def _password(value: object) -> str | None:
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str) or len(value) > 1000:
+        raise ApiError("password must be a text of at most 1000 characters")
+    return value
+
+
+def backup_to(target, password: object) -> list[str]:
+    """DOC534.11: write the archive of the database, the learned corrections and the settings to `target` (an open binary file)."""
+    return backup.create(cfg(), target, _password(password), __version__)
+
+
+def _known_migrations() -> set[str]:
+    from django.db.migrations.loader import MigrationLoader
+    return {f"{app}.{name}" for app, name in MigrationLoader(None, ignore_no_migrations=True).disk_migrations}
+
+
+def restore_backup(upload, password: object, with_settings: bool) -> dict:
+    """DOC534.11: put an uploaded archive back (see docflow.backup.restore), then bring the database to the schema of this program
+    (an older archive) and make this worker read the rules again."""
+    from django.core.management import call_command
+    if upload is None:
+        raise ApiError("file is required")
+    try:
+        result = backup.restore(cfg(), upload.file, _password(password), with_settings, _known_migrations)
+    except backup.BackupError as e:
+        raise ApiError(str(e)) from None
+    except (OSError, sqlite3.Error) as e:
+        log.exception("restore of a backup failed")
+        raise ApiError("the backup could not be restored; the previous state is kept") from None
+    connection.close()  # the next request opens the restored file afresh
+    call_command("migrate", interactive=False, verbosity=0)
+    cfg().refresh_learned()
+    return result
 
 
 def dashboard() -> dict:
