@@ -1193,10 +1193,14 @@ def test_manage_py_has_no_shebang_because_it_is_run_through_uv():
     assert not first.startswith("#!")
 
 
-def test_the_benchmark_stop_words_are_a_set_of_27_common_words():
+def test_the_benchmark_stop_words_are_common_words_and_never_a_word_that_tells_documents_apart():
+    # DOC534.266: not "exactly 27" (adding an ordinary word broke the test with no behaviour at stake): the properties that matter
     stop = load_script("benchmark").STOP
-    assert isinstance(stop, set) and len(stop) == 27
-    assert {"de", "la", "the", "and", "this"} <= stop and "facture" not in stop       # common words only, never a distinguishing one
+    assert isinstance(stop, set) and stop and all(w == w.lower() and w.isalpha() for w in stop)
+    assert {"de", "la", "les", "pour", "dans", "the", "and", "this", "with", "from"} <= stop         # the ordinary words of both languages
+    distinguishing = {"facture", "invoice", "total", "montant", "amount", "date", "hydro", "assurance", "releve", "statement", "order",
+                      "commande", "paiement", "payment", "taxes", "numero"}
+    assert not (stop & distinguishing), stop & distinguishing                                         # never one that names a kind of document
 
 
 def test_the_yaml_rule_files_pass_the_projects_yamllint_line_length():
