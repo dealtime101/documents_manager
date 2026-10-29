@@ -453,7 +453,7 @@ def test_approve_automatic_goes_on_after_the_point_where_the_previous_press_stop
     queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text()
     body = queue[queue.index("const afterAuto = useRef(0)"):queue.index("const approveSelected")]
     assert "api.approveAuto(afterAuto.current)" in body and "afterAuto.current = r.remaining ? r.next_after ?? 0 : 0" in body
-    assert "approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after })" in (UI.parents[1] / "api.ts").read_text()
+    assert "approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after }" in (UI.parents[1] / "api.ts").read_text()
 
 
 def test_the_sidebar_focus_ring_reaches_3_to_1_on_its_background_in_both_themes():
@@ -568,9 +568,9 @@ def test_a_network_failure_reaches_the_screens_as_a_translated_api_error_never_a
     # DOC474.78 feared "TypeError: Failed to fetch" in English on the dashboard: request() converts the fetch rejection first
     api = (UI.parents[1] / "api.ts").read_text()
     body = api[api.index("async function request"):api.index("const data = await r.json()")]
-    assert "r = await fetch(" in body and "catch {" in body                                    # the rejection is caught here...
+    assert "r = await fetch(" in body and "catch (e) {" in body                                # the rejection is caught here...
     assert "throw new ApiError('Network error: the server cannot be reached.')" in body        # ...and becomes an ApiError
-    assert body.index("r = await fetch(") < body.index("catch {") < body.index("throw new ApiError('Network error")
+    assert body.index("r = await fetch(") < body.index("catch (e) {") < body.index("throw new ApiError('Network error")
 
 
 def test_saving_the_settings_goes_through_request_so_a_lost_network_is_a_translated_api_error():
@@ -580,6 +580,35 @@ def test_saving_the_settings_goes_through_request_so_a_lost_network_is_a_transla
     assert "fetch(" not in save and "await call<FolderSettings>('POST', '/api/settings', values)" in save
     assert "throw new ApiError(errorMessage(data, r.status), r.status, data)" in api        # the refusal's body reaches the caller
     assert "e.status === 400" in save and "throw new SettingsRefused(errors)" in save and save.rstrip().endswith("},")
+
+
+def test_a_request_the_server_never_answers_ends_with_a_translated_timeout_and_the_slow_ones_wait_longer():
+    # DOC534.95: fetch had no timeout: a server that accepted the connection and said nothing left the screen loading for ever
+    setup = """
+      globalThis.document = { cookie: '' }
+      globalThis.seen = []
+      globalThis.fetch = (url, init) => new Promise((resolve, reject) => {
+        seen.push({ url, aborts: !!init.signal })
+        init.signal.addEventListener('abort', () => reject(init.signal.reason))    // as the real fetch does when the signal fires
+      })
+      const real = AbortSignal.timeout.bind(AbortSignal)
+      globalThis.waited = []
+      AbortSignal.timeout = (ms) => { waited.push(ms); return real(5) }               // the clock is short in the test, the duration is recorded
+      globalThis.keepAlive = setInterval(() => {}, 20)                                  // node's timeout timer does not keep the process alive
+    """
+    got = _node_route("""(async () => {
+      const out = {}
+      try { await m.api.dashboard() } catch (e) { out.message = e.message; out.type = e.constructor.name }
+      try { await m.api.approveAuto() } catch (e) { out.slow = e.message }
+      try { await m.api.libraryPlan('a.pdf') } catch (e) { out.plan = e.message }
+      out.waited = waited
+      clearInterval(keepAlive)
+      return out
+    })()""", module="api", setup=setup)
+    assert got["type"] == "ApiError" and got["message"] == "Request timed out: the server did not answer."
+    assert got["waited"] == [60_000, 900_000, 900_000]                                        # a minute, and 15 for approvals and OCR
+    assert got["slow"] == got["plan"] == got["message"]
+    assert "'Request timed out: the server did not answer.': " in (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")   # and it is translated
 
 
 def test_the_language_asked_of_the_changelog_is_encoded_like_every_other_query_value():

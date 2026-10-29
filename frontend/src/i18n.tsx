@@ -509,6 +509,7 @@ const frMessages: Record<string, string> = {
   'destination outside root: ': 'destination hors racine : ',
   'HTTP error: ': 'Erreur HTTP : ',
   'Network error: the server cannot be reached.': 'Erreur réseau : le serveur est injoignable.',
+  'Request timed out: the server did not answer.': "Délai dépassé : le serveur n'a pas répondu.",
   'unexpected error: ': 'erreur inattendue : ',
   'Incomplete text, pages not read: ': 'Texte incomplet, pages non lues : ',
   'unexpected response from the server: ': 'réponse inattendue du serveur : ',

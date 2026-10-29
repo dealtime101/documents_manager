@@ -171,11 +171,14 @@ export function errorMessage(data: unknown, status: number): string {
   return found.length ? found.join(' ') : `HTTP error: ${status}`
 }
 
-async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
-  return (await request<T>(method, url, body)).data
+const REQUEST_TIMEOUT_MS = 60_000      // a server that accepts the connection and never answers is given up on after this
+const SLOW_REQUEST_TIMEOUT_MS = 15 * 60_000  // what really takes minutes: reading a scan with OCR, filing hundreds of files on a NAS
+
+async function call<T>(method: string, url: string, body?: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
+  return (await request<T>(method, url, body, timeoutMs)).data
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<{ data: T; total: number | null }> {
+async function request<T>(method: string, url: string, body?: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<{ data: T; total: number | null }> {
   let r: Response
   try {
     r = await fetch(url, {
@@ -183,8 +186,10 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     })
-  } catch {  // fetch rejects with a bare TypeError ("Failed to fetch") when the server cannot be reached at all
+  } catch (e) {  // fetch rejects with a bare TypeError ("Failed to fetch") when the server cannot be reached at all
+    if (e instanceof DOMException && e.name === 'TimeoutError') throw new ApiError('Request timed out: the server did not answer.')
     throw new ApiError('Network error: the server cannot be reached.')
   }
   // `undefined` when the body is not JSON (HTML from a proxy or captive portal, truncated answer, empty body)
@@ -212,14 +217,14 @@ export const api = {
   remove: (id: number) => call('POST', `/api/items/${id}/remove`),
   scan: () => call<{ job: ScanJob }>('POST', '/api/scan'),
   scanStatus: () => call<ScanJob>('GET', '/api/scan/status'),
-  approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after }),  // after: where the previous request stopped
+  approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after }, SLOW_REQUEST_TIMEOUT_MS),  // after: where the previous request stopped
   search: (q: string) => call<SearchHit[]>('GET', `/api/search?${new URLSearchParams({ q })}`),
   stats: () => call<Accuracy>('GET', '/api/stats'),
   rules: () => call<LearnedRules>('GET', '/api/rules'),
   forgetRule: (kind: 'alias' | 'type' | 'route', company: string, pattern?: string) =>
     call<{ forgotten: boolean }>('POST', '/api/rules/forget', { kind, company, pattern }),
   setRoute: (company: string, destination: string) => call('POST', '/api/rules/route', { company, destination }),
-  approveSelected: (ids: number[]) => call<Batch>('POST', '/api/items/approve-selected', { ids }),
+  approveSelected: (ids: number[]) => call<Batch>('POST', '/api/items/approve-selected', { ids }, SLOW_REQUEST_TIMEOUT_MS),
   dashboard: () => call<Dashboard>('GET', '/api/dashboard'),
   history: () => call<Operation[]>('GET', '/api/history'),
   changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?${new URLSearchParams({ lang })}`),
@@ -243,9 +248,9 @@ export const api = {
   libraryDelete: (path: string) => call<{ path: string | null; permanent: boolean }>('POST', '/api/library/delete', { path }),
   /** Without `fields` the server reads the document and proposes them; with them it only computes the name and folder. */
   libraryPlan: (path: string, fields?: LibraryFields, rel_dir = '', final_name = '') =>
-    call<LibraryPlan>('POST', '/api/library/plan', { path, fields, rel_dir, final_name }),
+    call<LibraryPlan>('POST', '/api/library/plan', { path, fields, rel_dir, final_name }, SLOW_REQUEST_TIMEOUT_MS),
   libraryApply: (path: string, fields: LibraryFields, rel_dir = '', final_name = '') =>
-    call<{ path: string; learned: Learned[] }>('POST', '/api/library/apply', { path, fields, rel_dir, final_name }),
+    call<{ path: string; learned: Learned[] }>('POST', '/api/library/apply', { path, fields, rel_dir, final_name }, SLOW_REQUEST_TIMEOUT_MS),
   libraryFileUrl: (path: string) => `/api/library/file?${new URLSearchParams({ path })}`,
   undo: (id: number) => call<{ restored: string }>('POST', `/api/history/${id}/undo`),
   destinations: () => call<string[]>('GET', '/api/destinations'),
