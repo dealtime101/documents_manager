@@ -415,11 +415,13 @@ def test_tesseract_output_is_decoded_as_utf8_whatever_the_locale(tmp_path):
     import os
     import subprocess
     import sys
+
+    from conftest import python_path
     fake = tmp_path / "fake_tesseract"           # prints UTF-8 bytes like the real one
     fake.write_text("#!/bin/sh\nprintf 'Facture \\303\\251lectricit\\303\\251\\n'\n")
     fake.chmod(0o755)
     env = {**os.environ, "LC_ALL": "C", "LANG": "C", "PYTHONUTF8": "0", "PYTHONCOERCECLOCALE": "0",
-           "PYTHONPATH": str(Path(extract.__file__).resolve().parents[1])}
+           "PYTHONPATH": python_path(Path(extract.__file__).resolve().parents[1])}
     code = f"from docflow.extract import ocr_image; print(ascii(ocr_image(b'x', {str(fake)!r}, 'fra')))"
     out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)  # child: ASCII locale
     assert out.stdout.strip() == "'Facture \\xe9lectricit\\xe9\\n'", out.stderr[-300:]

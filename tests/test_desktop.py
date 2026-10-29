@@ -6,12 +6,13 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import python_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def _env(tmp_path):
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "backend"), "DOCFLOW_HOME": str(tmp_path / "home"), "DOCFLOW_ROOT": str(ROOT),
+    env = {**os.environ, "PYTHONPATH": python_path(ROOT / "backend"), "DOCFLOW_HOME": str(tmp_path / "home"), "DOCFLOW_ROOT": str(ROOT),
            "DJANGO_SETTINGS_MODULE": "webapp.settings"}
     for key in ("DOCFLOW_SANDBOX", "DOCFLOW_SECRET_KEY", "DOCFLOW_HOSTS", "DOCFLOW_CONFIG_DIR"):
         env.pop(key, None)
@@ -35,6 +36,14 @@ def _files_under(root: Path) -> dict[str, tuple[int, int]]:
                 continue
             found[str(path.relative_to(root))] = (stat.st_size, stat.st_mtime_ns)
     return found
+
+
+def test_the_child_environment_keeps_the_pythonpath_the_machine_already_had(tmp_path, monkeypatch):
+    # DOC534.249: PYTHONPATH was replaced by the backend folder, so a machine that finds its dependencies through it broke the self-test
+    monkeypatch.setenv("PYTHONPATH", "/already/there")
+    assert _env(tmp_path)["PYTHONPATH"].split(os.pathsep) == [str(ROOT / "backend"), "/already/there"]
+    monkeypatch.delenv("PYTHONPATH")
+    assert _env(tmp_path)["PYTHONPATH"] == str(ROOT / "backend")
 
 
 def test_the_snapshot_of_the_program_folder_sees_a_created_a_changed_and_a_removed_file(tmp_path):

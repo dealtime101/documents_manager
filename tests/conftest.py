@@ -12,6 +12,12 @@ os.environ["DOCFLOW_HOME"] = tempfile.mkdtemp(prefix="docflow-home-")  # forced:
 os.environ["DOCFLOW_CONFIG_DIR"] = str(Path(__file__).parent / "fixtures" / "config")  # forced too: not the one of the developer's shell
 
 
+def python_path(*folders: Path) -> str:
+    """A PYTHONPATH for a child process: the folders with the separator of the system (':' or ';'), then the one the environment
+    already had, which is kept, not replaced (DOC534.204, DOC534.249): a machine may rely on it to find its dependencies."""
+    return os.pathsep.join([*map(str, folders), *filter(None, [os.environ.get("PYTHONPATH")])])
+
+
 def top_level_block(source: str, start: str) -> str:
     """From `start` to the closing brace that stands alone at the start of a line: the whole function or table, however long, and not
     a word more (DOC534.240; DOC534.215 for the French table). A fixed number of characters either cut the code short or ran on into

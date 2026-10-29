@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pymupdf
 import pytest
+from conftest import python_path
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+SCRIPTS =Path(__file__).resolve().parents[1] / "scripts"
 
 
 def load_script(name: str):
@@ -27,12 +28,6 @@ def load_script(name: str):
             if str(getattr(sys.modules[loaded], "__file__", None) or "").startswith(str(SCRIPTS)):
                 del sys.modules[loaded]
     return module
-
-
-def python_path(*folders: Path) -> str:
-    """A PYTHONPATH for a child process: the folders with the separator of the system (':' or ';'), then the one the environment
-    already had, which is kept, not replaced (DOC534.204)."""
-    return os.pathsep.join([*map(str, folders), *filter(None, [os.environ.get("PYTHONPATH")])])
 
 
 def test_the_pythonpath_of_a_child_uses_the_separator_of_the_system_and_keeps_the_existing_one(monkeypatch):
