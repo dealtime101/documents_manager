@@ -253,6 +253,22 @@ def test_discover_says_why_files_were_unreadable_so_a_general_failure_is_not_tak
     assert "RuntimeError: tesseract is not installed" in out and "2" in out.split("RuntimeError")[0].splitlines()[-1]
 
 
+@pytest.mark.parametrize("message", [
+    "cannot open '/home/x/scan facture 3.pdf': tesseract is not installed",
+    "cannot open '/home/x/other folder/scan facture 17 b.pdf': tesseract is not installed",
+    'cannot open "C:\\Documents and Settings\\mon scan 1.pdf": tesseract is not installed'])
+def test_a_path_with_spaces_in_a_failure_is_one_cause_whatever_the_file(message):
+    # DOC534.135: the path stopped at its first space, so "scan facture 3.pdf" left "facture" in the key: one breakdown, many causes
+    discover = load_script("discover")
+    keys = {discover.cause_key(m) for m in (
+        "cannot open '/home/x/scan facture 3.pdf': tesseract is not installed",
+        "cannot open '/home/x/other folder/scan facture 17 b.pdf': tesseract is not installed",
+        'cannot open "C:\\Documents and Settings\\mon scan 1.pdf": tesseract is not installed')}
+    assert keys == {"cannot open <path>: tesseract is not installed"}, keys
+    assert discover.cause_key(message) == "cannot open <path>: tesseract is not installed"
+    assert discover.cause_key("page 7 of 12 failed") == "page # of # failed"                     # numbers still merge, as before
+
+
 def test_discover_says_how_many_causes_it_does_not_show(tmp_path, capsys):
     # DOC534.134: only the 5 most frequent causes were listed, the others vanished and the listed ones looked like the whole story
     for n in range(8):

@@ -45,7 +45,9 @@ def positive_int(text: str) -> int:
 def cause_key(cause: str) -> str:
     """A failure without what is specific to one file (its path, its numbers): the same general breakdown (OCR missing, a bad
     setting) on five files is ONE cause, not five."""
-    return re.sub(r"\d+", "#", re.sub(r"(?:[A-Za-z]:)?[\\/][^\s'\"()]+", "<path>", cause))
+    quoted = re.sub(r"'[^']*[\\/][^']*'", "<path>", cause)  # a quoted path whole, SPACES INCLUDED
+    quoted = re.sub(r'"[^"]*[\\/][^"]*"', "<path>", quoted)
+    return re.sub(r"\d+", "#", re.sub(r"(?:[A-Za-z]:)?[\\/][^\s'\"()]+", "<path>", quoted))
 
 
 def main(root: Path, limit: int = 45) -> None:
