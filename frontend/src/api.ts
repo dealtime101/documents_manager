@@ -32,6 +32,13 @@ export interface Dashboard {
   history: Operation[]
 }
 
+/** Documents that come on a rhythm (a monthly bill) and have not come, and the series the person asked not to hear about. */
+export interface Missing {
+  missing: { company: string; document_type: string; every_days: number; last_date: string; expected_date: string; days_late: number;
+    documents: number }[]
+  ignored: { company: string; document_type: string }[]
+}
+
 /** How often the engine's proposals were accepted without a correction, from the documents already filed. */
 export interface Accuracy {
   total: number
@@ -242,6 +249,9 @@ export const api = {
   setRoute: (company: string, destination: string) => call('POST', '/api/rules/route', { company, destination }),
   approveSelected: (ids: number[]) => call<Batch>('POST', '/api/items/approve-selected', { ids }, SLOW_REQUEST_TIMEOUT_MS),
   dashboard: () => call<Dashboard>('GET', '/api/dashboard'),
+  missing: () => call<Missing>('GET', '/api/missing'),
+  ignoreMissing: (company: string, document_type: string) => call<Missing>('POST', '/api/missing/ignore', { company, document_type }),
+  restoreMissing: (company: string, document_type: string) => call<Missing>('POST', '/api/missing/restore', { company, document_type }),
   history: () => call<Operation[]>('GET', '/api/history'),
   changelog: (lang: string) => call<Release[]>('GET', `/api/changelog?${new URLSearchParams({ lang })}`),
   thresholds: () => call<Thresholds>('GET', '/api/thresholds'),

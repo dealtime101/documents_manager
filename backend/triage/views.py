@@ -323,6 +323,28 @@ def rules_route(request):
 
 
 @api_view(["GET"])
+def missing(request):
+    """DOC534.10: the documents that came on a rhythm and have not come, and the series the person chose not to hear about."""
+    return Response(s.missing())
+
+
+@api_view(["POST"])
+def missing_ignore(request):
+    try:
+        return Response(s.ignore_series(request.data))
+    except s.ApiError as e:
+        return err(e)
+
+
+@api_view(["POST"])
+def missing_restore(request):
+    try:
+        return Response(s.restore_series(request.data))
+    except s.ApiError as e:
+        return err(e)
+
+
+@api_view(["GET"])
 def dashboard(request):
     return Response(s.dashboard())
 

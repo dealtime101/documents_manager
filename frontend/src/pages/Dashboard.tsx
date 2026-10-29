@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorText, type Dashboard as D, type Group } from '@/api'
 import Accuracy from '@/components/Accuracy'
+import MissingDocuments from '@/components/MissingDocuments'
 import { opLabel } from '@/ops'
 import { baseName } from '@/paths'
 import { Button } from '@/components/ui/button'
@@ -116,6 +117,7 @@ export default function Dashboard({ open }: { open: (target: Target) => void }) 
           ))}
         </CardContent>
       </Card>
+      <MissingDocuments />
       <Accuracy />
     </div>
   )

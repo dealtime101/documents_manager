@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import statistics
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
@@ -28,7 +29,7 @@ from docflow.pipeline import Proposal, apply, propose, sha256_file
 from docflow.pipeline import undo as engine_undo
 from docflow.routing import fill, route, safe_join
 
-from .models import Item, ItemText, ScanJob
+from .models import IgnoredSeries, Item, ItemText, ScanJob
 
 log = logging.getLogger("triage")
 
@@ -963,6 +964,92 @@ def in_group(group: str) -> Q:
     if group == "needs_validation":
         return ~(in_group("auto") | in_group("duplicates") | in_group("errors"))
     raise ApiError(f"unknown group: {group}")
+
+
+MISSING_MIN_DOCUMENTS = 4   # a rhythm needs three gaps: with fewer, two coincidences look like a habit
+MISSING_RECENT_GAPS = 12    # the latest gaps tell the rhythm of now (a bill that was yearly and became monthly)
+MISSING_SHORTEST_DAYS = 7   # shorter, they are documents that arrive together, not ones that are expected
+MISSING_LONGEST_DAYS = 400  # longer than a year is not a rhythm
+
+
+def _series_key(company: str, kind: str) -> tuple[str, str]:
+    return company.strip().casefold(), kind.strip().casefold()
+
+
+def _rhythm(days: list[date]) -> int | None:
+    """DOC534.10: the usual number of days between two documents (the median of the latest gaps), or None when there is no rhythm
+    to speak of: too few documents, a gap that is too short or too long, or gaps that are all over the place (fewer than half of
+    them within half a period of the usual one)."""
+    days = sorted(set(days))[-(MISSING_RECENT_GAPS + 1):]
+    gaps = [(b - a).days for a, b in zip(days, days[1:])]
+    if len(days) < MISSING_MIN_DOCUMENTS:
+        return None
+    every = round(statistics.median(gaps))
+    if not MISSING_SHORTEST_DAYS <= every <= MISSING_LONGEST_DAYS:
+        return None
+    steady = sum(abs(g - every) <= every / 2 for g in gaps)
+    return every if steady * 2 >= len(gaps) else None
+
+
+def missing(today: date | None = None) -> dict:
+    """DOC534.10: the documents that came on a rhythm and have not come. For each company and type of the filed library (dates the
+    engine read, or the person corrected) the usual gap is worked out (`_rhythm`); the series is late when the last document is older
+    than that gap plus a margin of a quarter of it (a week at least). The ones the person asked not to hear about are apart, with the
+    way back. The most late comes first."""
+    today = today or timezone.localdate()
+    library = cfg().path("library_root")
+    where_root, under_root = _in_library(library)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT i.analysis FROM triage_item i WHERE i.state = %s AND ({where_root}) AND {_DATE} GLOB {_ISO_DAY} "
+                    "ORDER BY i.id", [Item.APPROVED, *under_root])
+        found = cur.fetchall()
+    series: dict[tuple[str, str], dict] = {}
+    for (analysis,) in found:
+        a = json.loads(analysis) if isinstance(analysis, str) else (analysis or {})
+        company, kind = str(a.get("company") or "").strip(), str(a.get("document_type") or "").strip()
+        try:
+            day = date.fromisoformat(a["date"])
+        except (KeyError, TypeError, ValueError):
+            continue  # "2025-13-45" has the shape of a date and is not one
+        if company and kind:
+            entry = series.setdefault(_series_key(company, kind), {"days": []})
+            entry["days"].append(day)
+            if day >= max(entry["days"]):
+                entry["company"], entry["document_type"] = company, kind  # the way it was last written
+    ignored = set(IgnoredSeries.objects.values_list("company", "document_type"))
+    late = []
+    for key, entry in series.items():
+        every = _rhythm(entry["days"])
+        if every is None or key in ignored:
+            continue
+        last = max(entry["days"])
+        days_late = (today - last).days - every
+        if days_late > max(MISSING_SHORTEST_DAYS, every // 4):
+            late.append({"company": entry["company"], "document_type": entry["document_type"], "every_days": every,
+                         "last_date": last.isoformat(), "expected_date": (last + timedelta(days=every)).isoformat(),
+                         "days_late": days_late, "documents": len(set(entry["days"]))})
+    late.sort(key=lambda s: (-s["days_late"], s["company"].casefold(), s["document_type"].casefold()))
+    return {"missing": late, "ignored": [{"company": c, "document_type": t} for c, t in sorted(ignored)]}
+
+
+def _series_body(body: object) -> tuple[str, str]:
+    if not isinstance(body, dict):
+        raise ApiError("company and document_type are required")
+    return _series_key(_text(body.get("company"), "company"), _text(body.get("document_type"), "document_type"))
+
+
+def ignore_series(body: object) -> dict:
+    """DOC534.10: stop telling that this company's documents of this type are late."""
+    company, kind = _series_body(body)
+    IgnoredSeries.objects.get_or_create(company=company, document_type=kind)
+    return missing()
+
+
+def restore_series(body: object) -> dict:
+    """DOC534.10: tell again (the way back from `ignore_series`)."""
+    company, kind = _series_body(body)
+    IgnoredSeries.objects.filter(company=company, document_type=kind).delete()
+    return missing()
 
 
 def dashboard() -> dict:

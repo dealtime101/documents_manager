@@ -13,6 +13,9 @@ extra).
 - **Safe by design**: nothing is moved without your approval (except what you explicitly mark automatic), nothing is ever
   overwritten, duplicates go to a quarantine folder, and every move can be undone from **History**.
 - **Search** the full text of what you filed, **Dashboard** with the accuracy of the proposals, **Release notes** inside the app.
+- The **Dashboard** also lists the documents that did not come: for a company and type filed at a steady rhythm (at least four
+  documents, a gap of 7 to 400 days, say a monthly bill), it says when the next one was expected once it is more than a quarter
+  of the gap (a week at least) late. **Stop reporting** hides one that no longer matters; it can be brought back there.
 - Interface in English and French. Command line available (`docflow`).
 
 > The program's internal name — used by its command, its services and its settings folder — is `docflow`.

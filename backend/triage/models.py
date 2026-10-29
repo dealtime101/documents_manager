@@ -112,3 +112,14 @@ class ItemText(models.Model):
 
     item = models.OneToOneField(Item, primary_key=True, on_delete=models.CASCADE, related_name="fulltext")
     text = models.TextField(blank=True, default="")
+
+
+class IgnoredSeries(models.Model):
+    """DOC534.10: a company and document type (a monthly bill, say) the person does not want to be told is overdue any more. Kept in
+    lower case, so "Hydro-Quebec / Facture" and "hydro-quebec / facture" are the same series."""
+
+    company = models.TextField()
+    document_type = models.TextField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["company", "document_type"], name="ignored_series_unique")]
