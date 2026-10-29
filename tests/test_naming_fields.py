@@ -270,8 +270,10 @@ def test_build_filename_accepts_normal_currencies_and_extensions():
 def test_build_filename_rejects_bad_date_and_truncates_detail():
     with pytest.raises(ValueError):
         build_filename("07/10/2025", "A", "B")
+    from docflow.naming import MAX_NAME
     n = build_filename("2025-01-01", "A", "B", "x" * 400, Decimal(1))
-    assert len(n) <= 180 and n.endswith(" - 1.00$.pdf")
+    assert len(n) <= MAX_NAME and n.endswith(" - 1.00$.pdf")                      # (DOC534.231: the limit of the code, not a copy of it)
+    assert len(n) > MAX_NAME - 10                                                 # and the detail was cut to the limit, not to nothing
 
 
 @pytest.mark.parametrize("text,expected", [
