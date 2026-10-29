@@ -1822,6 +1822,41 @@ def test_the_search_migration_says_how_many_filed_documents_have_no_searchable_t
 
 
 @pytest.mark.django_db
+def test_the_state_migration_repairs_and_logs_the_unknown_states_before_adding_its_check(tmp_path, caplog):
+    # DOC534.176: a row whose state is not one of the four made the CHECK fail at `migrate`, and nothing said which rows or values
+    import importlib
+    import logging
+
+    from django.db import connections
+    from django.db.backends.sqlite3.base import DatabaseWrapper
+    from django.db.migrations.loader import MigrationLoader
+    migration = importlib.import_module("triage.migrations.0006_item_state_choices")
+    state_apps = MigrationLoader(None, ignore_no_migrations=True).project_state(("triage", "0005_item_source_stamp")).apps
+    wrapper = DatabaseWrapper({**connections["default"].settings_dict, "NAME": str(tmp_path / "old.db")}, alias="old")
+    connections["old"] = wrapper
+    try:
+        with wrapper.schema_editor() as editor:
+            for model in state_apps.get_app_config("triage").get_models():
+                editor.create_model(model)
+        Item = state_apps.get_model("triage", "Item")
+        with caplog.at_level(logging.WARNING, logger=migration.log.name):
+            with wrapper.schema_editor() as editor:
+                migration.repair(state_apps, editor)
+            assert not caplog.records                                                   # nothing to repair: nothing said
+            for n, state in enumerate(("pending", "Pending", "Pending", "", "approved")):
+                Item.objects.using("old").create(source_path=f"/a{n}.pdf", sha256=f"h{n}", engine_status="auto", state=state)
+            with wrapper.schema_editor() as editor:
+                migration.repair(state_apps, editor)
+        said = sorted(r.getMessage() for r in caplog.records)
+        assert len(said) == 2 and "1 row(s)" in said[0] and "''" in said[0] and "2 row(s)" in said[1] and "'Pending'" in said[1], said
+        assert sorted(Item.objects.using("old").values_list("state", flat=True)) == ["approved", "ignored", "ignored", "ignored", "pending"]
+        assert migration.Migration.operations[0].code is migration.repair               # before the constraint
+    finally:
+        wrapper.close()
+        del connections["old"]
+
+
+@pytest.mark.django_db
 def test_the_engine_status_migration_logs_the_unknown_values_it_overwrites(tmp_path, caplog):
     # DOC534.167: unknown engine_status values became 'manual' with no trace of what they were or how many rows were touched
     import importlib
