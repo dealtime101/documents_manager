@@ -292,12 +292,6 @@ def test_the_app_follows_the_hash_and_navigation_writes_it():
     assert "window.location.hash = toHash(route)" in app and "useState<Page>" not in app
 
 
-def test_a_network_failure_reaches_the_screens_as_a_translatable_api_error_not_a_raw_typeerror():
-    api = (BITS.parents[1] / "api.ts").read_text(encoding="utf-8")
-    assert "throw new ApiError('Network error: the server cannot be reached.')" in api   # fetch's "Failed to fetch" never escapes
-    assert "'Network error: the server cannot be reached.': 'Erreur réseau" in (BITS.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
-
-
 def test_a_disabled_input_can_show_its_not_allowed_cursor():
     source = (UI / "input.tsx").read_text(encoding="utf-8")
     assert "disabled:cursor-not-allowed" in source
@@ -743,6 +737,10 @@ def test_a_network_failure_reaches_the_screens_as_a_translated_api_error_never_a
     assert "r = await fetch(" in body and "catch (e) {" in body                                # the rejection is caught here...
     assert "throw new ApiError('Network error: the server cannot be reached.')" in body        # ...and becomes an ApiError
     assert body.index("r = await fetch(") < body.index("catch (e) {") < body.index("throw new ApiError('Network error")
+    # DOC534.269: and the message has its French text (the one test of this, merged from a twin that only checked the same sentence)
+    from conftest import fr_messages_table
+    french = fr_messages_table((UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8"))
+    assert "'Network error: the server cannot be reached.': 'Erreur réseau" in french
 
 
 def test_saving_the_settings_goes_through_request_so_a_lost_network_is_a_translated_api_error():
