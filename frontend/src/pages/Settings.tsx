@@ -66,6 +66,7 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
     if (busy) return
     setBusy(true)
     setErrors({})
+    setNote(null)  // the "saved" of an earlier save must not stay beside the errors (or the failure) of this one
     try {
       await api.saveSettings({ inbox: v.inbox.trim(), library_root: v.library_root.trim(), quarantine: v.quarantine.trim(),
         extra_inboxes: v.extra.split('\n').map((x) => x.trim()).filter(Boolean) })

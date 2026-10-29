@@ -81,6 +81,14 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_a_new_save_of_the_settings_clears_the_saved_message_of_the_previous_one():
+    # DOC534.122: after a first good save, a refused one showed its field errors beside the green "saved"
+    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+    save = settings[settings.index("const save = async"):settings.index("return (\n    <Card>")]
+    assert save.index("setNote(null)") < save.index("await api.saveSettings(") < save.index("setNote({ ok: true")      # cleared first, set on success only
+    assert save.index("setErrors({})") < save.index("await api.saveSettings(")
+
+
 def test_the_fixed_extension_of_a_file_name_field_is_read_by_screen_readers_with_the_field():
     # DOC534.121: the extension was aria-hidden: nobody using a screen reader learned that it is added by the program
     bits = BITS.read_text(encoding="utf-8")
