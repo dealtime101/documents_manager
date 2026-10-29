@@ -573,6 +573,15 @@ def test_a_network_failure_reaches_the_screens_as_a_translated_api_error_never_a
     assert body.index("r = await fetch(") < body.index("catch {") < body.index("throw new ApiError('Network error")
 
 
+def test_saving_the_settings_goes_through_request_so_a_lost_network_is_a_translated_api_error():
+    # DOC534.92: saveSettings called fetch itself: a server that could not be reached gave "Unexpected error." (a raw TypeError)
+    api = (UI.parents[1] / "api.ts").read_text()
+    save = api[api.index("saveSettings: async"):api.index("folders: (path")]
+    assert "fetch(" not in save and "await call<FolderSettings>('POST', '/api/settings', values)" in save
+    assert "throw new ApiError(errorMessage(data, r.status), r.status, data)" in api        # the refusal's body reaches the caller
+    assert "e.status === 400" in save and "throw new SettingsRefused(errors)" in save and save.rstrip().endswith("},")
+
+
 def test_the_dashboard_comment_says_the_today_tile_opens_the_unfiltered_history():
     # DOC474.79: "each tile opens exactly what it counts" was not true of the "Filed today" tile
     page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text()

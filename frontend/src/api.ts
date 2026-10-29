@@ -133,9 +133,11 @@ export interface Release {
 
 export class ApiError extends Error {
   status?: number  // the HTTP status, when the server answered at all
-  constructor(message: string, status?: number) {
+  body?: unknown   // what the server answered (the parsed JSON), for a caller that reads more than the message
+  constructor(message: string, status?: number, body?: unknown) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -187,7 +189,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   }
   // `undefined` when the body is not JSON (HTML from a proxy or captive portal, truncated answer, empty body)
   const data = await r.json().catch(() => undefined)
-  if (!r.ok) throw new ApiError(errorMessage(data, r.status), r.status)
+  if (!r.ok) throw new ApiError(errorMessage(data, r.status), r.status, data)
   if (data === undefined) throw new ApiError(`unexpected response from the server: HTTP ${r.status}`)  // every endpoint answers JSON
   const total = r.headers.get('X-Total-Count')
   // a whole number, or null: '' is 0 and 'abc' is NaN for Number(), and `?? data.length` replaces neither
@@ -224,12 +226,13 @@ export const api = {
   thresholds: () => call<Thresholds>('GET', '/api/thresholds'),
   settings: () => call<FolderSettings>('GET', '/api/settings'),
   saveSettings: async (values: Omit<FolderSettings, 'configured'>) => {
-    const r = await fetch('/api/settings', { method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(values) })
-    const data = await r.json().catch(() => undefined)
-    if (r.status === 400 && data?.errors) throw new SettingsRefused(data.errors as Record<string, string>)
-    if (!r.ok) throw new ApiError(errorMessage(data, r.status), r.status)
-    return data as FolderSettings
+    try {
+      return await call<FolderSettings>('POST', '/api/settings', values)  // the same request(): a lost network and a non-JSON answer are handled there
+    } catch (e) {
+      const errors = e instanceof ApiError && e.status === 400 ? (e.body as { errors?: Record<string, string> } | undefined)?.errors : undefined
+      if (errors) throw new SettingsRefused(errors)  // a refused save: the setting and what is wrong with it
+      throw e
+    }
   },
   folders: (path?: string) => call<FolderListing>('GET', `/api/folders${path ? `?${new URLSearchParams({ path })}` : ''}`),
   library: (path = '') => call<LibraryListing>('GET', `/api/library?${new URLSearchParams({ path })}`),
