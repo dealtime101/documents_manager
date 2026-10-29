@@ -22,6 +22,31 @@ def french_values() -> list[tuple[str, str]]:
     return [(a or b, c or d) for a, b, c, d in pairs]
 
 
+KEY_AT_TABLE_LEVEL = re.compile(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", re.MULTILINE)
+
+
+def keys_the_extraction_missed(block: str, extracted: list[tuple[str, str]]) -> list[str]:
+    """DOC534.237: the keys written in the table whose text was not read as a one-line quoted string (a value in backticks, over
+    several lines, or a trailing comment...). Each is a translation the register checks would never see."""
+    wanted = [a or b for a, b in KEY_AT_TABLE_LEVEL.findall(block)]
+    got = {k for k, _ in extracted}
+    return [k.replace("\\'", "'") for k in wanted if k.replace("\\'", "'") not in got]
+
+
+def table_block(source: str, start: str, end: str) -> str:
+    return source[source.index(start):source.index(end)]
+
+
+def test_every_key_of_the_translation_tables_has_its_text_read():
+    source = I18N.read_text(encoding="utf-8")
+    assert keys_the_extraction_missed(table_block(source, "const fr", "const fill"), french_values()) == []
+    assert keys_the_extraction_missed(table_block(source, "const en = {", "export type Key"), english_values()) == []
+    # and the check itself sees a value that the extraction cannot read
+    sample = "  'a.b': 'one line',\n  'c.d': `in backticks`,\n  'e.f':\n    'next line',\n  'g.h': 'x' + 'y',\n"
+    pairs = [("a.b", "one line")]
+    assert keys_the_extraction_missed(sample, pairs) == ["c.d", "e.f", "g.h"]
+
+
 def test_the_extraction_really_reads_the_french_strings():
     values = dict(french_values())
     assert len(values) > 80 and values["queue.scan"] == "Analyser la boîte de réception"         # a silent miss would make the next test vacuous
