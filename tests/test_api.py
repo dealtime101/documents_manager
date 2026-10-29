@@ -2485,5 +2485,9 @@ def test_a_library_pdf_is_read_and_proposed_then_refiled_under_its_new_name_and_
     assert (lib / done["path"]).is_file() and not (lib / "scan001.pdf").exists()
     assert post(api, "apply", path=done["path"], fields=typed["fields"], rel_dir="../out").status_code == 400
     assert post(api, "apply", path=done["path"], fields=typed["fields"], rel_dir="_Trash").status_code == 400
-    assert post(api, "plan", path="top.pdf", fields={"company": "X", "document_type": "Y", "date": "nope"}).status_code == 400
+    # DOC534.192: a PDF that can be read (top.pdf holds a few bytes only), and the refusal must name the date, not any other reason
+    pdf(lib / "readable.pdf", HYDRO)
+    assert post(api, "plan", path="readable.pdf", fields={"company": "X", "document_type": "Y", "date": "2025/10/08"}).status_code == 200
+    refused = post(api, "plan", path="readable.pdf", fields={"company": "X", "document_type": "Y", "date": "nope"})
+    assert refused.status_code == 400 and "date" in refused.json()["detail"].lower(), refused.content
     assert post(api, "plan", path="Bills/notes.txt").status_code == 400                        # only PDFs are classified
