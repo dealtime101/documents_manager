@@ -103,7 +103,10 @@ def validate(values: dict) -> dict[str, str]:
 
 def save(values: dict) -> dict:
     """Validate, keep only the folder settings and write them. Nothing is written when something is wrong."""
-    kept = {k: v for k, v in values.items() if k in FOLDER_KEYS and v not in ("", None)}  # an empty field means "the default"
+    # What was saved before stays, whatever the request leaves out; a key sent EMPTY means "the default" and is removed. The merged
+    # whole is what is validated, so the cross-checks (inbox / library / quarantine) also see the values this request does not send.
+    merged = {**load(), **{k: v for k, v in values.items() if k in FOLDER_KEYS}}
+    kept = {k: v for k, v in merged.items() if v not in ("", None)}
     errors = validate(kept)
     if errors:
         raise InvalidSettings(errors)

@@ -29,6 +29,23 @@ def test_the_user_folder_is_docflow_home_when_set_and_otherwise_a_per_user_place
     assert usersettings.user_dir() == tmp_path / "xdg" / "docflow"
 
 
+def test_a_partial_save_keeps_the_other_saved_folders_and_is_checked_against_them(home, tmp_path):
+    # DOC534.40: save() rewrote the file with only the keys received and validated only those: the others were lost and the
+    # inbox / library / quarantine cross-checks were bypassed by sending one value at a time
+    f = _folders(tmp_path)
+    usersettings.save({"inbox": str(f["inbox"]), "library_root": str(f["library"]), "quarantine": str(f["quarantine"])})
+    after = usersettings.save({"extra_inboxes": [str(f["extra"])]})
+    assert {k: after[k] for k in ("inbox", "library_root", "quarantine")} == {
+        "inbox": str(f["inbox"]), "library_root": str(f["library"]), "quarantine": str(f["quarantine"])}     # nothing was lost
+    assert usersettings.load()["extra_inboxes"] == [str(f["extra"])]
+    with pytest.raises(usersettings.InvalidSettings) as e:
+        usersettings.save({"library_root": str(f["inbox"])})                                                   # the SAVED inbox is checked too
+    assert "different" in e.value.errors["library_root"]
+    assert usersettings.load()["library_root"] == str(f["library"])                                           # and nothing was written
+    cleared = usersettings.save({"quarantine": ""})                                                            # empty = back to the default
+    assert "quarantine" not in cleared and cleared["inbox"] == str(f["inbox"])
+
+
 def test_nothing_saved_means_no_override(home):
     assert usersettings.load() == {}
 
