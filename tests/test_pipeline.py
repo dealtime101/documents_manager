@@ -271,6 +271,7 @@ def test_the_same_operation_cannot_be_marked_undone_twice(env):
     db.mark_undone(db.op(op))
     with pytest.raises(ValueError, match="already undone"):
         db.mark_undone(db.op(op))
+    assert not db.c.in_transaction                                  # DOC534.31: the refused UPDATE must not keep the write lock
 
 
 def test_name_collision_never_overwrites(env):

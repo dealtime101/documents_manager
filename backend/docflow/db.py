@@ -139,6 +139,7 @@ class DB:
     def mark_undone(self, op: sqlite3.Row) -> None:
         cur = self.c.execute("UPDATE operations SET undone=1 WHERE id=? AND undone=0", (op["id"],))
         if cur.rowcount == 0:
+            self.c.rollback()  # the UPDATE opened a transaction and holds the write lock even though it changed nothing
             raise ValueError(f"operation {op['id']} is already undone")
         # the document stops being "filed" only once NONE of its operations is still in force
         self.c.execute(
