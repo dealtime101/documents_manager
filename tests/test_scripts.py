@@ -1593,7 +1593,9 @@ def test_llm_eval_refuses_a_sample_size_that_is_not_a_positive_whole_number_with
         with pytest.raises(ValueError, match="at least 1"):
             llm_eval.main(tmp_path, "fake-model", int(bad))
     env = {**os.environ, "PYTHONPATH": python_path(SCRIPTS.parent / "backend", SCRIPTS)}
-    run = subprocess.run([sys.executable, str(SCRIPTS / "llm_eval.py"), str(tmp_path), "fake-model", bad], capture_output=True, text=True, env=env)
+    # DOC534.206: a regression of the check would send the script to look for "fake-model": it must fail the test in a minute, not wait
+    run = subprocess.run([sys.executable, str(SCRIPTS / "llm_eval.py"), str(tmp_path), "fake-model", bad], capture_output=True, text=True, env=env,
+                         timeout=60)
     # DOC534.205: the whole sentence, so a stray capital N (in a usage line, a NameError...) cannot satisfy it
     assert run.returncode == 2 and "Traceback" not in run.stderr, run.stderr
     assert "usage error: N must be a whole number of at least 1" in run.stderr, run.stderr
