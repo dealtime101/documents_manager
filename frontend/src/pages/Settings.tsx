@@ -24,7 +24,8 @@ function Picker({ start, onPick, onClose }: { start: string; onPick: (path: stri
         <>
           <p className="mb-1 break-all font-mono text-xs">{list.path}</p>
           <div className="mb-1 flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setTarget(list.parent)}>{t('settings.up')}</Button>
+            <Button type="button" variant="outline" size="sm" disabled={!list.parent || list.parent === list.path}
+              onClick={() => setTarget(list.parent)}>{t('settings.up')}</Button>
             <Button type="button" size="sm" onClick={() => onPick(list.path)}>{t('settings.useThis')}</Button>
             <Button type="button" variant="outline" size="sm" onClick={onClose}>{t('settings.close')}</Button>
           </div>

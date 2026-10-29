@@ -81,6 +81,15 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_the_folder_picker_cannot_go_up_from_the_root():
+    # DOC534.124: at the root the parent is the root itself (or empty, which reloads the default folder): "Up" did nothing useful
+    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+    assert "disabled={!list.parent || list.parent === list.path}" in settings and "onClick={() => setTarget(list.parent)}>{t('settings.up')}" in settings
+    # what the server answers at the roots: the parent of a root is the root (POSIX) and the drive root keeps its backslash (Windows)
+    from pathlib import Path, PureWindowsPath
+    assert str(Path("/").parent) == "/" and str(PureWindowsPath("C:\\").parent) == "C:\\"
+
+
 def test_a_new_save_of_the_settings_clears_the_saved_message_of_the_previous_one():
     # DOC534.122: after a first good save, a refused one showed its field errors beside the green "saved"
     settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
