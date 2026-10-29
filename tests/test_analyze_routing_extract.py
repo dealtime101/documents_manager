@@ -901,7 +901,8 @@ def test_a_tesseract_timeout_or_failure_leaves_a_trace_in_the_log(monkeypatch, c
         raise subprocess.TimeoutExpired("tesseract", 7)
     monkeypatch.setattr(extract.subprocess, "run", timeout)
     assert extract.ocr_image(b"x", "tesseract", "fra+eng", 7) is None
-    assert "timed out" in caplog.text and "7" in caplog.text
+    said = [r.getMessage() for r in caplog.records]                       # DOC534.221: the messages, not the text with file and line numbers
+    assert len(said) == 1 and "timed out after 7 s on a page (languages fra+eng)" in said[0], said
     caplog.clear()
     monkeypatch.setattr(extract.subprocess, "run", lambda cmd, *a, **k: subprocess.CompletedProcess(
         cmd, 1, stdout="", stderr="Error opening data file /usr/share/tessdata/fra.traineddata\nFailed loading language 'fra'"))
