@@ -1,3 +1,4 @@
+import sys
 from decimal import Decimal
 from pathlib import Path
 
@@ -997,7 +998,38 @@ def test_the_extraction_fingerprint_is_unchanged_but_no_longer_reads_the_whole_p
     real_read_bytes = Path.read_bytes
     monkeypatch.setattr(Path, "read_bytes", lambda self: (_ for _ in ()).throw(AssertionError("read whole")) if self == pdf
                         else real_read_bytes(self))
+    monkeypatch.setattr(extract, "find_tesseract", lambda name: "")                    # the formula without a Tesseract part
     assert extract.extraction_fingerprint(pdf, ocr) == old.hexdigest()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the fake Tesseract is a shell script")
+def test_the_extraction_fingerprint_changes_with_the_tesseract_version_and_its_language_data(tmp_path, monkeypatch):
+    # DOC534.83: a new Tesseract or new tessdata changes the OCR text, but a text saved earlier stayed "trusted"
+    import stat
+    data = tmp_path / "tessdata"
+    data.mkdir()
+    (data / "eng.traineddata").write_bytes(b"e" * 10)
+    (data / "fra.traineddata").write_bytes(b"f" * 20)
+    exe = tmp_path / "tesseract"
+
+    def install(version: str) -> None:
+        exe.write_text(f'#!/bin/sh\ncase "$1" in\n --version) echo "tesseract {version}";;\n'
+                       f' --list-langs) echo "List of available languages in \\"{data}/\\" (2):"; echo eng; echo fra;;\nesac\n')
+        exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
+        monkeypatch.setattr(extract, "_TESSERACT_IDENTITY", {})                         # a new process would ask again
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4\nx")
+    ocr = {"languages": "fra+eng", "tesseract": str(exe)}
+    install("5.3.0")
+    first = extract.extraction_fingerprint(pdf, ocr)
+    assert extract.extraction_fingerprint(pdf, ocr) == first                            # stable while nothing changes
+    install("5.4.0")
+    assert extract.extraction_fingerprint(pdf, ocr) != first                            # the version
+    install("5.3.0")
+    assert extract.extraction_fingerprint(pdf, ocr) == first
+    (data / "fra.traineddata").write_bytes(b"f" * 21)                                   # the language data
+    monkeypatch.setattr(extract, "_TESSERACT_IDENTITY", {})
+    assert extract.extraction_fingerprint(pdf, ocr) != first
 
 
 @pytest.mark.parametrize("value,expected", [

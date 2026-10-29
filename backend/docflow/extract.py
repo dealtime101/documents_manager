@@ -145,9 +145,39 @@ def detect_rotation(png: bytes, tesseract: str, timeout: float = OSD_TIMEOUT) ->
     return int(rot.group(1)) % 360
 
 
+_TESSERACT_IDENTITY: dict[str, str] = {}  # per program, for the life of the process: asking Tesseract costs two runs
+
+
+def tesseract_identity(exe: str) -> str:
+    """What decides the text Tesseract reads: its version and its language data. "" when there is no Tesseract. The data are
+    named by file, size and date (not read: tessdata is tens of megabytes), in the folder `--list-langs` says it uses."""
+    if not exe:
+        return ""
+    if exe not in _TESSERACT_IDENTITY:
+        said = []
+        for args in (["--version"], ["--list-langs"]):
+            try:
+                run = subprocess.run([exe, *args], capture_output=True, text=True, timeout=30, env=_env_for(exe), check=False,
+                                     creationflags=NO_WINDOW)
+                said.append(run.stdout + run.stderr)
+            except (OSError, subprocess.SubprocessError):
+                said.append("unavailable")
+        files = []
+        folder = re.search(r'languages in "([^"]+)"', said[1])
+        if folder:
+            for f in sorted(Path(folder.group(1)).glob("*.traineddata")):
+                try:
+                    st = f.stat()
+                    files.append(f"{f.name}:{st.st_size}:{st.st_mtime_ns}")
+                except OSError:
+                    files.append(f"{f.name}:unreadable")
+        _TESSERACT_IDENTITY[exe] = "\n".join([*said, *files])
+    return _TESSERACT_IDENTITY[exe]
+
+
 def extraction_fingerprint(pdf: Path, ocr: dict) -> str:
-    """Identity of a saved extraction: the PDF bytes, the OCR settings and this module's code. A text saved by a test
-    bench is only trustworthy while all three are unchanged."""
+    """Identity of a saved extraction: the PDF bytes, the OCR settings, this module's code and the Tesseract (version and language
+    data) that reads the scans. A text saved by a test bench is only trustworthy while all four are unchanged."""
     h = hashlib.sha256()
     pdf_hash = hashlib.sha256()
     with open(pdf, "rb") as f:  # by blocks: the whole PDF is never held in memory (same digest as hashing it in one piece)
@@ -156,6 +186,9 @@ def extraction_fingerprint(pdf: Path, ocr: dict) -> str:
     h.update(pdf_hash.digest())
     for part in (json.dumps(ocr, sort_keys=True).encode(), Path(__file__).read_bytes()):
         h.update(hashlib.sha256(part).digest())
+    identity = tesseract_identity(find_tesseract(ocr.get("tesseract", "tesseract")))
+    if identity:  # no Tesseract: the same value as before this part existed
+        h.update(hashlib.sha256(identity.encode()).digest())
     return h.hexdigest()
 
 
