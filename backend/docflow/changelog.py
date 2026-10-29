@@ -31,6 +31,7 @@ def parse(text: str) -> list[dict]:
         elif line.startswith("## "):  # another kind of heading: not a release, so it ends the previous one
             if line.startswith("## ["):  # it looks like a release heading and was not recognised: never drop it in silence
                 log.warning("CHANGELOG heading not recognised as a release, its notes are left out: %s", line.strip()[:80])
+            release["intro"] = release["intro"] or " ".join(intro)  # a release with an intro and no section keeps it
             release, section = None, None
         elif section is not None:
             if m := ITEM.match(line):

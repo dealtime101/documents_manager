@@ -93,6 +93,15 @@ def test_release_headings_with_a_suffix_trailing_spaces_or_yanked_are_read_and_a
     assert any("[Unreleased]" in r.getMessage() for r in caplog.records)             # reported, not dropped in silence
 
 
+def test_the_intro_of_a_release_without_section_survives_a_heading_that_is_not_a_release():
+    # DOC534.162: "## [Unreleased]" (or an appendix) right after an intro-only release dropped that intro: the version showed empty
+    from docflow.changelog import parse
+    got = parse("## [1.0.0] - 2026-12-01\nOnly an intro,\non two lines.\n## [Unreleased]\n### Added\n- Later.\n"
+                "## [0.9.0] - 2026-11-20\nAnother.\n## Appendix\nnot a release\n")
+    assert got == [{"version": "1.0.0", "date": "2026-12-01", "intro": "Only an intro, on two lines.", "sections": []},
+                   {"version": "0.9.0", "date": "2026-11-20", "intro": "Another.", "sections": []}]
+
+
 def test_the_real_changelog_is_read_whole():
     from docflow.changelog import parse
     got = parse((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
