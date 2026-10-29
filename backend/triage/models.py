@@ -68,7 +68,8 @@ class Item(models.Model):
     engine_status = models.CharField(max_length=20, choices=EngineStatus.choices)
     # a closed list for forms and the admin (choices) AND for the database itself (the CHECK below): a typo such as
     # "aproved" is refused instead of silently making the item vanish from every filter
-    state = models.CharField(max_length=10, choices=State.choices, default=State.PENDING, db_index=True)
+    # no db_index: item_state_conf_idx (Meta) starts with `state` and already serves every filter on it
+    state = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
     analysis = models.JSONField(null=True)                      # Analysis (fields + per-field scores)
     original = models.JSONField(null=True)                      # what the engine had detected (used for learning)
     final_name = models.TextField(blank=True, default="")

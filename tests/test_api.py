@@ -1748,6 +1748,19 @@ def test_the_database_constraints_are_built_from_the_choices_not_copied_from_the
 
 
 @pytest.mark.django_db
+def test_the_items_have_no_second_index_on_state_alone_the_composite_one_serves_it():
+    # DOC534.129: item_state_conf_idx starts with `state`; the single-column index only slowed every insert and state change
+    from django.db import connection
+    with connection.cursor() as cursor:
+        found = connection.introspection.get_constraints(cursor, "triage_item")
+    indexes = {name: c["columns"] for name, c in found.items() if c["index"] and not c["unique"]}
+    assert ["state"] not in indexes.values()                                            # none on state alone
+    assert indexes["item_state_conf_idx"][:1] == ["state"]                              # the composite one, which starts with it, stays
+    assert not any("state" in c["columns"] and c["columns"] != indexes["item_state_conf_idx"] for n, c in found.items()
+                   if c["index"] and not c["unique"] and n != "item_state_conf_idx")
+
+
+@pytest.mark.django_db
 def test_the_unique_constraints_migration_first_cleans_up_what_the_old_database_may_hold(tmp_path):
     # DOC534.50: a database written before the constraints (two scans left 'running', a file queued twice) made `migrate` fail
     import importlib
