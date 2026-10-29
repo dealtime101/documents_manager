@@ -1822,6 +1822,41 @@ def test_the_search_migration_says_how_many_filed_documents_have_no_searchable_t
 
 
 @pytest.mark.django_db
+def test_the_engine_status_migration_logs_the_unknown_values_it_overwrites(tmp_path, caplog):
+    # DOC534.167: unknown engine_status values became 'manual' with no trace of what they were or how many rows were touched
+    import importlib
+    import logging
+
+    from django.db import connections
+    from django.db.backends.sqlite3.base import DatabaseWrapper
+    from django.db.migrations.loader import MigrationLoader
+    migration = importlib.import_module("triage.migrations.0010_item_engine_status_choices")
+    state_apps = MigrationLoader(None, ignore_no_migrations=True).project_state(("triage", "0009_scanjob_counters_bounded")).apps
+    wrapper = DatabaseWrapper({**connections["default"].settings_dict, "NAME": str(tmp_path / "old.db")}, alias="old")
+    connections["old"] = wrapper
+    try:
+        with wrapper.schema_editor() as editor:
+            for model in state_apps.get_app_config("triage").get_models():
+                editor.create_model(model)
+        Item = state_apps.get_model("triage", "Item")
+        with caplog.at_level(logging.WARNING, logger=migration.log.name):
+            with wrapper.schema_editor() as editor:
+                migration.repair(state_apps, editor)                                # nothing to repair: nothing said
+            assert not caplog.records
+            for n, status in enumerate(("auto", "confrim", "confrim", "weird", "error")):
+                Item.objects.using("old").create(source_path=f"/a{n}.pdf", sha256=f"h{n}", engine_status=status)
+            with wrapper.schema_editor() as editor:
+                migration.repair(state_apps, editor)
+        said = sorted(r.getMessage() for r in caplog.records)
+        assert len(said) == 2 and "1 row(s)" in said[0] and "'weird'" in said[0] and "2 row(s)" in said[1] and "'confrim'" in said[1], said
+        assert sorted(Item.objects.using("old").values_list("engine_status", flat=True)) == ["auto", "error", "manual", "manual", "manual"]
+        assert migration.Migration.operations[0].code is migration.repair             # it runs first, before the constraint
+    finally:
+        wrapper.close()
+        del connections["old"]
+
+
+@pytest.mark.django_db
 def test_the_unique_constraints_migration_first_cleans_up_what_the_old_database_may_hold(tmp_path):
     # DOC534.50: a database written before the constraints (two scans left 'running', a file queued twice) made `migrate` fail
     import importlib
