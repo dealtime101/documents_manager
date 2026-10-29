@@ -330,6 +330,15 @@ def test_the_library_explorer_page_asks_before_deleting_and_only_calls_its_own_e
     assert '<TabsTrigger value="library">' in (src / "App.tsx").read_text()
 
 
+def test_a_proposal_read_for_one_library_file_never_fills_the_form_of_another():
+    # DOC534.19: the list stays clickable while a document is read; the late answer for file A must not fill the form of file B
+    page = (UI.parents[1] / "pages" / "Library.tsx").read_text()
+    assert "const shown = useRef(file)" in page and "shown.current = file;" in page       # what the form is about now
+    assert "const asked = file" in page and "api.libraryPlan(asked)" in page              # what was asked, fixed at the click
+    assert page.index("if (shown.current !== asked) return") > page.index("api.libraryPlan(asked)")   # checked after the wait, before filling
+    assert "if (shown.current === asked) setProblem(errorText(e))" in page               # and an error for A is not shown on B
+
+
 def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html():
     got = _node_route("({ search: m.parseHash('#search'), write: m.toHash({ page: 'search', group: null }) })")
     assert got["search"] == {"page": "search", "group": None} and got["write"] == "#search"

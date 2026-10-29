@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, errorText, type LibraryFields, type LibraryHit, type LibraryListing, type LibraryPlan } from '@/api'
 import { Field, NameInput, Notice } from '@/components/Bits'
 import { Button } from '@/components/ui/button'
@@ -81,7 +81,8 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
   const [dirs, setDirs] = useState<string[]>([])
 
   useEffect(() => { api.vocabulary().then(setVocab).catch(() => {}); api.destinations().then(setDirs).catch(() => {}) }, [])
-  useEffect(() => { setForm(EMPTY); setRelDir(''); setFinalName(''); setPlan(null); setProblem(''); setTouched(false) }, [file])
+  const shown = useRef(file)  // the file the form is about NOW: a proposal read for another one arrives too late and is dropped
+  useEffect(() => { shown.current = file; setForm(EMPTY); setRelDir(''); setFinalName(''); setPlan(null); setProblem(''); setTouched(false) }, [file])
 
   // the name and folder they give, recomputed shortly after each change
   useEffect(() => {
@@ -97,11 +98,13 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
 
   const set = (k: keyof LibraryFields) => (e: { target: { value: string } }) => { setForm({ ...form, [k]: e.target.value }); setTouched(true) }
   const suggest = async () => {
+    const asked = file
     setBusy(true)
     try {
-      const p = await api.libraryPlan(file)
+      const p = await api.libraryPlan(asked)
+      if (shown.current !== asked) return  // another file was selected while this one was read: its form is not this proposal's
       setForm(p.fields); setRelDir(''); setFinalName(''); setPlan(p); setProblem(''); setTouched(true)
-    } catch (e) { setProblem(errorText(e)) } finally { setBusy(false) }
+    } catch (e) { if (shown.current === asked) setProblem(errorText(e)) } finally { setBusy(false) }
   }
   const apply = async () => {
     setBusy(true)
