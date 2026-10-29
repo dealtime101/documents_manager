@@ -1294,7 +1294,9 @@ def test_the_operations_of_a_document_are_found_through_an_index(tmp_path):
     raw.executescript("\n".join(line for line in SCHEMA.splitlines() if "ix_op_doc" not in line and "ix_doc_logical" not in line))
     assert not raw.execute("SELECT name FROM sqlite_master WHERE name IN ('ix_op_doc', 'ix_doc_logical')").fetchall()
     raw.close()
-    assert DB(old).c.execute("SELECT name FROM sqlite_master WHERE name='ix_op_doc'").fetchone()   # an existing database gets it too
+    opened = DB(old)                                                                    # an existing database gets both indexes too
+    got = {r[0] for r in opened.c.execute("SELECT name FROM sqlite_master WHERE name IN ('ix_op_doc', 'ix_doc_logical')")}
+    assert got == {"ix_op_doc", "ix_doc_logical"}, got                                  # DOC534.212: the second one was never looked for
 
 
 def test_the_logical_duplicate_lookup_uses_an_index(tmp_path):
