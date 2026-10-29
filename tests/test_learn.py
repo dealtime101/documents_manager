@@ -228,6 +228,9 @@ def test_a_hand_written_rule_added_later_wins_over_an_old_learned_one(tmp_path):
     assert "Appris/Voisin" in (d / "routing_learned.yaml").read_text(encoding="utf-8")           # and the learned file is left alone
 
 
+MEET_SECONDS = 0.3  # without a lock the second worker is in _load within milliseconds; with one, this is all the test costs
+
+
 def test_simultaneous_learning_does_not_lose_either_correction(tmp_path, monkeypatch):
     import threading
 
@@ -240,9 +243,10 @@ def test_simultaneous_learning_does_not_lose_either_correction(tmp_path, monkeyp
     def load_then_meet(path, default):
         data = real_load(path, default)
         try:
-            meet.wait(timeout=1.5)       # both workers hold the SAME initial state before either one saves
+            meet.wait(timeout=MEET_SECONDS)  # both workers hold the SAME initial state before either one saves
         except threading.BrokenBarrierError:
-            pass                          # (with a lock the second one cannot get here until the first has saved)
+            pass                          # (with a lock the second one cannot get here until the first has saved: the wait times out
+            #                                once, DOC534.233, and the barrier then stays broken, so the second worker does not wait)
         return data
 
     monkeypatch.setattr(learn, "_load", load_then_meet)
