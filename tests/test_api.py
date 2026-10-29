@@ -2264,6 +2264,26 @@ def test_the_settings_screen_reads_and_saves_the_folders_and_refuses_bad_ones_wi
     assert APIClient().post("/api/settings", {}, format="json").status_code in (401, 403)       # signed-in users only
 
 
+def test_the_settings_screen_reads_and_saves_the_choice_to_analyse_arriving_files_by_itself(api, sb, tmp_path, monkeypatch):
+    # DOC534.5: off by default; a boolean only; saving it alone leaves the folders as they were
+    from docflow import usersettings
+    monkeypatch.setenv("DOCFLOW_HOME", str(tmp_path / "home"))
+    assert api.get("/api/settings").json()["watch_inbox"] is False
+    inbox, library = tmp_path / "in", tmp_path / "lib"
+    inbox.mkdir()
+    library.mkdir()
+    api.post("/api/settings", {"inbox": str(inbox), "library_root": str(library)}, format="json")
+    assert api.post("/api/settings", {"watch_inbox": True}, format="json").status_code == 200
+    got = api.get("/api/settings").json()
+    assert got["watch_inbox"] is True
+    assert usersettings.load()["inbox"] == str(inbox) and usersettings.load()["library_root"] == str(library)   # the folders are untouched
+    refused = api.post("/api/settings", {"watch_inbox": "yes"}, format="json")
+    assert refused.status_code == 400 and refused.json()["errors"] == {"watch_inbox": "must be true or false"}
+    assert usersettings.load()["watch_inbox"] is True                                          # and nothing was written
+    assert api.post("/api/settings", {"watch_inbox": False}, format="json").status_code == 200
+    assert api.get("/api/settings").json()["watch_inbox"] is False
+
+
 def test_the_folder_browser_lists_sub_folders_only_and_only_for_a_signed_in_user(api, sb, tmp_path):
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()

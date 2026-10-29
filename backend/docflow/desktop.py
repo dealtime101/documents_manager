@@ -153,6 +153,32 @@ def show_error(message: str) -> None:
         ctypes.windll.user32.MessageBoxW(None, message, "Documents Manager", 0x10)  # MB_ICONERROR
 
 
+def start_inbox_watch(stop: threading.Event | None = None, interval: float | None = None) -> threading.Thread:
+    """DOC534.5: when the user has turned it on in Settings, a PDF that arrives in the inbox (or in an extra source) is analysed by
+    itself: a normal scan job is started, so it shows up in "To file" already proposed. Nothing is moved: approving stays a decision.
+    The setting is read at every poll, so the switch applies at once, without restarting the program."""
+    from django.db import connections
+
+    from docflow import usersettings
+    from docflow.watch import POLL_SECONDS, watch
+    from triage import services
+
+    def files() -> list[Path]:
+        return services.source_files() if usersettings.load().get("watch_inbox") is True else []
+
+    def arrived(paths: list[Path]) -> None:
+        print(time.strftime("%Y-%m-%d %H:%M:%S"), f"{len(paths)} file(s) arrived: scan started", flush=True)
+        try:
+            services.scan_start()  # one at a time: if a scan is running, it simply is that one
+        finally:
+            connections.close_all()  # this thread's own connection
+
+    thread = threading.Thread(target=watch, args=(files, arrived, POLL_SECONDS if interval is None else interval), kwargs={"stop": stop},
+                              daemon=True, name="inbox-watch")
+    thread.start()
+    return thread
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     log_to_file()
@@ -176,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
         result = selftest(port, token)
         print(json.dumps(result))
         return 0 if result["signed_in"] and result["interface"] and result["database_in_user_folder"] else 1  # a script can tell
+    start_inbox_watch()
     url = f"http://127.0.0.1:{port}/?t={token}"
     try:
         import webview

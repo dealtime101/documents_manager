@@ -16,6 +16,7 @@ from .config import Config, load_config
 from .db import DB
 from .naming import FORBIDDEN
 from .pipeline import Proposal, apply, propose, undo
+from .watch import POLL_SECONDS, watch
 
 log = logging.getLogger(__name__)
 
@@ -215,7 +216,33 @@ def build_parser() -> argparse.ArgumentParser:
     u = sub.add_parser("undo", help="put a filed document back where it came from", description="Undo a filing.")
     u.add_argument("id", nargs="?", type=int, help="number of the operation to undo (see history); the last one by default")
     sub.add_parser("history", help="list the latest operations, with their numbers", description="List the latest operations.")
+    w = sub.add_parser("watch", help="analyse the PDFs that arrive in the Inbox as they come (nothing is moved)",
+                       description="Keep looking at the Inbox and analyse each PDF that arrives, as a dry run: nothing is filed or moved.")
+    w.add_argument("--interval", type=float, default=POLL_SECONDS, help="seconds between two looks at the folder (default %(default)s)")
     return ap
+
+
+def watch_inbox(cfg: Config, db: DB, interval: float = POLL_SECONDS, stop=None) -> int:
+    """DOC534.5: `docflow watch`. A PDF that arrives in the Inbox and is complete (its size stopped changing) is analysed and shown in
+    the table, as a dry run; to file it, run `docflow scan`, or approve it in the application. Ctrl-C ends it."""
+    inbox = cfg.path("inbox")
+    if not inbox.is_dir():
+        print(f"ERROR: not a folder: {inbox}", file=sys.stderr)
+        return 2
+
+    def files() -> list[Path]:
+        return sorted(f for f in inbox.glob("*") if f.is_file() and f.suffix.lower() == ".pdf")
+
+    def arrived(paths: list[Path]) -> None:
+        print(f"{len(paths)} PDF(s) arrived: {', '.join(p.name for p in paths)}", flush=True)
+        scan(cfg, db, dry=True, interactive=False, ollama=False, table=True)
+
+    print(f"Watching {inbox} every {interval:g} s: the PDFs that arrive are analysed, nothing is moved. Ctrl-C stops.", flush=True)
+    try:
+        watch(files, arrived, interval, stop)
+    except KeyboardInterrupt:
+        print("Stopped.")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -239,6 +266,8 @@ def main(argv: list[str] | None = None) -> int:
     db = DB(cfg.path("db"))
     if args.cmd == "scan":
         return scan(cfg, db, args.dry_run, args.interactive, args.ollama, args.source, args.recursive, args.table)
+    if args.cmd == "watch":
+        return watch_inbox(cfg, db, args.interval)
     if args.cmd == "undo":
         try:
             cur, old = undo(db, args.id)

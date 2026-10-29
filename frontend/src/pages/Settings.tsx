@@ -51,6 +51,7 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
   const { t, msg } = useI18n()
   const [v, setV] = useState<Values | null>(null)
   const [first, setFirst] = useState(false)
+  const [watch, setWatch] = useState(false)  // analyse what arrives in the watched folders by itself
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [picking, setPicking] = useState<keyof Values | null>(null)
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
@@ -58,6 +59,7 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     api.settings().then((s) => {
       setFirst(!s.configured)
+      setWatch(s.watch_inbox)
       setV({ inbox: s.configured ? s.inbox : '', library_root: s.configured ? s.library_root : '', quarantine: s.configured ? s.quarantine ?? '' : '', extra: s.extra_inboxes.join('\n') })
     }).catch((e) => setNote({ ok: false, text: errorText(e) }))
   }, [])
@@ -72,7 +74,7 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
     setNote(null)  // the "saved" of an earlier save must not stay beside the errors (or the failure) of this one
     try {
       await api.saveSettings({ inbox: v.inbox.trim(), library_root: v.library_root.trim(), quarantine: v.quarantine.trim(),
-        extra_inboxes: v.extra.split('\n').map((x) => x.trim()).filter(Boolean) })
+        extra_inboxes: v.extra.split('\n').map((x) => x.trim()).filter(Boolean), watch_inbox: watch })
       setNote({ ok: true, text: t('settings.saved') })
       if (first) onSaved()  // only the initial set-up goes on to the queue; a later save stays here, where the "saved" message is
       setFirst(false)
@@ -114,6 +116,13 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
                 })}
               </div>
             )}
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium" htmlFor="watch-inbox">
+              <input id="watch-inbox" type="checkbox" checked={watch} onChange={(e) => setWatch(e.target.checked)} aria-describedby="help-watch" />
+              {t('settings.watch')}
+            </label>
+            <p id="help-watch" className="text-xs text-slate-600">{t('settings.watchHelp')}</p>
           </div>
           <Button type="submit" disabled={busy} aria-busy={busy}>{t('settings.save')}</Button>
           <Notice note={note} />

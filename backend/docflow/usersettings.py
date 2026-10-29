@@ -11,7 +11,8 @@ from .fsutil import write_atomic
 
 log = logging.getLogger(__name__)
 
-FOLDER_KEYS = ("inbox", "extra_inboxes", "library_root", "quarantine", "db")  # what the Settings screen can change
+FOLDER_KEYS = ("inbox", "extra_inboxes", "library_root", "quarantine", "db")  # the folders the Settings screen can change
+FLAG_KEYS = ("watch_inbox",)  # and its on/off choices: analyse the files that arrive in the inbox by themselves (DOC534.5)
 
 
 class InvalidSettings(ValueError):
@@ -52,6 +53,9 @@ def load() -> dict:
             out[key] = value
         elif key != "extra_inboxes" and isinstance(value, str) and value.strip():
             out[key] = value
+    for key in FLAG_KEYS:
+        if isinstance(data.get(key), bool):  # true or false, nothing else ("yes", 1...) is taken for a choice
+            out[key] = data[key]
     return out
 
 
@@ -72,6 +76,9 @@ def _problem(p: Path) -> str | None:
 def validate(values: dict) -> dict[str, str]:
     """{setting: what is wrong}: empty when the folders can be used. Only the keys given are checked."""
     errors: dict[str, str] = {}
+    for key in FLAG_KEYS:
+        if key in values and not isinstance(values[key], bool):
+            errors[key] = "must be true or false"
 
     def folder(key: str, must_exist: bool = True) -> Path | None:
         raw = values.get(key)
@@ -113,7 +120,7 @@ def save(values: dict) -> dict:
     """Validate, keep only the folder settings and write them. Nothing is written when something is wrong."""
     # What was saved before stays, whatever the request leaves out; a key sent EMPTY means "the default" and is removed. The merged
     # whole is what is validated, so the cross-checks (inbox / library / quarantine) also see the values this request does not send.
-    merged = {**load(), **{k: v for k, v in values.items() if k in FOLDER_KEYS}}
+    merged = {**load(), **{k: v for k, v in values.items() if k in FOLDER_KEYS + FLAG_KEYS}}
     kept = {k: v for k, v in merged.items() if v not in ("", None)}
     errors = validate(kept)
     if errors:

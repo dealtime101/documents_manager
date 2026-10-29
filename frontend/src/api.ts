@@ -103,6 +103,7 @@ export interface FolderSettings {
   library_root: string
   quarantine: string
   extra_inboxes: string[]
+  watch_inbox: boolean  // analyse the files that arrive in the watched folders by themselves
 }
 export interface FolderListing { path: string; parent: string; folders: string[] }
 export interface LibraryHit { name: string; path: string; folder: string; is_dir: boolean; size: number; modified: number }

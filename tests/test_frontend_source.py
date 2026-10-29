@@ -937,6 +937,21 @@ def test_the_comment_of_the_tab_bar_says_what_its_class_does():
     assert "wraps onto several lines" in comment and "scrolls" not in comment
 
 
+def test_the_settings_screen_has_a_labelled_switch_for_analysing_arriving_files_that_is_loaded_and_saved():
+    # DOC534.5: a checkbox with a visible label and a permanent help text tied to it, read from the server and sent back with the rest
+    src = UI.parents[1]
+    settings = (src / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+    assert 'htmlFor="watch-inbox"' in settings and '<input id="watch-inbox" type="checkbox" checked={watch}' in settings
+    assert 'aria-describedby="help-watch"' in settings and '<p id="help-watch"' in settings and "t('settings.watchHelp')" in settings
+    assert "setWatch(s.watch_inbox)" in settings and "watch_inbox: watch" in settings
+    assert "watch_inbox: boolean" in (src / "api.ts").read_text(encoding="utf-8")
+    from conftest import fr_messages_table
+    i18n = (src / "i18n.tsx").read_text(encoding="utf-8")
+    assert i18n.count("'settings.watch'") == 2 and i18n.count("'settings.watchHelp'") == 2          # English and French, both
+    assert "Rien n\\'est déplacé" in i18n and "Nothing is moved" in i18n                          # the promise: only the analysis is automatic
+    assert fr_messages_table(i18n)                                                                   # (the French table is still found)
+
+
 def test_the_quarantine_help_is_text_under_the_field_and_not_a_placeholder():
     # DOC534.260: a placeholder is gone as soon as the field holds a value, and screen readers do not always read it
     settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")

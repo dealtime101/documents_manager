@@ -60,6 +60,12 @@ def test_the_snapshot_of_the_program_folder_sees_a_created_a_changed_and_a_remov
     assert set(after) - set(before) == {"new.txt"} and set(before) - set(after) == {"gone.txt"} and before["keep.txt"] != after["keep.txt"]
 
 
+@pytest.fixture(autouse=True)
+def _main_never_starts_a_real_inbox_watcher(monkeypatch):
+    from docflow import desktop
+    monkeypatch.setattr(desktop, "start_inbox_watch", lambda *a, **k: None)
+
+
 def _held_socket():
     """What main() gets from listening_socket(): only its port is read."""
     import types

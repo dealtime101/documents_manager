@@ -354,7 +354,7 @@ def folder_settings(request):
         s.cfg().refresh_learned()  # this worker follows at once; the others at their next request
     c = s.cfg()
     return Response({"configured": c.configured, **{k: c.settings.get(k) for k in ("inbox", "library_root", "quarantine")},
-                     "extra_inboxes": list(c.settings.get("extra_inboxes") or [])})
+                     "extra_inboxes": list(c.settings.get("extra_inboxes") or []), "watch_inbox": usersettings.load().get("watch_inbox") is True})  # (read where the watcher reads it)
 
 
 @api_view(["GET"])
