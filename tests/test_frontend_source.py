@@ -390,6 +390,14 @@ def test_a_proposal_for_a_library_file_does_not_start_a_second_plan_request_for_
     assert "setPlan(null); setPlanned('')" in effect                                        # a failed plan is asked again for the same inputs
 
 
+def test_the_folder_actions_of_the_library_wait_for_the_running_operation_like_the_file_actions():
+    # DOC534.70: rename, move and delete of a folder stayed available while another change was running
+    page = (UI.parents[1] / "pages" / "Library.tsx").read_text()
+    for action in ("setAsk('newFolder')", "setAsk('renameFolder')", "setMoving('folder')", "setConfirming(path)"):
+        assert f'size="sm" disabled={{busy}} onClick={{() => {action}}}' in page, action
+    assert 'size="sm" disabled={busy} onClick={() => setConfirming(file)}' in page            # the file's own delete already did
+
+
 def test_the_move_picker_builds_paths_from_the_folder_its_list_was_read_for():
     # DOC534.69: while the next folder loaded (or after a failure) the old list was joined with the NEW path: a click led nowhere
     page = (UI.parents[1] / "pages" / "Library.tsx").read_text()

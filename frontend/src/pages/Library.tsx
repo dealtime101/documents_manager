@@ -239,12 +239,12 @@ export default function Library() {
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" disabled={!list || list.is_root} onClick={() => list && go(list.parent)}>{t('library.up')}</Button>
           <Button type="button" variant="outline" size="sm" onClick={refresh}>{t('library.refresh')}</Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => setAsk('newFolder')}>{t('library.newFolder')}</Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setAsk('newFolder')}>{t('library.newFolder')}</Button>
           {folderActions && (
             <>
-              <Button type="button" variant="outline" size="sm" onClick={() => setAsk('renameFolder')}>{t('library.renameFolder')}</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setMoving('folder')}>{t('library.moveFolder')}</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(path)}>{t(inTrash(path) ? 'library.deleteForever' : 'library.deleteFolder')}</Button>
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setAsk('renameFolder')}>{t('library.renameFolder')}</Button>
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setMoving('folder')}>{t('library.moveFolder')}</Button>
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setConfirming(path)}>{t(inTrash(path) ? 'library.deleteForever' : 'library.deleteFolder')}</Button>
             </>
           )}
         </div>
