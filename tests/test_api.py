@@ -2143,6 +2143,23 @@ def test_refiling_a_library_pdf_teaches_the_program_the_company_the_type_and_the
     assert same["learned"] == []
 
 
+def test_a_refiling_that_fails_teaches_nothing_and_leaves_no_empty_folder(api, lib, settings, monkeypatch):
+    # DOC534.99: the company, the type and the route were learned BEFORE the move: a failed move left rules nobody validated
+    from triage import library
+    pdf(lib / "scan002.pdf", GARAGE)
+    fields = {"company": "GarageTremblay", "document_type": "Entretien", "date": "2025/03/05", "detail": "", "amount": "80", "currency": "CAD"}
+    with monkeypatch.context() as broken:
+        broken.setattr(library, "_move", lambda src, dst: (_ for _ in ()).throw(library.s.ApiError("the move failed")))
+        failed = post(api, "apply", path="scan002.pdf", fields=fields, rel_dir="Nouveau/Dossier/2025")
+    assert failed.status_code == 400 and (lib / "scan002.pdf").exists()                      # the file is where it was
+    assert not (lib / "Nouveau").exists()                                                     # and the folders made for it are gone
+    assert "GarageTremblay" not in settings.DOCFLOW.companies and not settings.DOCFLOW.learn_dir.joinpath("company_aliases.yaml").exists()
+    assert not any(r.get("company") == "GarageTremblay" for r in settings.DOCFLOW.types)     # nothing learned: no alias, no type, no route
+    assert "GarageTremblay" not in settings.DOCFLOW.routing
+    done = post(api, "apply", path="scan002.pdf", fields=fields, rel_dir="Nouveau/Dossier/2025").json()
+    assert [x["kind"] for x in done["learned"]] == ["company", "type", "route"]              # the same request, once it succeeds, teaches
+
+
 def test_a_library_pdf_is_read_and_proposed_then_refiled_under_its_new_name_and_folder(api, lib):
     pdf(lib / "scan001.pdf", HYDRO)
     proposed = post(api, "plan", path="scan001.pdf").json()

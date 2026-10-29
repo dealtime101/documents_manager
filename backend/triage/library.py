@@ -265,9 +265,18 @@ def apply(rel: str, fields: dict, rel_dir: str = "", final_name: str = "") -> di
     folder = safe_join(root, out["rel_dir"])
     if (root / TRASH) in (folder, *folder.parents):
         raise s.ApiError("use Delete to put something in the trash")
-    learned = _learn(p, out, bool(rel_dir.strip("/\\ ")))  # BEFORE the move: the text is looked up by the file's current path
+    made = [d for d in (folder, *folder.parents) if root in d.parents and not d.exists()]  # the folders this call creates, deepest first
     folder.mkdir(parents=True, exist_ok=True)
     dst = folder / out["final_name"]
-    if dst != p:
-        _move(p, dst)
+    try:
+        if dst != p:
+            _move(p, dst)
+    except s.ApiError:  # name taken, file open, read-only folder: nothing was re-filed, so nothing is learned and no empty folder stays
+        for d in made:
+            try:
+                d.rmdir()  # only an empty one goes
+            except OSError:
+                break
+        raise
+    learned = _learn(dst, out, bool(rel_dir.strip("/\\ ")))  # AFTER the move: only a re-filing that took place teaches (the item follows the file)
     return {"path": _rel(root, dst), "learned": learned}
