@@ -156,7 +156,8 @@ def test_the_product_is_called_documents_manager_where_people_read_its_name():
     assert (src.read_text(encoding="utf-8")).count("'app.title': 'Documents Manager'") == 2          # English and French
     assert "<title>Documents Manager</title>" in (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
     assert (ROOT / "README.md").read_text(encoding="utf-8").startswith("# Documents Manager")
-    assert (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").startswith("# Documents Manager")
+    for name in ("CHANGELOG.md", "CHANGELOG.en.md"):                                             # (DOC534.245: the English one is shown too)
+        assert (ROOT / name).read_text(encoding="utf-8").startswith("# Documents Manager"), name
 
 
 def test_the_english_release_notes_list_the_same_versions_with_the_same_dates_as_the_french_ones():
