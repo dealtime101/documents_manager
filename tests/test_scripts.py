@@ -387,7 +387,7 @@ def test_compare_never_leaves_a_half_written_text_that_a_later_run_would_trust(t
     make_pdf(pdf_path, "Hydro-Quebec\nFacture d'electricite du 7 octobre 2025\nMontant de la presente facture : 158,98 $ "
                        + "ligne de detail " * 20)
     compare.main(tmp_path)
-    saved = pdf_path.with_suffix(".txt")
+    saved = pdf_path.with_name(pdf_path.name + ".txt")
     complete = saved.read_text()
     real_write = Path.write_text
 
@@ -490,10 +490,31 @@ def test_compare_does_not_save_a_text_from_an_extraction_that_lost_pages(tmp_pat
     real = compare.extract_text
     monkeypatch.setattr(compare, "extract_text", lambda *a, **k: Extracted("", "ocr_unavailable", 1, missing_pages=1))
     compare.main(tmp_path)                                                # OCR failed this time: empty text, 1 page lost
-    assert not pdf_path.with_suffix(".txt").exists()                      # a failure must not be remembered as the answer
+    assert not pdf_path.with_name(pdf_path.name + ".txt").exists()        # a failure must not be remembered as the answer
     monkeypatch.setattr(compare, "extract_text", real)
     compare.main(tmp_path)
     assert "exact full date      : 1/1 = 100%" in capsys.readouterr().out.split("(rates below")[-1]   # the next run re-extracts
+
+
+def test_two_samples_that_differ_only_by_the_case_of_the_extension_keep_their_own_saved_text(tmp_path, capsys, monkeypatch):
+    # DOC534.110: x.pdf and x.PDF both wrote x.txt: each run invalidated the other's cache and ran the slow extraction again
+    compare = load_script("compare")
+    std = tmp_path / "std"
+    std.mkdir()
+    first = std / "000__2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf"
+    second = std / "000__2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.PDF"
+    make_pdf(first, "Hydro-Quebec\nFacture d'electricite du 7 octobre 2025\nMontant de la presente facture : 158,98 $")
+    make_pdf(second, "Hydro-Quebec\nFacture d'electricite du 7 octobre 2025\nMontant de la presente facture : 158,98 $ (copie)")
+    if not (first.exists() and second.exists() and first != second):
+        pytest.skip("this file system does not tell x.pdf from x.PDF")
+    compare.main(tmp_path)
+    assert sorted(p.name for p in std.iterdir() if p.name.endswith(".txt")) == sorted([first.name + ".txt", second.name + ".txt"])
+    calls = []
+    real = compare.extract_text
+    monkeypatch.setattr(compare, "extract_text", lambda *a, **k: calls.append(1) or real(*a, **k))
+    compare.main(tmp_path)
+    assert calls == []                                                      # the second run reads both texts from their own cache
+    capsys.readouterr()
 
 
 def test_compare_documentation_matches_what_it_does():
@@ -1081,8 +1102,8 @@ def test_compare_extracts_again_a_saved_text_it_cannot_read_instead_of_stopping(
     pdf_path = std / "000__2025-10-07 - Hydro-Quebec - FactureElectricite - 158.98$.pdf"
     make_pdf(pdf_path, "Hydro-Quebec\nFacture d'electricite du 7 octobre 2025\nMontant de la presente facture : 158,98 $")
     compare.main(tmp_path)
-    saved = pdf_path.with_suffix(".txt")
-    saved.write_bytes(b"\xff\xfe broken \x80")                               # the key still vouches for it, the bytes are garbage
+    saved = pdf_path.with_name(pdf_path.name + ".txt")
+    saved.write_bytes(b"\xff\xfe broken \x80")                             # the key still vouches for it, the bytes are garbage
     capsys.readouterr()
     assert compare.main(tmp_path) == 0
     out = capsys.readouterr().out

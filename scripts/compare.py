@@ -72,7 +72,7 @@ def main(root: Path, fresh: bool = False) -> int:
         date_tot += expect_date
         amt_tot += expected_amount is not None
         comp_tot += expect_company
-        cache = f.with_suffix(".txt")  # OCR is slow: text kept next to the sample (local, disposable)
+        cache = f.with_name(f.name + ".txt")  # OCR is slow: text kept next to the sample (local, disposable). The WHOLE name: "x.pdf" and "x.PDF" have one each
         key_file = cache.with_name(cache.name + ".key")
         try:
             key = cache_key(f, cfg.settings["ocr"])
