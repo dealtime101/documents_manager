@@ -2455,6 +2455,9 @@ def test_a_file_can_be_renamed_moved_and_deleted_and_its_filed_item_follows_it(a
     assert post(api, "move", path="Bills/renamed.pdf", to="Bills/Hydro").status_code == 400   # never replaces
     assert (lib / "Bills" / "Hydro" / "renamed.pdf").read_bytes() == b"%PDF-1.4 top"
     assert post(api, "delete", path="Bills/Hydro/renamed.pdf").json()["path"] == "_Trash/renamed.pdf"
+    # DOC534.195: the title says the item follows the file to the trash too, so its link points at the file that is there now
+    followed = Item.objects.get().result_path
+    assert followed == str(lib / "_Trash" / "renamed.pdf") and Path(followed).is_file(), followed
     assert post(api, "delete", path="Bills/renamed.pdf").json()["path"] == "_Trash/renamed (2).pdf"   # same name in the trash: kept both
 
 
