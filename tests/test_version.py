@@ -102,6 +102,13 @@ def test_the_intro_of_a_release_without_section_survives_a_heading_that_is_not_a
                    {"version": "0.9.0", "date": "2026-11-20", "intro": "Another.", "sections": []}]
 
 
+def test_an_indented_sub_bullet_is_an_item_and_a_tab_indents_a_continuation():
+    # DOC534.164: "- a / <2 spaces>- b" gave the one item "a - b"; a continuation indented with a tab was dropped
+    from docflow.changelog import parse
+    got = parse("## [1.0.0] - 2026-12-01\n### Added\n- a\n  - b\n\t* c\n- d\n  continues\n\tand more\n")
+    assert got[0]["sections"] == [{"title": "Added", "items": ["a", "b", "c", "d continues and more"]}]
+
+
 def test_the_three_markdown_bullets_are_items_and_a_bold_line_is_not():
     # DOC534.163: "* " and "+ " are valid Markdown bullets and were skipped in silence
     from docflow.changelog import parse

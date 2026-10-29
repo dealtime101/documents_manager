@@ -36,8 +36,11 @@ def parse(text: str) -> list[dict]:
         elif section is not None:
             if m := ITEM.match(line):
                 section["items"].append(m.group(1).strip())
-            elif line.strip() and line.startswith(" ") and section["items"]:
-                section["items"][-1] += " " + line.strip()
+            elif line.strip() and line[:1].isspace() and section["items"]:  # a space or a tab
+                if sub := ITEM.match(line.strip()):  # an indented sub-bullet is an item of its own, without its marker
+                    section["items"].append(sub.group(1).strip())
+                else:
+                    section["items"][-1] += " " + line.strip()
         elif line.strip():
             intro.append(line.strip())
     if release is not None and not release["intro"] and intro:
