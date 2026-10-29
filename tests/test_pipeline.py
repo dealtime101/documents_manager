@@ -620,6 +620,7 @@ def _typed(monkeypatch, *answers):
 @pytest.mark.parametrize("typed,expected", [
     ("Mine", "Mine.pdf"), ("  Mine.pdf  ", "Mine.pdf"), ("Mine.PDF", "Mine.PDF"),
     ("2025-10-07 - Hydro - Mine", "2025-10-07 - Hydro - Mine.pdf"),
+    ("facture.", "facture.pdf"), ("facture . ", "facture.pdf"), ("facture..pdf", "facture.pdf"), ("facture .pdf", "facture.pdf"),   # DOC534.89
 ])
 def test_a_hand_typed_name_gets_its_pdf_extension_when_missing(env, monkeypatch, typed, expected):
     cfg, db, tmp = env
@@ -628,7 +629,8 @@ def test_a_hand_typed_name_gets_its_pdf_extension_when_missing(env, monkeypatch,
     assert cli.ask(cfg, p) == expected
 
 
-@pytest.mark.parametrize("bad", ["../../escape", "sub/dir/x", "..\\x", "a:b", "x?", "..", ".", "   ", "/etc/passwd"])
+@pytest.mark.parametrize("bad", ["../../escape", "sub/dir/x", "..\\x", "a:b", "x?", "..", ".", "   ", "/etc/passwd",
+                                 ".pdf", ".PDF", " .pdf", "..pdf", ". .pdf"])   # DOC534.89: a name with nothing before the extension
 def test_an_invalid_hand_typed_name_is_refused_and_asked_again(env, monkeypatch, capsys, bad):
     cfg, db, tmp = env
     p = propose(mkpdf(tmp / "inbox" / "x.pdf", HYDRO), cfg, db, RuleBasedAnalyzer(cfg))

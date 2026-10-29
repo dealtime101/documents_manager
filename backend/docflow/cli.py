@@ -36,9 +36,13 @@ def typed_name(raw: str) -> str | None:
     """A hand-typed file name made usable: trimmed, '.pdf' added when missing. None if it cannot be a plain file name
     (path separators, '..', Windows-forbidden characters, nothing left): the same rule apply() enforces."""
     n = raw.strip()
-    if not n or FORBIDDEN.search(n) or n.strip(" .") == "":
+    if not n or FORBIDDEN.search(n):
         return None
-    return n if n.lower().endswith(".pdf") else n + ".pdf"
+    has_ext = n.lower().endswith(".pdf")
+    stem = (n[:-4] if has_ext else n).rstrip(" .")  # "facture." is "facture", never "facture..pdf"
+    if not stem.strip(" ."):
+        return None  # nothing before the extension: ".pdf" would be a hidden file with no name
+    return stem + (n[-4:] if has_ext else ".pdf")
 
 
 def ask(cfg: Config, p: Proposal) -> str | None:
