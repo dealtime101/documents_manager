@@ -41,6 +41,19 @@ def test_a_failed_tesseract_install_stops_the_script_with_its_own_message():
     assert script.index("has no tesseract.exe", run) < script.index("Copy-Item (Join-Path $install \"tesseract.exe\")")
 
 
+def test_the_windows_build_leaves_the_calling_console_as_it_found_it():
+    # DOC534.170: PY, the UTF-8 code page and the directory stayed in the cmd session that ran the script
+    script = (PACKAGING / "build_windows.bat").read_text(encoding="utf-8")
+    lines = [line.strip() for line in script.splitlines()]
+    assert lines.index("setlocal") < next(i for i, line in enumerate(lines) if line.startswith("chcp 65001"))     # variables stay local
+    saved = next(i for i, line in enumerate(lines) if "'chcp'" in line)
+    assert saved < lines.index("chcp 65001 >nul")                                   # the original code page is read before it is changed
+    assert not any(line.startswith("cd /d") for line in lines) and lines.count("popd") >= 2     # pushd at the start, popd at both exits
+    for exit_line in [i for i, line in enumerate(lines) if line.startswith("exit /b")]:
+        assert lines[exit_line - 1] == "chcp %OLDCP% >nul" and lines[exit_line - 2] == "popd", lines[exit_line - 2:exit_line + 1]
+    assert len([line for line in lines if line.startswith("exit /b")]) == 2
+
+
 def test_the_progress_bar_is_off_before_the_first_download():
     # DOC534.158: on Windows PowerShell 5.1 the progress bar of Invoke-WebRequest makes a big download many times slower
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
