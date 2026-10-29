@@ -915,6 +915,22 @@ def test_dashboard_counts(api, sb):
     assert api.get("/api/dashboard").json()["classified_today"] == 1
 
 
+def test_erasing_the_company_or_the_type_drops_the_computed_name_and_the_item_cannot_be_approved(api, sb):
+    # DOC534.56: the old name stayed, and with a destination chosen by hand the item was approved without a company
+    pdf(sb / "inbox" / "hydro.pdf", HYDRO)
+    api.post("/api/scan")
+    it = api.get("/api/items").json()[0]
+    assert it["final_name"] and it["company"] and it["document_type"]
+    for erased in ({"company": ""}, {"document_type": ""}):
+        api.patch(f"/api/items/{it['id']}", {"company": it["company"], "document_type": it["document_type"]}, format="json")
+        api.patch(f"/api/items/{it['id']}", {"rel_dir": "Autre/Dossier"}, format="json")
+        r = api.patch(f"/api/items/{it['id']}", erased, format="json")
+        assert r.status_code == 200 and r.json()["final_name"] == ""                    # no company / no type: no name
+        refused = api.post(f"/api/items/{it['id']}/approve")
+        assert refused.status_code == 400 and "required" in refused.json()["detail"]    # and nothing is filed
+        assert not list((sb / "library").rglob("*.pdf"))
+
+
 def test_emptying_a_destination_chosen_by_hand_goes_back_to_the_automatic_route(api, sb):
     # DOC534.17: `_dir_user` stayed true after the field was emptied, so the hand-made route was kept (and learned on approval)
     pdf(sb / "inbox" / "hydro.pdf", HYDRO)

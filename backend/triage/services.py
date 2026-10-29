@@ -379,6 +379,9 @@ def edit(it: Item, data: dict) -> Item:
                                            a.amount if a.include_amount else None, a.currency, ".pdf")
         except ValueError as e:
             raise ApiError(f"value rejected: {e}") from None
+    else:  # no company or no type any more: the name computed from them is no longer true, and approving needs a name
+        orig.pop("_name_user", None)
+        it.final_name = ""
     # destination: chosen by the human (validated) or recomputed by the rules
     if data.get("rel_dir"):
         try:
