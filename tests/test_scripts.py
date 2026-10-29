@@ -634,6 +634,20 @@ def test_benchmark_usage_errors_print_the_usage_not_a_traceback(argv, capsys):
     assert "usage:" in err and "Traceback" not in err
 
 
+def test_with_three_parts_the_last_one_is_the_type_never_a_reference_amount(tmp_path):
+    # DOC534.107: "<date> - <company> - 150 $" made the TYPE the reference amount, while amount_unread already needed a fourth part
+    import json
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    for k in ("k1", "k2"):
+        (cache / f"{k}.txt").write_text("Acme\nTotal a payer : 150,00 $")
+    names = {"k1": "2025-10-07 - Acme - 150.00$.pdf", "k2": "2025-10-08 - Acme - Facture - 150.00$.pdf"}      # three parts, then four
+    (cache / "index.json").write_text(json.dumps([{"key": k, "rel": n, "name": n} for k, n in names.items()]))
+    rows = {r["key"]: r for r in load_script("benchmark").load(cache)}
+    assert rows["k1"]["amount"] is None and rows["k1"]["currency"] is None and rows["k1"]["type"] == "150.00$"   # the type, as written
+    assert rows["k2"]["amount"] == "150.00" and rows["k2"]["currency"] == "CAD"                                   # a fourth part is the amount
+
+
 def test_benchmark_checks_the_currency_written_in_the_name_like_compare_does(tmp_path, capsys):
     # DOC534.106: name_currency was never used: "... 100.00 USD.pdf" counted as an exact amount when the engine read 100,00 $ (CAD)
     import json

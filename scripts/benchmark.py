@@ -91,9 +91,9 @@ def load(cache: Path, left_out: Counter | None = None) -> list[dict]:
         if len(parts) < 3:
             left_out["name not in the standard form"] += 1
             continue
-        amount = name_amount(parts[-1])
+        amount = name_amount(parts[-1]) if len(parts) > 3 else None  # with three parts the last one is the TYPE, whatever it looks like
         r.update(date=parts[0].strip(), company=parts[1].strip(), type=parts[2].strip(), amount=amount,
-                 currency=name_currency(parts[-1]),  # None: the name says no currency, so none is expected (as compare.py does)
+                 currency=name_currency(parts[-1]) if len(parts) > 3 else None,  # None: no currency expected (as compare.py does)
                  # an ending that looks like an amount but was not read must not silently leave the amount score
                  amount_unread=amount is None and len(parts) > 3 and bool(LOOKS_LIKE_AMOUNT.search(parts[-1])),
                  text=(cache / f"{r['key']}.txt").read_text(encoding="utf-8"))
