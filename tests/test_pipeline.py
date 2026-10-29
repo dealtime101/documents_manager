@@ -754,6 +754,15 @@ def test_cli_dry_run_flags_duplicates_inside_the_batch(env, capsys):
     assert "auto" in out.split("\n")[0] and "duplicate" in out.split("\n")[1]
 
 
+def test_interactive_with_dry_run_is_refused_instead_of_being_ignored_in_silence(tmp_path, capsys):
+    # DOC534.91: --dry-run --interactive asked nothing and said nothing about it
+    with pytest.raises(SystemExit) as stop:
+        cli.main(["--sandbox", str(tmp_path / "sb"), "scan", "--dry-run", "--interactive"])
+    assert stop.value.code == 2
+    assert "--interactive cannot be combined with --dry-run" in capsys.readouterr().err
+    assert cli.main(["--sandbox", str(tmp_path / "sb"), "scan", "--dry-run"]) == 0                  # each one alone still works
+
+
 def test_the_table_of_a_recursive_scan_names_the_file_by_its_folder_so_same_names_are_told_apart(env, capsys):
     # DOC534.90: two "facture.pdf" in different sub-folders gave two identical lines
     cfg, db, tmp = env

@@ -221,6 +221,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     ap = build_parser()
     args = ap.parse_args(argv)
+    if args.cmd == "scan" and args.dry_run and args.interactive:  # a dry run asks nothing and files nothing: the option would do nothing
+        ap.error("--interactive cannot be combined with --dry-run (a dry run only looks: nothing is filed, so there is nothing to ask)")
     if (args.sandbox and args.cmd == "scan" and args.source and not args.dry_run
             and not args.source.resolve().is_relative_to(args.sandbox.resolve())):
         # the sandbox promises that the real files are untouched, but a scan MOVES what it files out of its source folder
