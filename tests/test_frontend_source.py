@@ -246,6 +246,18 @@ def test_the_url_hash_names_the_page_and_the_queue_category_and_falls_back_to_th
     assert got["write"] == ["#queue/errors", "#history"]
 
 
+def test_a_route_written_as_a_hash_is_read_back_as_the_same_route():
+    # DOC534.175: {page: 'history', group: 'errors'} was written "#history/errors" and read back with no group
+    got = _node_route("""(() => {
+      const routes = [{page: 'queue', group: null}, {page: 'queue', group: 'errors'}, {page: 'history', group: 'errors'},
+                      {page: 'dashboard', group: 'auto'}, {page: 'settings', group: null}]
+      return routes.map((r) => [m.toHash(r), m.parseHash(m.toHash(r))]) })()""")
+    assert got[2][0] == "#history" and got[3][0] == "#dashboard"                  # a group is written for the queue only
+    assert [h for h, _ in got] == ["#queue", "#queue/errors", "#history", "#dashboard", "#settings"]
+    assert [r for _, r in got] == [{"page": "queue", "group": None}, {"page": "queue", "group": "errors"}, {"page": "history", "group": None},
+                                   {"page": "dashboard", "group": None}, {"page": "settings", "group": None}]
+
+
 def test_the_app_follows_the_hash_and_navigation_writes_it():
     app = (BITS.parents[1] / "App.tsx").read_text()
     assert "addEventListener('hashchange'" in app and "removeEventListener('hashchange'" in app

@@ -16,4 +16,5 @@ export function parseHash(hash: string): Route {
   return { page, group: page === 'queue' ? (GROUPS.find((g) => g === group) ?? null) : null }
 }
 
-export const toHash = (route: Route) => `#${route.page}${route.group ? `/${route.group}` : ''}`
+// only the queue has groups, as parseHash reads them: any other page makes the same hash back, so the URL shown is the state shown
+export const toHash = (route: Route) => `#${route.page}${route.page === 'queue' && route.group ? `/${route.group}` : ''}`
