@@ -890,6 +890,19 @@ def test_mine_groups_spelling_variants_of_a_type_so_they_do_not_count_against_ea
     assert "(2)" in out and "zulu" in out                                       # and the other type is untouched
 
 
+def test_benchmark_suggests_companies_the_way_its_search_compares_them():
+    # DOC534.255: the suggestions compared the raw names, so "hydro quebec" found nothing close to "Hydro-Quebec" and the five first
+    # names in alphabetical order were shown instead
+    closest = load_script("benchmark").closest_companies
+    names = {"Amazon", "Bell", "Cogeco", "Desjardins", "Energir", "Hydro-Quebec", "Videotron"}
+    assert closest("hydro quebec", names)[0] == "Hydro-Quebec"                       # case and punctuation do not matter
+    assert closest("HYDRO-QUÉBEC", names)[0] == "Hydro-Quebec"                       # nor accents
+    assert closest("Videotrn", names)[0] == "Videotron"                               # a typo still finds it
+    assert closest("zzzz", names) == ["Amazon", "Bell", "Cogeco", "Desjardins", "Energir"]   # nothing alike: the first five, as before
+    assert len(closest("a", names)) <= 5
+    assert closest("x", set()) == []
+
+
 def test_benchmark_says_what_to_do_when_the_corpus_is_missing(tmp_path, capsys):
     benchmark = load_script("benchmark")
     assert benchmark.main(["score", str(tmp_path / "no-such-corpus")]) == 2

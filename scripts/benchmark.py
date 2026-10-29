@@ -169,6 +169,16 @@ def score(cache: Path) -> None:
     print("known company but unknown type:", type_missing.most_common(14))
 
 
+def closest_companies(company: str, names: set[str], n: int = 5) -> list[str]:
+    """The names of the corpus that look most like what was typed, compared as the search itself compares them (key(): case, accents
+    and punctuation ignored), shown as they are written in the archive; the first alphabetically when none looks alike."""
+    by_key: defaultdict[str, list[str]] = defaultdict(list)
+    for name in sorted(names):
+        by_key[key(name)].append(name)
+    close = difflib.get_close_matches(key(company), list(by_key), n=n, cutoff=0.5)
+    return [name for k in close for name in by_key[k]][:n] or sorted(names)[:n]
+
+
 def mine(cache: Path, company: str) -> None:
     left_out: Counter = Counter()
     everything = load(cache, left_out)
@@ -177,8 +187,7 @@ def mine(cache: Path, company: str) -> None:
     if dropped:  # as score does: an entry that does not take part is said, never silent
         print(f"({left_out['entries']} index entries; left out: {dropped})")
     if not rows:
-        known = sorted({r["company"] for r in everything})
-        close = difflib.get_close_matches(company, known, n=5, cutoff=0.5) or known[:5]
+        close = closest_companies(company, {r["company"] for r in everything})
         print(f"no document of {company!r} in this corpus. Closest companies: {close}")
         return
     # grouped by tkey, like the score: "Visa" and "ReleveVisa" are ONE type, not counter-examples of each other
