@@ -1,10 +1,13 @@
 """Source-level checks on the React components (there is no JS test runner: these read the files themselves)."""
+import json
 import re
-from pathlib import Path
+import shutil
+import subprocess
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
-UI = Path(__file__).resolve().parents[1] / "frontend" / "src" / "components" / "ui"
+UI =Path(__file__).resolve().parents[1] / "frontend" / "src" / "components" / "ui"
 
 
 def test_a_badge_only_reacts_to_the_pointer_when_it_is_a_link():
@@ -83,8 +86,7 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
 
 def test_the_title_of_the_document_follows_the_page_shown():
     # DOC534.128: every page had the same title: Back / Forward entries, bookmarks and screen readers could not tell them apart
-    import re
-    app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
+    app =(UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
     route = (UI.parents[1] / "route.ts").read_text(encoding="utf-8")
     pages = re.search(r"const PAGES = (\[[^\]]+\])", route).group(1)                             # (the list the type is read from)
     names = dict(re.findall(r"(\w+): 'nav\.(\w+)'", app[app.index("const PAGE_NAME"):app.index("const MAX_SETUP_TRIES")]))
@@ -131,7 +133,6 @@ def test_the_folder_picker_cannot_go_up_from_the_root():
     settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
     assert "disabled={!list.parent || list.parent === list.path}" in settings and "onClick={() => setTarget(list.parent)}>{t('settings.up')}" in settings
     # what the server answers at the roots: the parent of a root is the root (POSIX) and the drive root keeps its backslash (Windows)
-    from pathlib import Path, PureWindowsPath
     assert str(Path("/").parent) == "/" and str(PureWindowsPath("C:\\").parent) == "C:\\"
 
 
@@ -214,20 +215,34 @@ NODE_TIMEOUT = 30  # seconds: these scripts transpile one file and print a line
 def run_node(command: list[str], **kwargs):
     """subprocess.run for node with its own short limit; a node that never ends (a promise that is never settled, a missing module
     waiting) is a failure that says so, not a frozen suite (DOC534.225)."""
-    import subprocess
-
-    import pytest
     try:
         return subprocess.run(command, capture_output=True, text=True, timeout=NODE_TIMEOUT, **kwargs)
     except subprocess.TimeoutExpired:
         pytest.fail(f"node did not finish within {NODE_TIMEOUT} s: {' '.join(command[:2])} ...", pytrace=False)
 
 
+def test_no_function_of_this_file_imports_again_what_the_module_already_imports():
+    # DOC534.270: pytest, json, shutil, subprocess and re were imported inside several functions, besides the top of the module
+    import ast
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    top = set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            top |= {a.asname or a.name for a in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            top |= {a.asname or a.name for a in node.names}
+    again = []
+    for function in ast.walk(tree):
+        if isinstance(function, ast.FunctionDef):
+            for node in ast.walk(function):
+                if isinstance(node, ast.Import | ast.ImportFrom):
+                    again += [(function.name, a.asname or a.name) for a in node.names if (a.asname or a.name) in top]
+    assert {"json", "re", "shutil", "subprocess", "pytest", "Path", "PureWindowsPath"} <= top
+    assert again == [], again
+
+
 def test_a_node_that_never_ends_fails_the_test_with_a_message(monkeypatch):
     # DOC534.225: no node call had a limit; a promise never settled held the whole suite
-    import shutil
-
-    import pytest
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not available")
@@ -239,10 +254,6 @@ def test_a_node_that_never_ends_fails_the_test_with_a_message(monkeypatch):
 
 def _node_route(expression: str, module: str = "route", setup: str = ""):
     """Run frontend/src/route.ts itself (transpiled with the project's own TypeScript), so the URL logic is tested, not read."""
-    import json
-    import shutil
-
-    import pytest
     node = shutil.which("node")
     frontend = BITS.parents[2]
     typescript = frontend / "node_modules" / "typescript" / "lib" / "typescript.js"
@@ -308,10 +319,6 @@ def test_ui_components_get_cn_from_the_one_local_module():
 
 def test_the_cn_helper_merges_conflicting_tailwind_classes_the_way_the_components_rely_on():
     """Components override each other's classes (TabsContent text-sm -> text-base, StatusBadge shrink-0 -> shrink)."""
-    import json
-    import shutil
-
-    import pytest
     frontend = UI.parents[2]
     if not shutil.which("node") or not (frontend / "node_modules" / "cn").exists():
         pytest.skip("node or the frontend's node_modules is not available")
@@ -823,7 +830,6 @@ def test_the_dashboard_comment_says_the_today_tile_opens_the_unfiltered_history(
 
 def test_the_route_groups_cannot_drift_from_the_group_type_without_the_compiler_saying_so():
     # DOC534.174: GROUPS duplicated the Group type of api.ts; a new group was rejected by parseHash in silence
-    import re
     src = UI.parents[1]
     route = (src / "route.ts").read_text(encoding="utf-8")
     assert "const GROUPS: Group[]" not in route
