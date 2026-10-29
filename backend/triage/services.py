@@ -826,20 +826,29 @@ def dashboard() -> dict:
 
 
 def destinations(limit: int = 800) -> list[str]:
+    """The folders of the library, three levels deep, as suggestions. Taken level by level: when `limit` cuts the list, it is the
+    DEEPEST folders that go (and the cut is logged), not whatever sorts after the first top-level folders."""
     root = cfg().path("library_root")
     out: list[str] = []  # destination folders relative to the library, e.g. "Bills/Hydro-Quebec/2025"
     if not root.exists():
         return out
-    base = len(root.parts)
-    for d, dirs, _ in os.walk(root):
-        dirs[:] = sorted(x for x in dirs if not x.startswith(("@", ".")))
-        depth = len(Path(d).parts) - base
-        if depth and depth <= 3:
-            out.append(Path(d).relative_to(root).as_posix())
-        if depth >= 3:
-            dirs[:] = []
-        if len(out) >= limit:
-            break
+    level = [root]
+    for _ in range(3):
+        deeper: list[Path] = []
+        for folder in level:
+            try:
+                with os.scandir(folder) as entries:
+                    children = sorted((e for e in entries if e.is_dir() and not e.name.startswith(("@", "."))), key=lambda e: e.name)
+            except OSError:
+                continue  # unreadable: skipped, as os.walk did
+            for entry in children:
+                if len(out) >= limit:
+                    log.warning("destinations: the list of suggested folders is cut at %d; the deepest folders are left out", limit)
+                    return sorted(out)
+                out.append(Path(entry.path).relative_to(root).as_posix())
+                if not entry.is_symlink():  # a link is a destination, but it is not followed (as os.walk did)
+                    deeper.append(Path(entry.path))
+        level = deeper
     return sorted(out)
 
 

@@ -1287,6 +1287,23 @@ def test_the_search_finds_documents_whose_stored_path_uses_backslashes_or_goes_t
     assert found()
 
 
+def test_a_cut_list_of_destinations_loses_the_deepest_folders_first_and_says_so(sb, caplog):
+    # DOC534.61: the depth-first walk used up the limit in the first top-level folders: the ones sorting later vanished, in silence
+    import logging
+
+    from triage import services
+    library = services.cfg().path("library_root")
+    for top in ("A", "B", "C", "D"):
+        for mid in ("1", "2"):
+            (library / top / mid / "2025").mkdir(parents=True)
+    with caplog.at_level(logging.WARNING):
+        cut = services.destinations(limit=8)
+    assert [d for d in cut if "/" not in d] == ["A", "B", "C", "D"]                  # every top-level folder is kept
+    assert len(cut) == 8 and any("2025" not in d and "/" in d for d in cut)         # then the next level, before any third level
+    assert any("cut at 8" in r.getMessage() for r in caplog.records)                # and the cut is reported
+    assert len(services.destinations()) == 4 + 8 + 8                                 # no limit reached: all of them, no warning
+
+
 def test_a_scan_never_sends_the_whole_batch_to_the_database_for_each_result(api, sb):
     # DOC534.60: every result ran a query with one SQL parameter per file of the scan (SQLite caps them; thousands of files are slow)
     from django.db import connection
