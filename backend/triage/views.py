@@ -271,7 +271,9 @@ def search(request):
     try:
         # ASCII digits only, one optional minus: "--5" and "²" (which isdigit() accepts) would crash int(); anything else goes
         # on as text and the service refuses it with a clear 400
-        return Response(s.search(request.query_params.get("q"), int(limit) if re.fullmatch(r"-?[0-9]+", limit) else limit))
+        params = request.query_params
+        return Response(s.search(params.get("q"), int(limit) if re.fullmatch(r"-?[0-9]+", limit) else limit,
+                                 {k: params.get(k) for k in s.SEARCH_FILTERS}, params.get("sort") or "relevance"))
     except s.ApiError as e:
         return err(e)
 

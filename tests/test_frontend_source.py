@@ -570,9 +570,9 @@ def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html()
     page = (UI.parents[1] / "pages" / "Search.tsx").read_text(encoding="utf-8")
     assert "dangerouslySetInnerHTML" not in page and "<mark" in page                      # a snippet is document text: elements only
     assert 'role="status"' in page and 'role="alert"' in page                              # count and errors are announced
-    assert "api.search(query)" in page and "aria-label={t('search.openLabel'" in page
+    assert "api.search(query, filters)" in page and "aria-label={t('search.openLabel'" in page
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
-    assert "new URLSearchParams({ q })" in api                                             # the query is encoded, not concatenated
+    assert "new URLSearchParams({ q, ...Object.fromEntries(" in api                                          # the query is encoded, not concatenated
     assert '<TabsTrigger value="search">' in (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
 
 
@@ -703,10 +703,10 @@ def test_the_search_runs_on_submit_only_and_never_while_a_search_is_in_flight():
     # DOC474.60 feared stale answers from searches fired while typing; there is one request at a time, started by a submit
     page = (UI.parents[1] / "pages" / "Search.tsx").read_text(encoding="utf-8")
     submit = page[page.index("const submit"):page.index("return (", page.index("const submit"))]
-    assert "if (busy || !query.trim()) return" in submit and submit.index("if (busy") < submit.index("api.search")
+    assert "if (busy || !canSearch) return" in submit and submit.index("if (busy") < submit.index("api.search")
     assert page.count("api.search(") == 1                                              # the only caller: submit
     assert "onChange={(e) => setQuery(e.target.value)}" in page                       # typing only edits the text...
-    assert "onSubmit={submit}" in page and "disabled={busy || !query.trim()}" in page      # ...and the button is off while busy
+    assert "onSubmit={submit}" in page and "disabled={busy || !canSearch}" in page      # ...and the button is off while busy
 
 
 def test_the_total_count_header_is_a_whole_number_or_null_never_nan_or_zero_from_an_empty_string():

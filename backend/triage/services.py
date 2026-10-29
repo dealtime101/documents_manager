@@ -9,7 +9,7 @@ import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, replace
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -587,18 +587,89 @@ MAX_TERMS = 8
 HIT_START, HIT_END = "\x01", "\x02"  # around the words found in a snippet: never part of a real document text
 
 
-def search(query: object, limit: object = 20) -> list[dict]:
+SEARCH_FILTERS = ("company", "type", "date_from", "date_to", "amount_min", "amount_max")
+SEARCH_SORTS = ("relevance", "date", "-date", "amount", "-amount")
+_DATE = "json_extract(i.analysis, '$.date')"
+_AMOUNT = "CAST(json_extract(i.analysis, '$.amount') AS REAL)"
+_ISO_DAY = "'[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"  # a date the engine could read: the others are "XXXX" or "2025-XX-XX"
+
+
+def _search_filters(filters: dict) -> tuple[list[str], list]:
+    """DOC534.8: the SQL conditions (and their values) for the fields the engine extracted from each filed document: company and
+    type contain the text typed (case-insensitive; accents must match), the date lies in a period, the amount in a range. A value
+    that is empty is no filter; one that is not a date or a number is refused, never ignored (the list would look filtered)."""
+    clauses: list[str] = []
+    args: list = []
+    for key, field in (("company", "company"), ("type", "document_type")):
+        text = filters.get(key)
+        if text is None or not str(text).strip():
+            continue
+        if not isinstance(text, str) or len(text) > 100:
+            raise ApiError(f"{key} must be a text of at most 100 characters")
+        clauses.append(f"json_extract(i.analysis, '$.{field}') LIKE %s ESCAPE '\\'")
+        args.append("%" + text.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+    days = {}
+    for key in ("date_from", "date_to"):
+        text = filters.get(key)
+        if text is None or not str(text).strip():
+            continue
+        text = str(text).strip()
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):  # fromisoformat also takes "20250101": the screen sends this form
+                raise ValueError(text)
+            days[key] = date.fromisoformat(text).isoformat()
+        except ValueError:
+            raise ApiError(f"{key} must be a date (YYYY-MM-DD)") from None
+    if len(days) == 2 and days["date_from"] > days["date_to"]:
+        raise ApiError("the period ends before it starts")
+    if days:
+        clauses.append(f"{_DATE} GLOB {_ISO_DAY}")
+    for key, op in (("date_from", ">="), ("date_to", "<=")):
+        if key in days:
+            clauses.append(f"{_DATE} {op} %s")
+            args.append(days[key])
+    amounts = {}
+    for key in ("amount_min", "amount_max"):
+        text = filters.get(key)
+        if text is None or not str(text).strip():
+            continue
+        try:
+            value = Decimal(str(text).strip())
+            if not value.is_finite():
+                raise InvalidOperation
+            amounts[key] = float(value)
+        except InvalidOperation:
+            raise ApiError(f"{key} must be a number") from None
+    if len(amounts) == 2 and amounts["amount_min"] > amounts["amount_max"]:
+        raise ApiError("the minimum amount is above the maximum")
+    for key, op in (("amount_min", ">="), ("amount_max", "<=")):
+        if key in amounts:
+            clauses.append(f"{_AMOUNT} IS NOT NULL AND {_AMOUNT} {op} %s")
+            args.append(amounts[key])
+    return clauses, args
+
+
+def search(query: object, limit: object = 20, filters: dict | None = None, sort: object = "relevance") -> list[dict]:
     """Full-text search of the FILED documents, from the text read at scan time (local SQLite FTS5: accents and case do not
     matter, the last word may be a beginning). Only words are passed to the index: its operators, quotes and wildcards, typed
-    or pasted, never reach it as syntax."""
-    if not isinstance(query, str):
+    or pasted, never reach it as syntax.
+    DOC534.8: `filters` (SEARCH_FILTERS) narrow the documents by company, type, period and amount; with at least one of them the
+    words are optional (the list is then the documents that match, newest first), and `sort` orders the hits."""
+    clauses, args = _search_filters(filters or {})
+    if sort not in SEARCH_SORTS:
+        raise ApiError(f"sort must be one of: {', '.join(SEARCH_SORTS)}")
+    if clauses and (query is None or query == ""):
+        query = ""
+    elif not isinstance(query, str):
         raise ApiError("q must be a text")
     words = re.findall(r"\w+", query)[:MAX_TERMS]
-    if not words:
+    if not words and not clauses:
         raise ApiError("type at least one word to search for")
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 50:
         raise ApiError("limit must be a whole number from 1 to 50")
-    match = " ".join([*(f'"{w}"' for w in words[:-1]), f'"{words[-1]}"*'])
+    match = " ".join([*(f'"{w}"' for w in words[:-1]), f'"{words[-1]}"*']) if words else ""
+    if sort == "relevance" and not match:
+        sort = "-date"  # nothing to rank the hits by: the newest first
     library = cfg().path("library_root")
     root = library.resolve()
     # only what is IN the library: an approved duplicate is in quarantine, and its copy of the text must not be a second hit. The
@@ -608,12 +679,19 @@ def search(query: object, limit: object = 20) -> list[dict]:
     under_root = [p.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%" for p in prefixes]
     stored = "replace(i.result_path, '\\', '/')" if _WINDOWS_PATHS else "i.result_path"
     where_root = " OR ".join([f"{stored} LIKE %s ESCAPE '\\'"] * len(under_root))
+    order = {"relevance": "bm25(item_fts)",
+             "date": f"({_DATE} GLOB {_ISO_DAY}) DESC, {_DATE} ASC", "-date": f"({_DATE} GLOB {_ISO_DAY}) DESC, {_DATE} DESC",
+             "amount": f"{_AMOUNT} IS NULL, {_AMOUNT} ASC", "-amount": f"{_AMOUNT} IS NULL, {_AMOUNT} DESC"}[str(sort)]
+    where = f"i.state = %s AND ({where_root})" + "".join(f" AND ({c})" for c in clauses)  # a document with no date comes last
+    if match:
+        sql = ("SELECT i.id, i.result_path, i.analysis, snippet(item_fts, 0, %s, %s, '…', 14) FROM item_fts "
+               f"JOIN triage_item i ON i.id = item_fts.rowid WHERE item_fts MATCH %s AND {where} ORDER BY {order} LIMIT %s")
+        params = [HIT_START, HIT_END, match, Item.APPROVED, *under_root, *args, limit]
+    else:  # filters only: no words to find, so no snippet
+        sql = f"SELECT i.id, i.result_path, i.analysis, '' FROM triage_item i WHERE {where} ORDER BY {order} LIMIT %s"
+        params = [Item.APPROVED, *under_root, *args, limit]
     with connection.cursor() as cur:
-        cur.execute(
-            "SELECT i.id, i.result_path, i.analysis, snippet(item_fts, 0, %s, %s, '…', 14) FROM item_fts "
-            "JOIN triage_item i ON i.id = item_fts.rowid WHERE item_fts MATCH %s AND i.state = %s "
-            f"AND ({where_root}) "
-            "ORDER BY bm25(item_fts) LIMIT %s", [HIT_START, HIT_END, match, Item.APPROVED, *under_root, limit])
+        cur.execute(sql, params)
         rows = cur.fetchall()
     out = []
     for item_id, result_path, analysis, snippet in rows:
@@ -622,6 +700,7 @@ def search(query: object, limit: object = 20) -> list[dict]:
         base = next((b for b in (root, library) if b in filed.parents), None)
         folder = filed.parent.relative_to(base).as_posix() if base else str(filed.parent)
         out.append({"id": item_id, "filename": filed.name, "folder": folder, "company": a.get("company"), "date": a.get("date"),
+                    "document_type": a.get("document_type"), "amount": a.get("amount"), "currency": a.get("currency"),
                     "snippet": snippet})
     return out
 

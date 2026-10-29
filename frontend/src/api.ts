@@ -50,7 +50,21 @@ export interface SearchHit {
   folder: string
   company: string | null
   date: string | null
+  document_type: string | null
+  amount: string | null
+  currency: string | null
   snippet: string
+}
+
+/** What narrows a search to the fields read from each document (all optional; a value left empty is no filter). */
+export interface SearchFilters {
+  company: string
+  type: string
+  date_from: string
+  date_to: string
+  amount_min: string
+  amount_max: string
+  sort: string
 }
 
 /** A rule the program learned from a correction (the hand-written ones are not part of this list). */
@@ -219,7 +233,8 @@ export const api = {
   scan: () => call<{ job: ScanJob }>('POST', '/api/scan'),
   scanStatus: () => call<ScanJob>('GET', '/api/scan/status'),
   approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after }, SLOW_REQUEST_TIMEOUT_MS),  // after: where the previous request stopped
-  search: (q: string) => call<SearchHit[]>('GET', `/api/search?${new URLSearchParams({ q })}`),
+  search: (q: string, filters: Partial<SearchFilters> = {}) =>
+    call<SearchHit[]>('GET', `/api/search?${new URLSearchParams({ q, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) })}`),
   stats: () => call<Accuracy>('GET', '/api/stats'),
   rules: () => call<LearnedRules>('GET', '/api/rules'),
   forgetRule: (kind: 'alias' | 'type' | 'route', company: string, pattern?: string) =>
