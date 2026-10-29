@@ -405,13 +405,26 @@ def test_text_that_only_looks_a_little_like_an_item_row_is_not_one():
 
 
 def test_find_date_stays_fast_on_a_long_statement_with_a_date_on_every_line():
+    # DOC534.230: the GROWTH is measured, not a time in seconds that a loaded CI runner or a coverage run would exceed. Four times the
+    # lines must cost about four times as much (a few lines x dates loop makes it sixteen); the best of several runs removes the noise.
     import time
-    text = "\n".join(f"2025-{(i % 12) + 1:02d}-{(i % 28) + 1:02d} operation {i} 12,34 $" for i in range(8000))
-    start = time.perf_counter()
-    d = find_date(text)
-    elapsed = time.perf_counter() - start
+
+    def statement(lines):
+        return "\n".join(f"2025-{(i % 12) + 1:02d}-{(i % 28) + 1:02d} operation {i} 12,34 $" for i in range(lines))
+
+    def best_time(text):
+        runs = []
+        for _ in range(5):
+            start = time.perf_counter()
+            found = find_date(text)
+            runs.append(time.perf_counter() - start)
+        return min(runs), found
+
+    small, _ = best_time(statement(2500))
+    large, d = best_time(statement(10000))
     assert (d.text, d.kind) == ("2025-01-01", "other")
-    assert elapsed < 1.5, f"{elapsed:.2f}s: the cost grows with lines x dates"   # was ~5.5 s; linear is a few tenths
+    ratio = large / max(small, 1e-6)
+    assert ratio < 9, f"4x the lines cost {ratio:.1f}x as much ({small:.3f}s, {large:.3f}s): the cost grows with lines x dates"   # linear: 4, squared: 16
 
 
 def test_the_date_label_words_have_one_source_that_find_date_really_uses(monkeypatch):
