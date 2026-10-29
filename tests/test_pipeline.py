@@ -104,14 +104,63 @@ def test_undo_across_volumes_verifies_the_copy_before_deleting_the_filed_documen
     dst = apply(propose(f, cfg, db, RuleBasedAnalyzer(cfg)), cfg, db)
     filed = dst.read_bytes()
     real = pipeline.sha256_file
-    cross = lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device"))
-    monkeypatch.setattr(pipeline.os, "link", cross)
-    monkeypatch.setattr(pipeline.os, "rename", cross)
+    cross_device(monkeypatch)
     monkeypatch.setattr(pipeline, "sha256_file", lambda p: real(p) if Path(p) == dst else "corrupt")   # the restored copy is bad
     with pytest.raises(OSError, match="checksum mismatch"):
         undo(db)
     assert dst.read_bytes() == filed and not f.exists()             # the filed document was never deleted
     assert db.op(None) is not None
+
+
+def raising(error):
+    """A stand-in for a function that always fails with `error` (DOC534.267: instead of a generator-throw lambda written each time)."""
+    def fail(*args, **kwargs):
+        raise error
+    return fail
+
+
+def cross_device(monkeypatch):
+    """Rename and hard link between two volumes are refused (EXDEV), so the engine has to copy and verify."""
+    import errno
+
+    from docflow import pipeline
+    refuse = raising(OSError(errno.EXDEV, "cross-device"))
+    monkeypatch.setattr(pipeline.os, "rename", refuse)
+    monkeypatch.setattr(pipeline.os, "link", refuse)
+
+
+def copy_dies_half_way(monkeypatch) -> list:
+    """The copy between volumes writes 100 bytes and then the disk is full. Returns the sizes it wrote, to show it really did."""
+    import errno
+    import shutil
+    written = []
+
+    def half_then_fail(fin, fout, *args, **kwargs):
+        written.append(fout.write(fin.read(100)))  # a truncated copy is already on disk
+        raise OSError(errno.ENOSPC, "No space left on device")
+    monkeypatch.setattr(shutil, "copyfileobj", half_then_fail)
+    return written
+
+
+def test_the_failure_helpers_fail_the_way_they_say(tmp_path, monkeypatch):
+    # DOC534.267: the cross-volume scenario is written once; its helpers must do what the two tests that use them rely on
+    import errno
+    import os
+    import shutil
+
+    with pytest.raises(ValueError, match="boom"):
+        raising(ValueError("boom"))("any", argument=1)
+    cross_device(monkeypatch)
+    for call in (os.rename, os.link):
+        with pytest.raises(OSError) as refused:
+            call(tmp_path / "a", tmp_path / "b")
+        assert refused.value.errno == errno.EXDEV
+    written = copy_dies_half_way(monkeypatch)
+    source, target = tmp_path / "s", tmp_path / "t"
+    source.write_bytes(b"x" * 500)
+    with open(source, "rb") as fin, open(target, "wb") as fout, pytest.raises(OSError, match="No space left"):
+        shutil.copyfileobj(fin, fout)
+    assert written == [100] and target.stat().st_size == 100                         # half a copy, and nothing more
 
 
 def library_files(cfg, tmp):
@@ -443,8 +492,7 @@ def test_a_cross_device_move_verifies_the_copy_before_deleting_the_original(env,
     original = f.read_bytes()
     p = propose(f, cfg, db, RuleBasedAnalyzer(cfg))
     real = pipeline.sha256_file
-    monkeypatch.setattr(pipeline.os, "rename", lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device")))
-    monkeypatch.setattr(pipeline.os, "link", lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device")))
+    cross_device(monkeypatch)
     monkeypatch.setattr(pipeline, "sha256_file", lambda path: "corrupt" if str(tmp / "lib") in str(path) else real(path))
     with pytest.raises(OSError, match="checksum mismatch"):
         apply(p, cfg, db)
@@ -503,8 +551,7 @@ def test_apply_never_overwrites_across_filesystems_either(env, monkeypatch):
     cfg, db, tmp = env
     f = mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO)
     p = propose(f, cfg, db, RuleBasedAnalyzer(cfg))
-    monkeypatch.setattr(pipeline.os, "rename", lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device")))
-    monkeypatch.setattr(pipeline.os, "link", lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device")))
+    cross_device(monkeypatch)
     real, calls = pipeline._unique, []
 
     def racy(dest):
@@ -971,13 +1018,8 @@ def test_a_cross_device_copy_that_fails_midway_leaves_no_partial_file_in_the_lib
     f = mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO)
     original = f.read_bytes()
     p = propose(f, cfg, db, RuleBasedAnalyzer(cfg))
-    monkeypatch.setattr(pipeline.os, "rename", lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device")))
-    monkeypatch.setattr(pipeline.os, "link", lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device")))
-
-    def half_then_fail(fin, fout, *a, **k):
-        fout.write(fin.read(100))  # a truncated copy is already on disk
-        raise OSError(errno.ENOSPC, "No space left on device")
-    monkeypatch.setattr(shutil, "copyfileobj", half_then_fail)
+    cross_device(monkeypatch)
+    copy_dies_half_way(monkeypatch)
     with pytest.raises(OSError, match="No space left"):
         apply(p, cfg, db)
     assert f.exists() and f.read_bytes() == original            # the ORIGINAL is untouched
@@ -1026,9 +1068,7 @@ def test_a_cross_device_copy_is_removed_when_the_original_cannot_be_deleted(env,
     cfg, db, tmp = env
     f = mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO)
     p = propose(f, cfg, db, RuleBasedAnalyzer(cfg))
-    cross = lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device"))  # noqa: E731
-    monkeypatch.setattr(pipeline.os, "rename", cross)
-    monkeypatch.setattr(pipeline.os, "link", cross)
+    cross_device(monkeypatch)
     real_unlink = Path.unlink
 
     def locked(self, *a, **k):
@@ -1054,17 +1094,9 @@ def test_a_retry_after_a_failed_cross_device_copy_gets_the_wanted_name_not_a_suf
     cfg, db, tmp = env
     f = mkpdf(tmp / "inbox" / "invoice.pdf", HYDRO)
     p = propose(f, cfg, db, RuleBasedAnalyzer(cfg))
-    cross = lambda *a: (_ for _ in ()).throw(OSError(errno.EXDEV, "cross-device"))  # noqa: E731
-    monkeypatch.setattr(pipeline.os, "rename", cross)
-    monkeypatch.setattr(pipeline.os, "link", cross)
+    cross_device(monkeypatch)
     real = shutil.copyfileobj
-
-    written = []
-
-    def half_then_fail(fin, fout, *a, **k):
-        written.append(fout.write(fin.read(100)))
-        raise OSError(errno.ENOSPC, "No space left on device")
-    monkeypatch.setattr(shutil, "copyfileobj", half_then_fail)
+    written = copy_dies_half_way(monkeypatch)
     with pytest.raises(OSError, match="No space left"):                  # DOC534.214: this failure, not any other I/O error
         apply(p, cfg, db)
     assert written == [100] and f.exists()                                # a partial copy was really written; the source is untouched
