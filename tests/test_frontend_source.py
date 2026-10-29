@@ -897,6 +897,15 @@ def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
         assert "'rules.forgetPatternLabel'" in block and "{pattern}" in block.split("'rules.forgetPatternLabel'")[1].split("\n")[0]
 
 
+def test_the_comment_of_the_tab_bar_says_what_its_class_does():
+    # DOC534.261: it said the row scrolls, but flex-wrap makes it wrap onto several lines
+    app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
+    bar = app[app.index("<TabsList"):app.index(">", app.index("<TabsList"))]
+    comment = app[app.index("{/* the height is in rem"):app.index("*/}", app.index("{/* the height is in rem"))]
+    assert "flex-wrap" in bar and "overflow-x" not in bar
+    assert "wraps onto several lines" in comment and "scrolls" not in comment
+
+
 def test_the_quarantine_help_is_text_under_the_field_and_not_a_placeholder():
     # DOC534.260: a placeholder is gone as soon as the field holds a value, and screen readers do not always read it
     settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
