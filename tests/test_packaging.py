@@ -54,6 +54,19 @@ def test_the_windows_build_leaves_the_calling_console_as_it_found_it():
     assert len([line for line in lines if line.startswith("exit /b")]) == 2
 
 
+def test_the_windows_build_checks_the_python_version_and_remakes_an_old_build_venv():
+    # DOC534.171: an old .venv-build, or a py/python older than 3.12, failed later with an unclear error
+    import re
+    script = (PACKAGING / "build_windows.bat").read_text(encoding="utf-8")
+    minimum = re.search(r"requires-python = \">=(\d+\.\d+)\"", (PACKAGING.parent / "pyproject.toml").read_text(encoding="utf-8")).group(1)
+    major, minor = minimum.split(".")
+    check = f'-c "import sys; sys.exit(sys.version_info < ({major}, {minor}))"'                   # the bar of pyproject, not another
+    assert script.count(check) == 2                                                               # the interpreter found AND the old venv
+    interpreter = script.index("%PY% " + check)
+    old_venv = script.index('".venv-build\\Scripts\\python.exe" ' + check)
+    assert interpreter < old_venv < script.index("rmdir /s /q .venv-build") < script.index("%PY% -m venv .venv-build")
+
+
 def test_the_progress_bar_is_off_before_the_first_download():
     # DOC534.158: on Windows PowerShell 5.1 the progress bar of Invoke-WebRequest makes a big download many times slower
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")

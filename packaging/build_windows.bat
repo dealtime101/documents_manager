@@ -7,6 +7,9 @@ set "OLDCP=%OLDCP: =%"
 chcp 65001 >nul
 pushd "%~dp0\.."
 where py >nul 2>nul && (set "PY=py -3") || (set "PY=python")
+rem Python 3.12+ (pyproject: requires-python): the interpreter found is checked, and an older build venv is thrown away and made again.
+%PY% -c "import sys; sys.exit(sys.version_info < (3, 12))" || (echo Python 3.12 or newer is needed: %PY% is older or missing. & goto :fail)
+if exist ".venv-build\Scripts\python.exe" (".venv-build\Scripts\python.exe" -c "import sys; sys.exit(sys.version_info < (3, 12))" || rmdir /s /q .venv-build)
 if not exist ".venv-build\Scripts\python.exe" %PY% -m venv .venv-build || goto :fail
 ".venv-build\Scripts\python.exe" -m pip install --quiet --upgrade pip || goto :fail
 ".venv-build\Scripts\python.exe" -m pip install --quiet . pyinstaller pywebview || goto :fail
