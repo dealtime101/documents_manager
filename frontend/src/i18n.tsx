@@ -145,7 +145,7 @@ const en = {
   'queue.approveSelected': 'Approve selected ({n})',
   'queue.confirmBatch.one': 'Approve {n} document? It is filed as shown.',
   'queue.confirmBatch.other': 'Approve {n} documents? Each one is filed as shown.',
-  'queue.empty': 'Nothing to file. Drop PDFs in the inbox, then click “Scan inbox”.',
+  'queue.empty': 'Nothing to file. Drop PDFs or photos in the inbox, then click “Scan inbox”.',
   'queue.truncated': 'Showing {shown} of {total}. File or approve some to see the rest.',
   'queue.nameToEnter': 'Name to enter',
   'queue.noSelection': 'No document selected.',
@@ -227,6 +227,7 @@ const en = {
   'hist.none': 'No operations yet.',
   'op.move': 'move',
   'op.quarantine': 'quarantine',
+  'op.convert': 'picture filed as PDF',
 } as const
 
 export type Key = keyof typeof en
@@ -375,7 +376,7 @@ const fr: Record<Key, string> = {
   'queue.approveSelected': 'Approuver la sélection ({n})',
   'queue.confirmBatch.one': 'Approuver {n} document ? Il est classé tel qu’affiché.',
   'queue.confirmBatch.other': 'Approuver {n} documents ? Chacun est classé tel qu’affiché.',
-  'queue.empty': 'Rien à classer. Déposer des PDF dans la boîte de réception, puis cliquer sur « Analyser la boîte de réception ».',
+  'queue.empty': 'Rien à classer. Déposer des PDF ou des photos dans la boîte de réception, puis cliquer sur « Analyser la boîte de réception ».',
   'queue.truncated': 'Affichage de {shown} sur {total}. Classer ou approuver quelques documents pour voir la suite.',
   'queue.nameToEnter': 'Nom à saisir',
   'queue.noSelection': 'Aucun document sélectionné.',
@@ -458,6 +459,7 @@ const fr: Record<Key, string> = {
   'hist.none': "Aucune opération pour l'instant.",
   'op.move': 'déplacement',
   'op.quarantine': 'quarantaine',
+  'op.convert': 'image classée en PDF',
 }
 
 // Messages produced by the server are in English; exact texts and "prefix: detail" texts are translated here.
@@ -509,6 +511,8 @@ const frMessages: Record<string, string> = {
   'no operation to undo': 'aucune opération à annuler',
   'incomplete proposal: manual validation required': 'proposition incomplète : validation manuelle requise',
   'Cannot read file: ': 'Lecture impossible : ',
+  'not a picture that can be read: ': 'image illisible : ',
+  'the original picture is no longer kept: ': 'l’image d’origine n’est plus conservée : ',
   'Ollama unavailable: ': 'Ollama indisponible : ',
   'value rejected: ': 'valeur refusée : ',
   'file not found: ': 'fichier introuvable : ',

@@ -1,5 +1,7 @@
-"""Text of a PDF: text layer first, page-by-page OCR only if the page is empty."""
+"""Text of a PDF: text layer first, page-by-page OCR only if the page is empty. A picture (photo, scan saved as an image) is
+turned into a one-page PDF first, so it takes the very same road as a scanned page."""
 import hashlib
+import io
 import json
 import logging
 import os
@@ -18,8 +20,52 @@ from pathlib import Path
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_raw
+from PIL import Image, ImageOps
+from PIL.Image import open as open_image
 
 log = logging.getLogger(__name__)
+
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".bmp"}
+try:  # HEIC (the iPhone's format) is read only where pillow-heif is installed (the "heic" extra): its binary wheels carry GPL
+    # libraries (x265), so the packaged application does not ship it, as it does not ship PyMuPDF (AGPL)
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    IMAGE_SUFFIXES |= {".heic", ".heif"}
+except ImportError:
+    pass
+SCANNED_SUFFIXES = {".pdf"} | IMAGE_SUFFIXES  # what a scan picks up in a folder: everything else stays where it is
+PAGE_LONG_SIDE_INCHES = 11.69  # a picture becomes a page of about an A4 sheet, whatever its pixels (a phone photo is 4000 pixels)
+PICTURE_MIN_DPI, PICTURE_MAX_DPI = 150, 600  # ... but never a page so small or so big that the OCR renders it badly
+
+
+def is_image(path: Path) -> bool:
+    return path.suffix.lower() in IMAGE_SUFFIXES
+
+
+def is_scannable(path: Path) -> bool:
+    return path.suffix.lower() in SCANNED_SUFFIXES
+
+
+def image_to_pdf(data: bytes) -> bytes:
+    """A one-page PDF holding the picture, upright (the camera's orientation flag is applied; a page that is still sideways is
+    straightened by the OCR step like any scan). Transparency is flattened onto white: black behind a screenshot's text is unreadable.
+    Raises ValueError for a file that is not a picture or is too big to open.
+    ponytail: the first frame only (a multi-page TIFF or an animation keeps its first page); add all frames when scanners need it."""
+    try:
+        with open_image(io.BytesIO(data)) as opened:  # (Image.open would trip the guard against open() without an encoding)
+            im = ImageOps.exif_transpose(opened)
+            if im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info):
+                rgba = im.convert("RGBA")
+                im = Image.new("RGB", rgba.size, "white")
+                im.paste(rgba, mask=rgba.getchannel("A"))
+            elif im.mode not in ("L", "RGB"):  # 1-bit, palette, CMYK, 16-bit...
+                im = im.convert("RGB")
+            dpi = min(max(max(im.size) / PAGE_LONG_SIDE_INCHES, PICTURE_MIN_DPI), PICTURE_MAX_DPI)
+            out = io.BytesIO()
+            im.save(out, "PDF", resolution=dpi, quality=95)
+            return out.getvalue()
+    except (OSError, Image.DecompressionBombError, SyntaxError, ValueError, EOFError) as e:  # Pillow's own ways to say "not a picture"
+        raise ValueError(f"not a picture that can be read: {type(e).__name__}") from e
 
 # PDFium is NOT thread-safe: two threads in it crash the process (a segmentation fault, not an exception). A scan reads several
 # PDFs in parallel, so every call into PDFium is made under this lock; Tesseract, the slow part, runs OUTSIDE it.
@@ -267,8 +313,9 @@ def extract_text(path: Path, ocr: dict | None = None) -> Extracted:
     parts, used_text, used_ocr, missing_pages = [], False, False, 0
     tesseract_exe = find_tesseract(ocr.get("tesseract", "tesseract"))  # searched ONCE: the pages get the full path
     tesseract_found = bool(tesseract_exe)
+    pdf = image_to_pdf(path.read_bytes()) if is_image(path) else path
     with _PDFIUM:
-        doc = pdfium.PdfDocument(path)
+        doc = pdfium.PdfDocument(pdf)
         n = len(doc)
     try:
         for index in range(n):  # all pages

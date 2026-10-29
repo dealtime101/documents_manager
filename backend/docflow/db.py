@@ -77,6 +77,11 @@ class DB:
             self.c.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_doc_sha_filed ON documents(sha256) WHERE status='classified'")
         except sqlite3.IntegrityError:  # duplicates filed before this guard existed: keep working without it, never refuse to open
             log.warning("history already holds the same content filed twice: the uniqueness guard is not installed")
+        if "detail" not in {r["name"] for r in self.c.execute("PRAGMA table_info(operations)")}:
+            try:  # DOC534.6: what an operation must remember to be undone beyond src and dst (a picture: where its original was kept)
+                self.c.execute("ALTER TABLE operations ADD COLUMN detail TEXT")
+            except sqlite3.OperationalError:  # "duplicate column name": another process opening the file added it a moment ago
+                pass
         self._document_columns = frozenset(r["name"] for r in self.c.execute("PRAGMA table_info(documents)"))
 
     def close(self) -> None:
@@ -122,9 +127,9 @@ class DB:
         self.c.commit()
         return _row_id(cur)
 
-    def add_op(self, doc_id: int, kind: str, src: str, dst: str) -> int:
-        cur = self.c.execute("INSERT INTO operations (document_id,kind,src,dst,ts) VALUES (?,?,?,?,?)",
-                             (doc_id, kind, src, dst, now()))
+    def add_op(self, doc_id: int, kind: str, src: str, dst: str, detail: str | None = None) -> int:
+        cur = self.c.execute("INSERT INTO operations (document_id,kind,src,dst,ts,detail) VALUES (?,?,?,?,?,?)",
+                             (doc_id, kind, src, dst, now(), detail))
         self.c.commit()
         return _row_id(cur)
 

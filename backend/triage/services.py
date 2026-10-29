@@ -20,7 +20,7 @@ from django.utils import timezone
 from docflow import learn
 from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.db import DB
-from docflow.extract import extract_text, find_tesseract
+from docflow.extract import extract_text, find_tesseract, is_scannable
 from docflow.naming import build_filename, sanitize
 from docflow.pipeline import Proposal, apply, propose, sha256_file
 from docflow.pipeline import undo as engine_undo
@@ -62,14 +62,15 @@ def roots() -> list[Path]:
 
 # ------------------------------------------------------------------ scan
 def pdfs_under(root: Path) -> list[Path]:
-    """The ONE definition of "a PDF to scan": any case of .pdf, subfolders included, folders starting with @ or . skipped
-    (NAS metadata such as @eaDir). The scan and the dashboard count both use it, so they cannot disagree."""
+    """The ONE definition of "a file to scan": a PDF (any case of .pdf) or a picture (docflow.extract.IMAGE_SUFFIXES), subfolders
+    included, folders starting with @ or . skipped (NAS metadata such as @eaDir). The scan and the dashboard count both use it, so
+    they cannot disagree."""
     out: list[Path] = []
     if not root.exists():
         return out
     for d, dirs, files in os.walk(root):
         dirs[:] = sorted(x for x in dirs if not x.startswith(("@", ".")))
-        out += [Path(d) / f for f in sorted(files) if f.lower().endswith(".pdf")]
+        out += [Path(d) / f for f in sorted(files) if is_scannable(Path(f))]
     return out
 
 

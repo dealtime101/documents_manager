@@ -2,6 +2,7 @@
 `propose` touches nothing; `apply` and `undo` are the only functions that move files."""
 import errno
 import hashlib
+import json
 import logging
 import os
 import shutil
@@ -11,7 +12,7 @@ from pathlib import Path
 from .analyze import Analysis, DocumentAnalyzer
 from .config import Config
 from .db import DB, now
-from .extract import extract_text
+from .extract import extract_text, image_to_pdf, is_image
 from .fields import header_line
 from .naming import FORBIDDEN, build_filename
 from .routing import fill, route, safe_join, type_destination_unusable, unknown_placeholder
@@ -92,7 +93,8 @@ def propose(path: Path, cfg: Config, db: DB, analyzer: DocumentAnalyzer, fallbac
     if a.company and a.document_type:
         try:
             p.final_name = build_filename(a.date, a.company, a.document_type, a.detail,
-                                          a.amount if a.include_amount else None, a.currency, path.suffix.lower())
+                                          a.amount if a.include_amount else None, a.currency,
+                                          ".pdf" if is_image(path) else path.suffix.lower())  # a picture is filed as a PDF
         except ValueError as e:  # one document whose name cannot be built must not fail the whole batch: a human names it
             log.warning("no file name for %s: %s", path.name, e)
             p.notes.append("No file name could be built: the company or the type is empty once cleaned.")
@@ -276,6 +278,51 @@ def _put_back(src: Path, dst: Path, sha: str) -> None:
         log.exception("could not put %s back to %s; it stays at %s", dst.name, src, dst)
 
 
+def _write_unique(wanted: Path, data: bytes) -> Path:
+    """Write `data` to the first free name at `wanted`, never over a file; no partial file stays if the write fails."""
+    wanted.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(50):
+        dst = _unique(wanted)
+        try:
+            with open(dst, "xb") as f:
+                f.write(data)
+        except FileExistsError:  # someone took the name between the check and the write: take the next one
+            continue
+        except BaseException:
+            dst.unlink(missing_ok=True)
+            raise
+        return dst
+    raise FileExistsError(wanted)
+
+
+def _file_picture(src: Path, wanted: Path, sha: str, kept_dir: Path) -> tuple[Path, Path, str]:
+    """DOC534.6: a picture is filed as a PDF. The PDF is written at `wanted` (first free name), then the ORIGINAL is moved aside to
+    `kept_dir/<its SHA-256><its extension>`, so that the undo can give it back. Returns (the PDF, where the original is, the PDF's
+    SHA-256). The picture is read ONCE: the bytes that were hashed are the bytes that are converted."""
+    data = src.read_bytes()
+    if hashlib.sha256(data).hexdigest() != sha:  # the file changed after it was analysed
+        raise OSError(f"checksum mismatch: {src} changed since it was analysed")
+    pdf = image_to_pdf(data)
+    dst = _write_unique(wanted, pdf)
+    kept = kept_dir / f"{sha}{src.suffix.lower()}"
+    try:
+        if kept.exists():  # named by its content: the same picture was set aside before and never given back
+            src.unlink()
+        else:
+            _move_verified(src, kept, sha)
+    except BaseException:  # the picture stays where it is, and so must nothing else: no PDF without its original's trace
+        dst.unlink(missing_ok=True)
+        raise
+    return dst, kept, hashlib.sha256(pdf).hexdigest()
+
+
+def _unfile_picture(src: Path, kept: Path, dst: Path, sha: str) -> None:
+    """Best effort, after a later step failed: the original goes back to `src` and the PDF made from it is removed."""
+    _put_back(src, kept, sha)
+    if src.exists():
+        dst.unlink(missing_ok=True)
+
+
 def apply(p: Proposal, cfg: Config, db: DB, final_name: str | None = None, source: str = "LocalFolder",
           confirmed: bool = False) -> Path:
     """Rename + move. Never overwrites an existing file (' (2)' suffix). Returns the final path.
@@ -311,7 +358,11 @@ def apply(p: Proposal, cfg: Config, db: DB, final_name: str | None = None, sourc
     wanted = safe_join(cfg.path("library_root"), p.rel_dir) / name
     if len(str(wanted)) + len(" (999)") > MAX_PATH:  # room for a collision suffix
         raise ValueError(f"path too long ({len(str(wanted))} chars)")
-    dst = _move_unique(p.source, wanted, p.sha256)
+    picture = is_image(p.source)
+    if picture:
+        dst, kept, pdf_sha = _file_picture(p.source, wanted, p.sha256, cfg.path("quarantine") / "originals")
+    else:
+        dst = _move_unique(p.source, wanted, p.sha256)
     doc = None
     try:
         doc = db.add_document(
@@ -320,9 +371,15 @@ def apply(p: Proposal, cfg: Config, db: DB, final_name: str | None = None, sourc
             document_date=a.date, amount=str(a.amount) if a.amount is not None else None, currency=a.currency,
             invoice_number=a.invoice_number, confidence=p.confidence, source=source, processed_at=now(),
             status="classified")
-        db.add_op(doc, "move", str(p.source), str(dst))
+        if picture:
+            db.add_op(doc, "convert", str(p.source), str(dst), json.dumps({"kept": str(kept), "pdf_sha": pdf_sha}))
+        else:
+            db.add_op(doc, "move", str(p.source), str(dst))
     except Exception:  # no trace in the history = no undo: put the file back instead of orphaning it
-        _put_back(p.source, dst, p.sha256)
+        if picture:
+            _unfile_picture(p.source, kept, dst, p.sha256)
+        else:
+            _put_back(p.source, dst, p.sha256)
         if doc:
             db.forget_document(doc)
         raise
@@ -331,11 +388,41 @@ def apply(p: Proposal, cfg: Config, db: DB, final_name: str | None = None, sourc
     return dst
 
 
+def _undo_picture(db: DB, op) -> tuple[Path, Path]:
+    """DOC534.6: the original picture goes back where it came from and the PDF made from it is removed. Refuses, as undo() does,
+    when the original location is occupied, and when the PDF is not the one that was filed (edited since: it would be lost)."""
+    detail = json.loads(op["detail"] or "{}")
+    src, dst, kept = Path(op["src"]), Path(op["dst"]), Path(detail.get("kept", ""))
+    if not dst.exists():
+        raise FileNotFoundError(f"file not found: {dst}")
+    if not kept.is_file():
+        raise FileNotFoundError(f"the original picture is no longer kept: {kept}")
+    if src.exists():
+        raise FileExistsError(f"the original location is occupied: {src}")
+    if sha256_file(dst) != detail.get("pdf_sha"):
+        raise ValueError(f"the filed document has changed since it was filed, not restoring it: {dst}")
+    sha = db.document_sha(op["document_id"]) or sha256_file(kept)
+    _move_verified(kept, src, sha)
+    try:
+        db.mark_undone(op)
+    except Exception:  # history and disk must agree: the picture goes back where the history says it is
+        _put_back(kept, src, sha)
+        raise
+    try:
+        dst.unlink()
+    except OSError as e:  # the picture is back and the history says so; the PDF that stays is a copy to delete by hand
+        log.error("UNDO OP=%s: the PDF %s could not be removed: %s", op["id"], dst, e)
+    log.info("UNDO OP=%s RESTORED=%s", op["id"], src.name)
+    return dst, src
+
+
 def undo(db: DB, op_id: int | None = None) -> tuple[Path, Path]:
     """Restore the old path + old name. Refuses if the original already exists (never overwrites)."""
     op = db.op(op_id)
     if op is None or op["undone"]:
         raise ValueError("no operation to undo")
+    if op["kind"] == "convert":
+        return _undo_picture(db, op)
     src, dst = Path(op["src"]), Path(op["dst"])
     if not dst.exists():
         raise FileNotFoundError(f"file not found: {dst}")

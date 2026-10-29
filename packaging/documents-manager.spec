@@ -20,7 +20,7 @@ for py in (root / "backend").rglob("*.py"):
     hiddenimports.append(".".join(parts[:-1] if parts[-1] == "__init__" else parts))
 
 a = Analysis([str(root / "packaging" / "entry.py")], pathex=[str(root / "backend")], binaries=binaries, datas=datas,
-             hiddenimports=hiddenimports, excludes=["tkinter", "pytest", "mypy", "pymupdf", "fitz"])  # PyMuPDF is AGPL: not shipped, under either of its names
+             hiddenimports=hiddenimports, excludes=["tkinter", "pytest", "mypy", "pymupdf", "fitz", "pillow_heif"])  # PyMuPDF is AGPL: not shipped, under either of its names; the pillow-heif wheels carry GPL libraries (x265)
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], name="DocumentsManager", console=False, upx=False,
           icon=None, disable_windowed_traceback=False)

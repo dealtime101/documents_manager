@@ -14,6 +14,7 @@ from . import __version__
 from .analyze import OllamaAnalyzer, RuleBasedAnalyzer
 from .config import Config, load_config
 from .db import DB
+from .extract import is_scannable
 from .naming import FORBIDDEN
 from .pipeline import Proposal, apply, propose, undo
 from .watch import POLL_SECONDS, watch
@@ -80,9 +81,9 @@ def row(p: Proposal, root: Path | None = None) -> str:
 
 
 def _left_over(files: list[Path], i: int) -> tuple[int, int]:
-    """(PDFs, other files) that stay exactly where they are when the run stops at files[i]: that file and the following ones."""
+    """(PDFs and pictures, other files) that stay exactly where they are when the run stops at files[i]: that file and the following ones."""
     rest = files[i:]
-    return (sum(1 for g in rest if g.suffix.lower() == ".pdf"), sum(1 for g in rest if g.suffix.lower() != ".pdf"))
+    return (sum(1 for g in rest if is_scannable(g)), sum(1 for g in rest if not is_scannable(g)))
 
 
 def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
@@ -108,7 +109,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
     seen: set[str] = set()  # hashes already seen in THIS batch (a dry run records nothing in the database)
     interrupted: BaseException | None = None
     for i, f in enumerate(files):
-        if f.suffix.lower() != ".pdf":
+        if not is_scannable(f):
             skipped += 1  # counted in the summary even when --table hides the line
             if not table:
                 print(f"\nSkipped (type not handled in Phase 1): {f.name}")
@@ -119,7 +120,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
             interrupted = e
             pdfs, others = _left_over(files, i)
             held += pdfs
-            skipped += others - (f.suffix.lower() != ".pdf")
+            skipped += others - (not is_scannable(f))
             print("\nInterrupted: nothing else will be filed.")
             break
         except Exception as e:  # one broken file (database, analyser, value error) must not stop the batch
@@ -160,7 +161,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
                     interrupted = e
                     pdfs, others = _left_over(files, i)  # this file and the following ones stay exactly where they are
                     held += pdfs
-                    skipped += others - (f.suffix.lower() != ".pdf")
+                    skipped += others - (not is_scannable(f))
                     print("\nInterrupted: nothing else will be filed.")
                     break
                 if name is None:
@@ -181,7 +182,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
             interrupted = e
             pdfs, others = _left_over(files, i)
             held += pdfs
-            skipped += others - (f.suffix.lower() != ".pdf")
+            skipped += others - (not is_scannable(f))
             print(f"\nInterrupted: nothing else will be filed. {f.name} may already be filed: see `docflow history`.")
             break
         except Exception as e:  # whatever apply() raises (OSError, a locked or broken history, a bug) is this file's failure, not the batch's
@@ -190,7 +191,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
             report(f"ERROR: {e}")
             log.error("ORIGINAL=%s STATUS=ERROR %s: %s", f.name, type(e).__name__, e)  # an unattended run must leave a trace
     handled = f"{analysed} analysed" if dry else f"{done} processed"
-    print(f"\n{len(files)} file(s); {handled}, {held} pending" + (f", {skipped} skipped (not PDF)" if skipped else "")
+    print(f"\n{len(files)} file(s); {handled}, {held} pending" + (f", {skipped} skipped (not PDF or picture)" if skipped else "")
           + (f", {failed} FAILED" if failed else "")
           + (" [DRY-RUN: nothing moved]" if dry else "") + (" [INTERRUPTED]" if interrupted else ""))
     if isinstance(interrupted, KeyboardInterrupt):
@@ -231,7 +232,7 @@ def watch_inbox(cfg: Config, db: DB, interval: float = POLL_SECONDS, stop=None) 
         return 2
 
     def files() -> list[Path]:
-        return sorted(f for f in inbox.glob("*") if f.is_file() and f.suffix.lower() == ".pdf")
+        return sorted(f for f in inbox.glob("*") if f.is_file() and is_scannable(f))
 
     def arrived(paths: list[Path]) -> None:
         print(f"{len(paths)} PDF(s) arrived: {', '.join(p.name for p in paths)}", flush=True)

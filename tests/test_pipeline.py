@@ -837,14 +837,14 @@ def test_the_summary_adds_up_to_the_number_of_files_and_counts_the_skipped_ones(
     mkpdf(tmp / "inbox" / "b-held.pdf", "Lettre de la tante Huguette, 3 mai 2025")
     mkpdf(tmp / "inbox" / "c-propose-fails.pdf", "Lettre de la tante Huguette, 4 mai 2025")
     (tmp / "inbox" / "d-notes.txt").write_text("not a pdf")
-    (tmp / "inbox" / "e-photo.jpg").write_bytes(b"\xff\xd8")
+    (tmp / "inbox" / "e-photo.mp4").write_bytes(b"\xff\xd8")  # a video: not a PDF, not a picture (a .jpg is one now)
     real = cli.propose
     monkeypatch.setattr(cli, "propose", lambda path, *a, **k: (_ for _ in ()).throw(ValueError("boom"))
                         if path.name.startswith("c-") else real(path, *a, **k))
     cli.scan(cfg, db, dry=False, interactive=False, ollama=False, table=table)
     summary = capsys.readouterr().out.strip().splitlines()[-1]
     # 5 files = 1 processed + 2 pending (held and failed to analyse) + 2 skipped; the failure is counted on top, not instead
-    assert summary == "5 file(s); 1 processed, 2 pending, 2 skipped (not PDF), 1 FAILED"
+    assert summary == "5 file(s); 1 processed, 2 pending, 2 skipped (not PDF or picture), 1 FAILED"
 
 
 def test_the_env_fixture_reads_the_versioned_test_configuration_never_the_users(env):
@@ -914,7 +914,7 @@ def test_a_dry_run_summary_accounts_for_every_file_as_analysed_not_processed(env
     cli.scan(cfg, db, dry=True, interactive=False, ollama=False, table=table)
     summary = capsys.readouterr().out.strip().splitlines()[-1]
     # 3 files = 2 analysed + 1 skipped: nothing was "processed" (nothing moved), and the line must still add up
-    assert summary == "3 file(s); 2 analysed, 0 pending, 1 skipped (not PDF) [DRY-RUN: nothing moved]"
+    assert summary == "3 file(s); 2 analysed, 0 pending, 1 skipped (not PDF or picture) [DRY-RUN: nothing moved]"
 
 
 def test_cli_dry_run_moves_nothing(env, monkeypatch, capsys):

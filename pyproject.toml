@@ -10,10 +10,16 @@ dependencies = [
     "djangorestframework>=3.18.1",
     "pypdfium2>=5.14.0",
     "waitress>=3.0.2",
+    "pillow>=11",
 ]
 
 [project.scripts]
 docflow = "docflow.cli:main"
+
+[project.optional-dependencies]
+heic = [
+    "pillow-heif>=1.8",
+]
 
 [dependency-groups]
 desktop = [
@@ -26,6 +32,7 @@ dev = [
     "pytest",
     "pytest-django>=4.14.0",
     "types-pyyaml>=6.0.12.20260906",
+    "pillow-heif>=1.8",
 ]
 
 [build-system]

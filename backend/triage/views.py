@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import re
@@ -10,6 +11,7 @@ from django.http import FileResponse
 from django.middleware.csrf import get_token
 from docflow import __version__, usersettings
 from docflow.changelog import parse as parse_changelog
+from docflow.extract import image_to_pdf, is_image
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import (
@@ -223,15 +225,17 @@ def item_pdf(request, pk):
     try:
         # the file can vanish or become unreadable between the check of its path and the opening: still "unavailable"
         path = s.pdf_path(get_item(pk))
-        fh = path.open("rb")  # handed to FileResponse below, which closes it once sent
-    except (Item.DoesNotExist, s.ApiError):
+        # a picture waiting to be filed is shown as the PDF it will become (a browser cannot show a HEIC); else the file itself
+        fh = io.BytesIO(image_to_pdf(path.read_bytes())) if is_image(path) else path.open("rb")  # FileResponse closes it once sent
+    except (Item.DoesNotExist, s.ApiError, ValueError):
         return err(ValueError("file unavailable"), status.HTTP_404_NOT_FOUND)
     except OSError as e:  # the user only learns "unavailable"; the log says why (permissions, storage, a vanished file)
         log.warning("pdf of item %s unavailable: %s", pk, e)
         return err(ValueError("file unavailable"), status.HTTP_404_NOT_FOUND)
     # shown inline in the preview, but "Save as" proposes the document's own name (Django writes the RFC 6266 form, with the
     # UTF-8 filename* for accents and with quotes escaped, instead of a hand-built header)
-    return FileResponse(fh, content_type="application/pdf", as_attachment=False, filename=path.name)
+    return FileResponse(fh, content_type="application/pdf", as_attachment=False,
+                        filename=path.with_suffix(".pdf").name if is_image(path) else path.name)
 
 
 @api_view(["POST"])

@@ -1,7 +1,9 @@
 # Documents Manager
 
-Local, private filing of personal documents. Drop PDFs in a folder: Documents Manager reads them (text layer, or local OCR for
-scans), proposes a name and a destination folder, and files them when you approve. Everything stays on your machine: no document
+Local, private filing of personal documents. Drop PDFs or photos (JPEG, PNG, WebP, TIFF, BMP; HEIC where `pillow-heif` is installed,
+see below) in a folder: Documents Manager reads them (text layer, or local OCR for scans and photos), proposes a name and a
+destination folder, and files them when you approve. A photo is filed as a one-page PDF; the original picture is kept in the
+`originals` folder of the quarantine, and **History** → undo gives it back. Everything stays on your machine: no document
 leaves it, no cloud service is used (Ollama on `localhost` is an optional extra).
 
 - **To file**: a PDF preview, the proposed company / type / date / amount, a score per field, corrections, batch approval.
@@ -21,7 +23,9 @@ choose the folder to watch (the inbox) and the folder documents are filed into (
 It files with the rights of your Windows session: a folder on a network drive works if the drive is connected in Windows.
 
 **From source** (any system): Python 3.12+, [uv](https://docs.astral.sh/uv/), Node.js 20+ and [Tesseract
-OCR](https://tesseract-ocr.github.io/tessdoc/Installation.html) (scans only; PDFs that already contain text are read without it).
+OCR](https://tesseract-ocr.github.io/tessdoc/Installation.html) (scans and photos only; PDFs that already contain text are read
+without it). HEIC photos (iPhone) need the optional extra: `uv sync --extra heic`. It is not part of the Windows application,
+because the `pillow-heif` wheels carry GPL libraries (x265).
 
 ```bash
 git clone <this repository> documents-manager && cd documents-manager
@@ -65,7 +69,8 @@ uvx ruff check backend scripts tests
 cd frontend && npx tsc -b && npm run build
 ```
 
-PyMuPDF is used by the tests only, to build sample PDFs; the program itself reads PDFs with PDFium (`pypdfium2`).
+PyMuPDF is used by the tests only, to build sample PDFs; the program itself reads PDFs with PDFium (`pypdfium2`) and turns pictures
+into PDFs with Pillow.
 
 ## License
 
