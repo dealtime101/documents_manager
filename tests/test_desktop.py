@@ -38,6 +38,27 @@ def test_the_selftest_exit_code_says_whether_it_passed(monkeypatch, capsys):
     assert capsys.readouterr().out.count('"signed_in"') == 4                         # and the result is still printed each time
 
 
+def test_without_a_native_window_the_browser_fallback_stops_when_no_browser_opens_and_on_ctrl_c(monkeypatch, capsys):
+    # DOC534.36: the return value of webbrowser.open was ignored and the process then waited for ever, with nothing to see or to stop
+    import sys
+    import webbrowser
+
+    from docflow import desktop
+    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("free_port", lambda: 1),
+                        ("start_server", lambda port: None)):
+        monkeypatch.setattr(desktop, name, value)
+    monkeypatch.setitem(sys.modules, "webview", None)                         # `import webview` raises ImportError
+
+    class Interrupted:
+        def wait(self):
+            raise KeyboardInterrupt
+    monkeypatch.setattr(desktop.threading, "Event", Interrupted)
+    monkeypatch.setattr(webbrowser, "open", lambda url: False)
+    assert desktop.main([]) == 1 and "No browser could be opened" in capsys.readouterr().out
+    monkeypatch.setattr(webbrowser, "open", lambda url: True)
+    assert desktop.main([]) == 0 and "Stopped." in capsys.readouterr().out   # Ctrl-C ends it cleanly, without a traceback
+
+
 def test_a_free_local_port_is_found_and_really_free():
     from docflow.desktop import free_port
     port = free_port()

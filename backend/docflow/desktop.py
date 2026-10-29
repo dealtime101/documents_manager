@@ -123,8 +123,14 @@ def main(argv: list[str] | None = None) -> int:
         import webview
     except ImportError:  # no native window available: the default browser shows the same page
         import webbrowser
-        webbrowser.open(url)
-        threading.Event().wait()
+        if not webbrowser.open(url):  # nothing opened: do not keep a server nobody can reach running (the address goes to desktop.log)
+            print("No browser could be opened. The program stops; open the application from a machine with a window system.", flush=True)
+            return 1
+        print("Opened in the default browser. Press Ctrl-C to stop the program.", flush=True)
+        try:
+            threading.Event().wait()
+        except KeyboardInterrupt:
+            print("Stopped.", flush=True)
         return 0
     webview.create_window("Documents Manager", url, width=1280, height=840, min_size=(900, 600))
     webview.start()
