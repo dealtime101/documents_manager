@@ -164,7 +164,7 @@ def parse_llm_json(raw: str, amount_free_types: frozenset[str] = frozenset()) ->
     # answer: the field is dropped (score 0, so a human checks it) and the rest still reaches the user as a suggestion.
     raw_date = d.get("date")
     date = raw_date if isinstance(raw_date, str) and valid_date(raw_date) else "XXXX"
-    currency, currency_ok = _llm_currency(d.get("currency"))
+    currency, currency_ok = _llm_currency(d.get("currency"), d.get("amount"))
     doc_type = _text(d.get("document_type"))
     try:
         a = Analysis(date=date, company=_text(d.get("company")), document_type=doc_type,
@@ -199,13 +199,22 @@ def _llm_confidence(v) -> float:
     return min(max(c, 0.0), LLM_CAP) if math.isfinite(c) else 0.0  # NaN and +-Infinity are not a confidence
 
 
-def _llm_currency(v) -> tuple[str, bool]:
-    """(currency, usable). Absent -> CAD, usable. "cad", " usd ", "cad$" -> normalised. Anything else -> CAD, NOT usable:
-    the amount is then kept for a human to look at, but not trusted."""
+_AMOUNT_CODE = re.compile(r"(?<![A-Za-z])(CAD|USD|EUR)(?![A-Za-z])", re.IGNORECASE)  # the codes fields.py reads in a document
+
+
+def _llm_currency(v, amount=None) -> tuple[str, bool]:
+    """(currency, usable). Absent -> the code written in the amount ("12.34 USD"), else CAD, usable. "cad", " usd ", "cad$" ->
+    normalised. Anything else -> CAD, NOT usable: the amount is then kept for a human to look at, but not trusted. Two different
+    codes in the amount, or a currency field that contradicts the code written in the amount, are not usable either."""
+    written = {c.upper() for c in _AMOUNT_CODE.findall(amount)} if isinstance(amount, str) else set()
+    if len(written) > 1:
+        return "CAD", False
     if v in (None, ""):
-        return "CAD", True
+        return (next(iter(written)), True) if written else ("CAD", True)
     letters = re.sub(r"[^A-Za-z]", "", v).upper() if isinstance(v, str) else ""
-    return (letters, True) if len(letters) == 3 else ("CAD", False)
+    if len(letters) != 3:
+        return "CAD", False
+    return letters, not written or letters in written
 
 
 def _llm_amount(v) -> Decimal | None:

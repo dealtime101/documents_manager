@@ -180,6 +180,18 @@ def test_a_model_currency_is_normalised(fragment, currency):
     assert a.currency == currency and a.conf["amount"] > 0
 
 
+@pytest.mark.parametrize("fragment,currency,trusted", [
+    ('"amount":"12.34 USD"', "USD", True), ('"amount":"EUR 12.34"', "EUR", True), ('"amount":"12.34 usd","currency":"USD"', "USD", True),
+    ('"amount":"12.34 USD","currency":"CAD"', "CAD", False),   # the field contradicts what is written in the amount
+    ('"amount":"12.34 USD or EUR"', "CAD", False),             # two codes: which one?
+    ('"amount":"12.34"', "CAD", True),                         # nothing written anywhere: the default of the archive
+])
+def test_a_currency_written_in_the_amount_is_used_when_the_field_is_absent_and_a_conflict_is_not_trusted(fragment, currency, trusted):
+    # DOC534.23: "12.34 USD" without a currency field was filed as CAD with full confidence
+    a = parse_llm_json(_ANSWER % fragment)
+    assert a.amount == Decimal("12.34") and a.currency == currency and (a.conf["amount"] > 0) is trusted
+
+
 def test_an_unusable_currency_keeps_the_amount_but_not_the_trust_in_it():
     a = parse_llm_json(_ANSWER % '"amount":"5.00","currency":"dollars"')
     assert a.amount == Decimal("5.00") and a.currency == "CAD"
