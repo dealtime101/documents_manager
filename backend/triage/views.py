@@ -27,6 +27,7 @@ from . import services as s
 from .models import Item
 
 log = logging.getLogger(__name__)
+HISTORY_MAX = 500  # the most operations /api/history answers with, whatever `n` asks for
 
 
 def err(e: Exception, code=status.HTTP_400_BAD_REQUEST) -> Response:
@@ -328,7 +329,7 @@ def history(request):
         n = int(request.query_params.get("n", 50))
     except ValueError:
         return err(ValueError("n must be an integer"))
-    return Response(s.history(max(1, min(n, 500))))  # never the whole table by request, never a negative LIMIT
+    return Response(s.history(max(1, min(n, HISTORY_MAX))))  # never the whole table by request, never a negative LIMIT
 
 
 @api_view(["POST"])

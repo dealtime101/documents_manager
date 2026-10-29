@@ -1112,7 +1112,9 @@ def test_undo_through_api_restores_and_requeues(api, sb):
     assert api.post(f"/api/history/{op['id']}/undo").status_code == 400  # already undone
 
 
-def test_history_n_parameter_is_validated_and_bounded(api, sb):
+def test_history_n_parameter_is_validated_and_bounded(api, sb, monkeypatch):
+    from triage import views
+    assert views.HISTORY_MAX == 500                                  # the real bound
     for i in range(3):
         pdf(sb / "inbox" / f"h{i}.pdf", HYDRO[:3] + [f"Montant de la presente facture : {100 + i},00 $"])
     api.post("/api/scan")
@@ -1120,7 +1122,10 @@ def test_history_n_parameter_is_validated_and_bounded(api, sb):
     assert len(api.get("/api/history").json()) == 3
     assert len(api.get("/api/history?n=2").json()) == 2
     assert len(api.get("/api/history?n=-5").json()) == 1          # clamped, not "everything"
-    assert len(api.get("/api/history?n=100000").json()) == 3      # bounded (500), never the whole table by request
+    assert len(api.get("/api/history?n=100000").json()) == 3      # fewer operations than the bound: all of them
+    monkeypatch.setattr(views, "HISTORY_MAX", 2)                  # DOC534.190: with 3 operations a bound of 500 cannot be seen at work
+    assert len(api.get("/api/history?n=100000").json()) == 2      # bounded, never the whole table by request
+    assert len(api.get("/api/history?n=2").json()) == 2 and len(api.get("/api/history?n=1").json()) == 1
     r = api.get("/api/history?n=abc")
     assert r.status_code == 400 and "integer" in r.json()["detail"]
 
