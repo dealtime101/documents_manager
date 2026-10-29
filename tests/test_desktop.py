@@ -18,6 +18,39 @@ def _env(tmp_path):
     return env
 
 
+SKIPPED_FOLDERS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build"}
+
+
+def _files_under(root: Path) -> dict[str, tuple[int, int]]:
+    """{path relative to root: (size, mtime in ns)} of the files of the program's folder, without the folders that tools and Python
+    itself write to (version control, virtual environments, caches, build output)."""
+    found = {}
+    for folder, dirs, names in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in SKIPPED_FOLDERS]
+        for name in names:
+            path = Path(folder) / name
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            found[str(path.relative_to(root))] = (stat.st_size, stat.st_mtime_ns)
+    return found
+
+
+def test_the_snapshot_of_the_program_folder_sees_a_created_a_changed_and_a_removed_file(tmp_path):
+    (tmp_path / "keep.txt").write_text("a", encoding="utf-8")
+    (tmp_path / "gone.txt").write_text("a", encoding="utf-8")
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__" / "x.pyc").write_text("a", encoding="utf-8")                # a cache folder: not looked at
+    before = _files_under(tmp_path)
+    assert set(before) == {"keep.txt", "gone.txt"}
+    (tmp_path / "keep.txt").write_text("changed", encoding="utf-8")
+    (tmp_path / "gone.txt").unlink()
+    (tmp_path / "new.txt").write_text("a", encoding="utf-8")
+    after = _files_under(tmp_path)
+    assert set(after) - set(before) == {"new.txt"} and set(before) - set(after) == {"gone.txt"} and before["keep.txt"] != after["keep.txt"]
+
+
 def _held_socket():
     """What main() gets from listening_socket(): only its port is read."""
     import types
@@ -171,9 +204,15 @@ def test_the_port_is_held_from_the_moment_it_is_chosen_and_only_our_own_server_c
 def test_the_desktop_selftest_starts_the_server_signs_in_and_keeps_every_file_in_the_users_folder(tmp_path):
     # the same start-up as the application, without the window: it must create its database in the USER's folder (the program
     # folder of a packaged application is read-only), sign in with the launcher's token, and report its version
+    before = _files_under(ROOT)
     run = subprocess.run([sys.executable, "-m", "docflow.desktop", "--selftest"], env=_env(tmp_path), capture_output=True, text=True,
                          timeout=120, check=False)
     assert run.returncode == 0, run.stdout + run.stderr
+    # DOC534.248: "every file in the user's folder" is checked on the files, not only on the report that the program makes of itself:
+    # nothing in the program's own folder (read-only once packaged) was created, changed or removed by the run
+    after = _files_under(ROOT)
+    assert after == before, {"created": sorted(set(after) - set(before)), "removed": sorted(set(before) - set(after)),
+                             "changed": sorted(k for k in set(before) & set(after) if before[k] != after[k])}
     report = json.loads(run.stdout.strip().splitlines()[-1])
     from docflow import __version__
     assert isinstance(report.pop("ocr"), list)                      # the languages this machine can read (none without Tesseract)
