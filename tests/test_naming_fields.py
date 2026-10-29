@@ -124,7 +124,15 @@ def test_build_filename_fits_the_byte_limit_of_file_systems_without_cutting_a_ch
     n = build_filename("2025-10-07", company, doc_type, detail, Decimal("12.5"))
     assert len(n) <= MAX_NAME and len(n.encode("utf-8")) <= MAX_BYTES <= 255 - len(" (999)")   # room for a ' (2)' suffix
     assert n.startswith("2025-10-07 - ") and n.endswith(" - 12.50$.pdf")      # date, amount and extension are kept
-    assert n.encode("utf-8").decode("utf-8") == n                              # no half character
+    # DOC534.229: not "a str encodes and decodes" (always true): each field of the name is the START of what was given, whole
+    # characters only, and none ends on a combining mark or a lone surrogate
+    import unicodedata
+    fields = n[:-4].split(" - ")
+    assert len(fields) == 5, fields                                            # date, company, type, detail, amount
+    for kept, given in zip(fields[1:4], (company, doc_type, detail), strict=True):
+        assert kept and given.startswith(kept), (kept, given)
+        assert not unicodedata.combining(kept[-1]) and not 0xD800 <= ord(kept[-1]) <= 0xDFFF, kept[-1:]
+    assert any(len(kept) < len(given) for kept, given in zip(fields[1:4], (company, doc_type, detail), strict=True))   # something was cut
 
 
 @pytest.mark.parametrize("date", ["2024-01-01\n", "2024-01-01\r\n", "2024\n", "XXXX\n", " 2024-01-01", "2024-01-01 ", "2024-01-01\t",
