@@ -227,7 +227,7 @@ def load_config(config_dir: Path | str | None = None, sandbox: Path | None = Non
             companies.setdefault(name, []).extend(p for p in found if p not in companies.get(name, []))
     # learned rules carry an in-memory marker (never written back) so they can be told apart from hand-written ones
     own_types = _only_dicts(rd(learn, "types_learned.yaml", [], learned=True), "types_learned.yaml")
-    taken = {r.get("company") for r in own_types}  # a company the sandbox corrected: its default type replaces the inherited one
+    taken = {c for r in own_types if (c := r.get("company"))}  # a company the sandbox corrected: its default type replaces the inherited one
     inherited_types = [r for r in _only_dicts(rd(inherited, "types_learned.yaml", [], learned=True), "types_learned.yaml")
                        if r.get("company") not in taken] if inherited else []
     types = list(rd(hand_dir("document_types.yaml"), "document_types.yaml", [])) + [dict(r, _learned=True) for r in inherited_types + own_types]

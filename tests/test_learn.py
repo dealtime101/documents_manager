@@ -77,6 +77,23 @@ def test_one_malformed_learned_alias_costs_that_entry_not_the_start_of_the_progr
         load_config(prod)
 
 
+def test_a_sandbox_rule_with_no_company_does_not_hide_the_inherited_rules_that_have_none(tmp_path):
+    # DOC534.97: None entered `taken`, so every inherited rule without a company disappeared as soon as the sandbox had one
+    prod = _production_with_learned(tmp_path / "prod")
+    (prod / "types_learned.yaml").write_text("- {type: Lettre, company: Voisin, type_conf: 0.85}\n"
+                                             "- {type: Generale, type_conf: 0.7}\n", encoding="utf-8")
+    sb = tmp_path / "sb"
+    (sb / "learned").mkdir(parents=True)
+    (sb / "learned" / "types_learned.yaml").write_text("- {type: Autre, type_conf: 0.6}\n"
+                                                      "- {type: Facture, company: Garage, type_conf: 0.85}\n", encoding="utf-8")
+    cfg = load_config(prod, sandbox=sb, inherit_learned=True)
+    learned = {(r.get("company"), r["type"]) for r in cfg.types if r.get("_learned")}
+    assert learned == {("Voisin", "Lettre"), (None, "Generale"), (None, "Autre"), ("Garage", "Facture")}   # nothing hidden
+    (sb / "learned" / "types_learned.yaml").write_text("- {type: Facture, company: Voisin, type_conf: 0.9}\n", encoding="utf-8")
+    cfg = load_config(prod, sandbox=sb, inherit_learned=True)                           # a company the sandbox corrected still wins
+    assert {(r.get("company"), r["type"]) for r in cfg.types if r.get("_learned")} == {("Voisin", "Facture"), (None, "Generale")}
+
+
 def test_a_learned_type_entry_that_is_not_a_mapping_is_ignored_not_fatal(tmp_path, caplog):
     # DOC534.27: types_learned.yaml was checked as a list only; a string or null item crashed `.get` / dict() in load_config
     import logging
