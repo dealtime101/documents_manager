@@ -1,5 +1,8 @@
 {
   // MD013: the notes of the changelog and the README are prose with inline code and long names; the project's own width (the one of
   // ruff and of .yamllint) instead of the 80 columns of the default, which would cut them in the middle of a sentence
-  "MD013": { "line_length": 140 }
+  "MD013": { "line_length": 140 },
+  // MD024: a changelog repeats "Added", "Changed", "Fixed" under every release, as it should; only two headings with the same text
+  // under the same parent would be a mistake
+  "MD024": { "siblings_only": true }
 }

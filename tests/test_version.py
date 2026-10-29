@@ -38,6 +38,35 @@ def dates_problem(releases: list[tuple[str, str]]) -> str:
     return ""
 
 
+def blank_line_problems(text: str) -> list[tuple[int, str]]:
+    """What markdownlint's MD022 and MD032 ask of the changelogs: a heading has a blank line above and below, and a list has one above
+    it (DOC534: headings were followed directly by their first item)."""
+    lines = text.splitlines()
+    item = re.compile(r"^(?:[-*+] |\d+\. )")
+    problems = []
+    for number, line in enumerate(lines):
+        if line.startswith("#"):
+            if number and lines[number - 1].strip():
+                problems.append((number + 1, "no blank line above the heading"))
+            if number + 1 < len(lines) and lines[number + 1].strip():
+                problems.append((number + 1, "no blank line below the heading"))
+        elif item.match(line) and number and lines[number - 1].strip() and not item.match(lines[number - 1]) \
+                and not lines[number - 1].startswith(" "):
+            problems.append((number + 1, "a list that starts without a blank line above it"))
+    return problems
+
+
+def test_the_changelogs_have_the_blank_lines_markdownlint_asks_around_headings_and_lists():
+    assert blank_line_problems("# T\n\n## H\n- a\n") == [(3, "no blank line below the heading"),
+                                                          (4, "a list that starts without a blank line above it")]
+    assert blank_line_problems("# T\n\ntext\n- a\n") == [(4, "a list that starts without a blank line above it")]
+    assert blank_line_problems("# T\n\n## H\n\n- a\n  more\n- b\n\n1. x\n2. y\n") == []
+    for name in ("CHANGELOG.md", "CHANGELOG.en.md"):
+        assert blank_line_problems((ROOT / name).read_text(encoding="utf-8")) == [], name
+    config = (ROOT / ".markdownlint.jsonc").read_text(encoding="utf-8")
+    assert re.search(r'"MD024":\s*\{\s*"siblings_only":\s*true', config)               # the repeated "Added" / "Fixed" are by design
+
+
 def test_the_dates_of_the_changelog_are_real_dates_and_never_go_back_in_time():
     assert dates_problem([("0.3.0", "2026-10-07"), ("0.2.0", "2026-10-07"), ("0.1.0", "2026-02-28")]) == ""
     assert "not a date" in dates_problem([("0.3.0", "2026-13-45")]) and "not a date" in dates_problem([("0.3.0", "2026-02-30")])

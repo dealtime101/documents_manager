@@ -6,6 +6,7 @@ Patch: a fix only. Major: a change that needs something from you before it start
 ## [0.8.1] - 2026-10-07
 
 ### Changed
+
 - **File name typed without ".pdf"**: the extension is shown greyed to the right of the field, not editable, and added by the
   program ("To file", the Library form, and renaming a Library file). A ".pdf" typed anyway is not doubled. The message "the
   name must end with .pdf" no longer comes up.
@@ -13,6 +14,7 @@ Patch: a fix only. Major: a change that needs something from you before it start
 ## [0.8.0] - 2026-10-07
 
 ### Added
+
 - **Library: the program learns from your corrections**, as in "To file". When you apply a PDF's form, the company (kept by its
   name when the text contains it), that company's default type and the folder (if typed; the year becomes `{year}`) are
   remembered if they differ from what the rules would have proposed. The message says what was remembered. A learning failure
@@ -21,6 +23,7 @@ Patch: a fix only. Major: a change that needs something from you before it start
 ## [0.7.0] - 2026-10-07
 
 ### Added
+
 - **Library: search by name** in every folder (case and accents ignored); a click on a result opens its folder.
 - **Library: folders**: create, rename, move and delete a folder.
 - **Library: files**: rename, move and delete a file.
@@ -32,11 +35,13 @@ Patch: a fix only. Major: a change that needs something from you before it start
   change its root or `_Trash` itself. A document already filed whose file is renamed or moved keeps its "Open document" link.
 
 ### Changed
+
 - The top menu wraps onto a second line when too wide, instead of showing scroll arrows.
 
 ## [0.6.0] - 2026-10-07
 
 ### Added
+
 - **"Library" tab**: a file explorer for the Library folder. Walk down the folders (breadcrumb, parent folder, refresh), see the
   size and date of each file, and a click on a PDF shows it on the right (or in a new tab). Read only: nothing is moved, renamed
   or deleted. It cannot leave the library (`..`, absolute path, symbolic link); a file that is not a PDF is only offered as a
@@ -45,6 +50,7 @@ Patch: a fix only. Major: a change that needs something from you before it start
 ## [0.5.1] - 2026-10-07
 
 ### Changed
+
 - **Hand-typed date**: "2026/02/24", "2026.02.24", "2026 02 24" or "2026/2/4" are converted automatically to "2026-02-24"
   (or "2026-02-04") instead of being refused. Only the year-first order is read (never DD/MM or MM/DD, which are ambiguous);
   a date that does not exist is still refused.
@@ -52,6 +58,7 @@ Patch: a fix only. Major: a change that needs something from you before it start
 ## [0.5.0] - 2026-10-07
 
 ### Added
+
 - **Well-known companies ship with the program**: about forty common issuers (Amazon, Apple, Netflix, HelloFresh, Hydro-Québec,
   Vidéotron, Bell, Desjardins, banks, insurers, Quebec and Canadian government bodies…) are recognised from the first run,
   with nothing to learn. The patterns avoid common words ("apple" or "bell" alone). To change the list, copy
@@ -61,6 +68,7 @@ Patch: a fix only. Major: a change that needs something from you before it start
 ## [0.4.3] - 2026-10-06
 
 ### Fixed
+
 - **Learning a company**: when the document contains the company's name (e.g. "HelloFresh"), that name is kept as the rule, no
   longer the first line of the document (the title of a recipe or a letter, different every time). The company is then proposed
   on the next documents.
@@ -68,24 +76,29 @@ Patch: a fix only. Major: a change that needs something from you before it start
 ## [0.4.2] - 2026-10-06
 
 ### Fixed
+
 - Windows: a scan no longer opens a console window for every page read by OCR.
 
 ### Changed
+
 - The scan shows a progress bar (besides the counter on the button).
 
 ## [0.4.1] - 2026-10-06
 
 ### Fixed
+
 - Documents queued while OCR was unavailable are read again at the next scan, once Tesseract is found (the "OCR is unavailable"
   message stayed on them because an unchanged file was not read again).
 
 ## [0.4.0] - 2026-10-06
 
 ### Added
+
 - **Tesseract (OCR) bundled in the executable**, with French, English and orientation detection. Nothing to install to read
   scanned documents.
 
 ### Removed
+
 - The "OCR is unavailable" message when Tesseract is not installed on the machine.
 
 ## [0.3.0] - 2026-10-06
@@ -93,6 +106,7 @@ Patch: a fix only. Major: a change that needs something from you before it start
 Preparation for a public release under the MIT license.
 
 ### Added
+
 - **Windows desktop application** (`DocumentsManager.exe`, built by `packaging/build_windows.bat`): a native window that starts
   the local server (`127.0.0.1`, never the network) and opens already signed in thanks to a one-time token, with no password to
   create. The database, the settings and the rules live in the user's folder. Tesseract (OCR, with French, English and
@@ -107,11 +121,13 @@ Preparation for a public release under the MIT license.
 - **Release notes in English and French**: the screen follows the interface language.
 
 ### Removed
+
 - **Everything that only served the server mode**: password sign-in, log-out, the sign-in attempt limit, the host list
   (`DOCFLOW_HOSTS`), the systemd service templates (`deploy/`), `gunicorn`, and the `backup` command. The program now listens on
   `127.0.0.1` only and has no password: only the launcher's token sign-in exists.
 
 ### Changed
+
 - **Product name: Documents Manager** (page title, browser tab, README and these notes). The internal name `docflow` (command,
   folders, services, `DOCFLOW_*` variables) is kept: changing it would break an existing installation.
 - **PDF reading: PyMuPDF (AGPL) is replaced by PDFium** (through `pypdfium2`, Apache-2.0/BSD). The program no longer contains any
@@ -124,6 +140,7 @@ Preparation for a public release under the MIT license.
 A complete correction pass (audit 474: 457 findings, all handled). Nothing applies to a running service until it is restarted.
 
 ### Added
+
 - **Backup**: `manage.py backup` takes a consistent snapshot of the database (even while the service works) and copies the learned
   rules into a dated folder, keeps the 14 newest, and refuses to write if the share is not mounted; `--restore` puts one back. A
   nightly timer is ready in `deploy/`.
@@ -138,6 +155,7 @@ A complete correction pass (audit 474: 457 findings, all handled). Nothing appli
 - **Quality**: mypy without errors, ruff configured in `pyproject.toml`, French typography (no-break spaces).
 
 ### Fixed
+
 - **Filing**: a file is no longer left in two places if deleting the source fails; an interrupted cross-volume copy leaves no
   partial file; reserved Windows names and trailing dots or spaces are refused; amounts (sign, currency, whole numbers,
   fractions) are read better; French month abbreviations; "overdue" and "residue" are no longer taken for a due date; a company
@@ -151,6 +169,7 @@ A complete correction pass (audit 474: 457 findings, all handled). Nothing appli
 - **Server**: `/api` without a slash returns JSON, `index.html` is no longer cached, the secret and the cache follow the sandbox.
 
 ### To deploy (nothing was done for you)
+
 1. Stop the service.
 2. `uv run python manage.py migrate` (migrations 0009, 0010, 0011).
 3. `cd frontend && npm run build`.

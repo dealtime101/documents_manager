@@ -7,6 +7,7 @@ une action de votre part avant de démarrer.
 ## [0.8.1] - 2026-10-07
 
 ### Modifié
+
 - **Nom de fichier saisi sans « .pdf »** : l'extension est affichée en gris à droite du champ, non modifiable, et ajoutée par le
   programme (« À classer », formulaire de la Bibliothèque, et renommage d'un fichier de la Bibliothèque). Un « .pdf » tapé quand
   même n'est pas doublé. Fini le message « le nom doit se terminer par .pdf ».
@@ -14,6 +15,7 @@ une action de votre part avant de démarrer.
 ## [0.8.0] - 2026-10-07
 
 ### Ajouté
+
 - **Bibliothèque : le programme apprend de vos corrections**, comme dans « À classer ». En appliquant le formulaire d'un PDF, la
   société (retenue par son nom quand le texte le contient), le type par défaut de cette société et le dossier (s'il a été saisi ;
   l'année devient `{year}`) sont retenus s'ils diffèrent de ce que les règles auraient proposé. Le message dit ce qui a été
@@ -22,6 +24,7 @@ une action de votre part avant de démarrer.
 ## [0.7.0] - 2026-10-07
 
 ### Ajouté
+
 - **Bibliothèque : recherche par nom** dans tous les dossiers (majuscules et accents ignorés) ; un clic sur un résultat ouvre son
   dossier.
 - **Bibliothèque : dossiers** : créer, renommer, déplacer et supprimer un dossier.
@@ -35,11 +38,13 @@ une action de votre part avant de démarrer.
   fichier est renommé ou déplacé garde son lien « Ouvrir le document ».
 
 ### Modifié
+
 - Le menu du haut passe à la ligne quand il est trop large, au lieu d'afficher des flèches de défilement.
 
 ## [0.6.0] - 2026-10-07
 
 ### Ajouté
+
 - **Onglet « Bibliothèque »** : un explorateur de fichiers du dossier Bibliothèque. On descend dans les dossiers (fil d'Ariane,
   dossier parent, actualiser), on voit la taille et la date de chaque fichier, et un clic sur un PDF l'affiche à droite (ou dans
   un nouvel onglet). Lecture seule : rien n'est déplacé, renommé ni supprimé. Impossible de sortir de la bibliothèque (`..`,
@@ -48,6 +53,7 @@ une action de votre part avant de démarrer.
 ## [0.5.1] - 2026-10-07
 
 ### Modifié
+
 - **Date saisie à la main** : « 2026/02/24 », « 2026.02.24 », « 2026 02 24 » ou « 2026/2/4 » sont convertis automatiquement en
   « 2026-02-24 » (ou « 2026-02-04 ») au lieu d'être refusés. Seul l'ordre année en premier est lu (jamais JJ/MM ou MM/JJ,
   ambigus) ; une date qui n'existe pas reste refusée.
@@ -55,6 +61,7 @@ une action de votre part avant de démarrer.
 ## [0.5.0] - 2026-10-07
 
 ### Ajouté
+
 - **Sociétés connues livrées avec le programme** : une quarantaine d'émetteurs courants (Amazon, Apple, Netflix, HelloFresh,
   Hydro-Québec, Vidéotron, Bell, Desjardins, banques, assureurs, ministères et organismes du Québec et du Canada…) sont reconnus
   dès la première utilisation, sans rien apprendre. Les motifs évitent les mots courants (« apple », « bell » seuls). Pour
@@ -64,6 +71,7 @@ une action de votre part avant de démarrer.
 ## [0.4.3] - 2026-10-06
 
 ### Corrigé
+
 - **Apprentissage d'une société** : quand le document contient le nom de la société (ex. « HelloFresh »), c'est ce nom qui est
   retenu comme règle, et non plus la première ligne du document (le titre d'une recette ou d'une lettre, différent à chaque fois).
   La société est alors proposée sur les documents suivants.
@@ -71,24 +79,29 @@ une action de votre part avant de démarrer.
 ## [0.4.2] - 2026-10-06
 
 ### Corrigé
+
 - Windows : un scan n'ouvre plus une fenêtre de console par page lue par l'OCR.
 
 ### Modifié
+
 - Le scan affiche une barre de progression (en plus du compteur sur le bouton).
 
 ## [0.4.1] - 2026-10-06
 
 ### Corrigé
+
 - Les documents mis en file quand l'OCR n'était pas disponible sont relus au scan suivant, une fois Tesseract trouvé (le message
   « OCR indisponible » restait sur eux, car un fichier inchangé n'était pas relu).
 
 ## [0.4.0] - 2026-10-06
 
 ### Ajouté
+
 - **Tesseract (OCR) fourni dans l'exécutable** : avec le français, l'anglais et la détection d'orientation. Plus rien à installer
   pour lire les documents numérisés.
 
 ### Retiré
+
 - Le message « OCR indisponible » quand Tesseract n'est pas installé sur la machine.
 
 ## [0.3.0] - 2026-10-06
@@ -96,6 +109,7 @@ une action de votre part avant de démarrer.
 Préparation d'une diffusion publique sous licence MIT.
 
 ### Ajouté
+
 - **Application de bureau Windows** (`DocumentsManager.exe`, construite par `packaging/build_windows.bat`) : une fenêtre native qui
   démarre le serveur local (`127.0.0.1`, jamais le réseau) et s'ouvre déjà connectée grâce à un jeton à usage unique, sans mot de
   passe à créer. La base, les réglages et les règles vivent dans le dossier de l'utilisateur. Tesseract (OCR, avec le français, l'anglais
@@ -111,11 +125,13 @@ Préparation d'une diffusion publique sous licence MIT.
 - **Notes de version en anglais et en français** : l'écran suit la langue de l'interface (`CHANGELOG.en.md` et `CHANGELOG.md`).
 
 ### Retiré
+
 - **Tout ce qui ne servait qu'au mode serveur** : connexion par mot de passe, déconnexion, limitation des essais de connexion,
   liste d'hôtes (`DOCFLOW_HOSTS`), modèles de service systemd (`deploy/`), `gunicorn`, et la commande de sauvegarde `backup`. Le
   programme n'écoute plus que `127.0.0.1` et n'a plus de mot de passe : seule la connexion par jeton du lanceur existe.
 
 ### Modifié
+
 - **Nom du produit : Documents Manager** (titre de la page, de l'onglet du navigateur, du README et de ces notes). Le nom
   interne `docflow` (commande, dossiers, services, variables `DOCFLOW_*`) est conservé : le changer casserait votre installation.
 - **Lecture des PDF : PyMuPDF (AGPL) est remplacé par PDFium** (via `pypdfium2`, Apache-2.0/BSD). Le programme ne contient plus
@@ -129,6 +145,7 @@ Passage de correction complet (audit 474 : 457 constats, tous traités ; 311 cor
 ou différé avec une date de revue). Rien n'est appliqué au service tant qu'il n'est pas redémarré : voir « Pour déployer ».
 
 ### Ajouté
+
 - **Sauvegarde** : `manage.py backup` fait un instantané cohérent de la base (même pendant que le service travaille) et copie les
   règles apprises dans un dossier daté, garde les 14 plus récents, refuse d'écrire si le partage n'est pas monté ;
   `--restore` remet une sauvegarde en place. Minuteur nocturne prêt dans `deploy/`.
@@ -145,6 +162,7 @@ ou différé avec une date de revue). Rien n'est appliqué au service tant qu'il
 - **Qualité** : mypy sans erreur, ruff configuré dans `pyproject.toml`, typographie française (espaces insécables).
 
 ### Corrigé
+
 - **Classement** : un fichier ne reste plus en double si la suppression de la source échoue ; une copie inter-volumes
   interrompue ne laisse plus de fichier partiel ; noms réservés Windows, points et espaces finaux refusés ; montants (signe,
   devise, entiers, fractions) mieux lus ; abréviations françaises des mois ; « overdue » et « residue » ne sont plus pris pour
@@ -161,6 +179,7 @@ ou différé avec une date de revue). Rien n'est appliqué au service tant qu'il
 - **Serveur** : `/api` sans slash renvoie du JSON, `index.html` n'est plus mis en cache, secret et cache suivent le bac à sable.
 
 ### Pour déployer (rien n'a été fait pour vous)
+
 1. Arrêter le service.
 2. `uv run python manage.py migrate` (migrations 0009, 0010, 0011).
 3. `cd frontend && npm run build`.
@@ -170,6 +189,7 @@ ou différé avec une date de revue). Rien n'est appliqué au service tant qu'il
 5. Démarrer le service ; installer le minuteur de sauvegarde si ce n'est pas fait (voir le README).
 
 ### À décider (réouvert à la date indiquée ou sur condition)
+
 - Fichiers non PDF, statiques servis par WhiteNoise, horodatages anciens sans fuseau, migrations de schéma : revue le 2026-12-05.
 
 ## [0.1.0] - 2026-10-04
