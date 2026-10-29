@@ -13,7 +13,7 @@ $out = Join-Path $root "packaging\tesseract"
 $needed = "tesseract.exe", "tessdata\eng.traineddata", "tessdata\osd.traineddata", "tessdata\fra.traineddata"
 $missing = @($needed | Where-Object { -not (Test-Path (Join-Path $out $_)) })
 $dlls = @(Get-ChildItem -Path $out -Filter "*.dll" -ErrorAction SilentlyContinue)
-if ($missing.Count -eq 0 -and $dlls.Count -gt 0) { Write-Host "Tesseract already prepared in $out"; exit 0 }
+if ($missing.Count -eq 0 -and $dlls.Count -gt 0) { Write-Output "Tesseract already prepared in $out"; exit 0 }
 $install = $From
 if (-not $install) {
   $work = Join-Path $root "build\tesseract-src"
@@ -27,7 +27,7 @@ if (-not $install) {
   # No hash to compare with is a failure, not a pass: the installer is about to be RUN and shipped inside the product
   if (-not $expected) { throw "No pinned SHA-256 for the Tesseract installer. This download is $actual : compare it with a source you trust, then put it in `$pinned` in this script (or pass -Sha256). Nothing was run." }
   if ($actual -ne $expected) { throw "Tesseract installer hash mismatch: expected $expected, got $actual" }
-  Write-Host "installer sha256: $actual"
+  Write-Output "installer sha256: $actual"
   $install = Join-Path $work "install"
   # NSIS: /D= must come last and unquoted, so the arguments go in as ONE string
   $proc = Start-Process -FilePath $installer -ArgumentList "/S /D=$install" -Wait -PassThru
@@ -64,4 +64,4 @@ foreach ($lang in $blobIds.Keys) {
 $licences = @(Get-ChildItem -Path (Join-Path $install "doc") -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^(LICENSE|LICENCE|NOTICE|COPYING)' })
 if ($licences.Count -eq 0) { throw "No LICENSE/NOTICE file in $(Join-Path $install 'doc'): Tesseract must not be redistributed without its licence text." }
 foreach ($file in $licences) { Copy-Item $file.FullName (Join-Path $out ("LICENSE-Tesseract-" + $file.Name + ".txt")) }
-Write-Host "Prepared $out"
+Write-Output "Prepared $out"

@@ -123,6 +123,18 @@ def test_uv_lock_resolves_the_python_versions_that_fix_the_advisories_it_once_ha
     assert behind == {}, behind
 
 
+def test_the_tesseract_script_reports_through_the_output_stream_not_the_host():
+    # DOC534.768 to .770 (PSAvoidUsingWriteHost): Write-Host needs a host and cannot be redirected or captured; the three messages are
+    # said with Write-Output, which build_windows.bat and a log can both collect
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    assert "Write-Host" not in script
+    for message in ('Write-Output "Tesseract already prepared in $out"', 'Write-Output "installer sha256: $actual"', 'Write-Output "Prepared $out"'):
+        assert message in script, message
+    # nothing is returned by the main flow but these lines: Get-GitBlobId is the one function that returns a value, and it says nothing
+    function = script[script.index("function Get-GitBlobId"):script.index("foreach ($lang in")]
+    assert "Write-Output" not in function
+
+
 def test_the_tesseract_work_folder_is_assigned_once_where_it_is_used():
     # DOC534.263: it was set before the `if` and again inside it, the same way; only the inner one is read
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
@@ -151,7 +163,7 @@ def test_a_tesseract_package_without_a_licence_text_is_a_failure_not_a_silent_om
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
     assert 'LICENSE-Tesseract.txt") -ErrorAction' not in script
     assert "if ($licences.Count -eq 0) { throw " in script
-    assert script.index("if ($licences.Count -eq 0) { throw ") < script.index("foreach ($file in $licences)") < script.index('Write-Host "Prepared')
+    assert script.index("if ($licences.Count -eq 0) { throw ") < script.index("foreach ($file in $licences)") < script.index('Write-Output "Prepared')
 
 
 def test_the_tesseract_script_does_not_promise_that_nothing_stays_installed():
