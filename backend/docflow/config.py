@@ -193,8 +193,12 @@ def load_config(config_dir: Path | str | None = None, sandbox: Path | None = Non
     companies ={k: _patterns(k, v, "companies.yaml") for k, v in rd(hand_dir("companies.yaml"), "companies.yaml", {}).items()}
     for source in ([inherited] if inherited else []) + [learn]:  # inherited first: the sandbox's own come on top
         for name, pats in rd(source, "company_aliases.yaml", {}, learned=True).items():
-            companies.setdefault(name, []).extend(
-                p for p in _patterns(name, pats, "company_aliases.yaml") if p not in companies.get(name, []))
+            try:
+                found = _patterns(name, pats, "company_aliases.yaml")
+            except ValueError as e:  # one malformed entry of a LEARNED file costs that entry, not the start of the program
+                log.warning("learned entry ignored (%s)", e)
+                continue
+            companies.setdefault(name, []).extend(p for p in found if p not in companies.get(name, []))
     # learned rules carry an in-memory marker (never written back) so they can be told apart from hand-written ones
     own_types = rd(learn, "types_learned.yaml", [], learned=True)
     taken = {r.get("company") for r in own_types}  # a company the sandbox corrected: its default type replaces the inherited one

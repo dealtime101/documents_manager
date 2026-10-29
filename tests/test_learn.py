@@ -61,6 +61,22 @@ def _production_with_learned(tmp_path):
     return d
 
 
+def test_one_malformed_learned_alias_costs_that_entry_not_the_start_of_the_program(tmp_path, caplog):
+    # DOC534.26: _patterns raised ValueError outside the tolerant reader, so a single bad entry of a learned file stopped load_config
+    import logging
+    prod = _production_with_learned(tmp_path / "prod")
+    (prod / "company_aliases.yaml").write_text("Voisin: [voisin tremblay]\nBad: {x: 1}\nOk: [ok pattern]\n", encoding="utf-8")
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(prod)
+    assert cfg.companies["Voisin"][-1] == "voisin tremblay" and cfg.companies["Ok"] == ["ok pattern"]   # the good entries are kept
+    assert "Bad" not in cfg.companies
+    assert any("Bad" in r.getMessage() and "learned entry ignored" in r.getMessage() for r in caplog.records)
+    # a hand-written file with the same mistake still stops the program, loudly
+    (prod / "companies.yaml").write_text("Bad: {x: 1}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="companies.yaml"):
+        load_config(prod)
+
+
 def test_a_sandbox_rehearses_with_what_production_has_learned(tmp_path):
     prod = _production_with_learned(tmp_path / "prod")
     sandbox = load_config(prod, sandbox=tmp_path / "sb", inherit_learned=True)
