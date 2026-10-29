@@ -512,6 +512,20 @@ const frMessages: Record<string, string> = {
   'HTTP error: ': 'Erreur HTTP : ',
   'Network error: the server cannot be reached.': 'Erreur réseau : le serveur est injoignable.',
   'Request timed out: the server did not answer.': "Délai dépassé : le serveur n'a pas répondu.",
+  // the reasons the Settings screen gets for a folder it refuses (docflow/usersettings.py); `{p}` stands for the path in the text
+  'a folder is required': 'un dossier est requis',
+  '{p} is not a folder': "{p} n'est pas un dossier",
+  '{p} does not exist': "{p} n'existe pas",
+  'Windows refuses access to {p}: connect the network share first (open it once in the file explorer, with the right account)':
+    "Windows refuse l'accès à {p} : connecter d'abord le partage réseau (l'ouvrir une fois dans l'explorateur de fichiers, avec le bon compte)",
+  'must be a different folder from the inbox (filed documents would be scanned again)':
+    'doit être un dossier différent de la boîte de réception (les documents classés seraient analysés de nouveau)',
+  'must not be inside the inbox (filed documents would be scanned again)':
+    'ne doit pas être dans la boîte de réception (les documents classés seraient analysés de nouveau)',
+  'must be outside the library (duplicates would be filed into it)': 'doit être en dehors de la bibliothèque (les doublons y seraient classés)',
+  'is not writable': "n'est pas accessible en écriture",
+  'must not be the library or contain it (filed documents would be scanned again)':
+    'ne doit pas être la bibliothèque ni la contenir (les documents classés seraient analysés de nouveau)',
   'unexpected error: ': 'erreur inattendue : ',
   'Incomplete text, pages not read: ': 'Texte incomplet, pages non lues : ',
   'unexpected response from the server: ': 'réponse inattendue du serveur : ',
@@ -522,6 +536,10 @@ const frMessages: Record<string, string> = {
 // the French texts are written with plain spaces; what the screen shows has the no-break ones (typography.ts)
 const frSpaced = Object.fromEntries(Object.entries(fr).map(([k, v]) => [k, frenchSpaces(v)])) as Record<Key, string>
 const frMessagesSpaced = Object.fromEntries(Object.entries(frMessages).map(([k, v]) => [k, frenchSpaces(v)])) as Record<string, string>
+// the texts with a path inside ("{p} does not exist"): matched as a whole, the path put back where it stands in the French text
+const escapeRegExp = (s: string) => s.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&')
+const frTemplates = Object.entries(frMessagesSpaced).filter(([k]) => k.includes('{p}')).map(([k, v]) =>
+  [new RegExp('^' + k.split('{p}').map(escapeRegExp).join('(.+)') + '$'), v] as const)
 
 const fill = (s: string, vars?: Record<string, string | number>) =>
   s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars?.[k] ?? `{${k}}`))
@@ -595,6 +613,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       msg: (text) => {
         if (lang === 'en') return text
         if (frMessagesSpaced[text]) return frMessagesSpaced[text]
+        for (const [rx, french] of frTemplates) {
+          const m = rx.exec(text)
+          if (m) return french.replace('{p}', m[1])
+        }
         const prefix = Object.keys(frMessagesSpaced).find((p) => p.endsWith(': ') && text.startsWith(p))
         return prefix ? frMessagesSpaced[prefix] + text.slice(prefix.length) : text
       },

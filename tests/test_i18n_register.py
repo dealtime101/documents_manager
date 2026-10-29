@@ -80,6 +80,23 @@ def test_the_empty_queue_message_quotes_the_exact_label_of_the_scan_button_in_bo
         assert label in empty, (label, empty)
 
 
+def test_every_reason_the_settings_screen_can_be_refused_with_has_a_french_text_and_goes_through_msg():
+    # DOC534.123: the field errors of the server were shown as they came, in English, whatever the language of the screen
+    root = Path(__file__).resolve().parents[1]
+    server = (root / "backend" / "docflow" / "usersettings.py").read_text(encoding="utf-8")
+    i18n = (root / "frontend" / "src" / "i18n.tsx").read_text(encoding="utf-8")
+    table = i18n[i18n.index("const frMessages"):]
+    keys = {a or b for a, b in re.findall(r"^  (?:'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"):", table, re.MULTILINE)}
+    texts = re.findall(r'errors(?:\[[^\]]+\])? = (?:f)?"([^"]+)"', server) + re.findall(r'\n\s+return f"([^"]*\{p\}[^"]*)"', server)
+    texts += re.findall(r'errors\.setdefault\("[a-z_]+", "([^"]+)"\)', server)
+    assert len(texts) >= 8, texts                                                       # the extraction really sees the messages
+    for text in texts:
+        assert text in keys, f"no French text for the server message: {text!r}"
+    settings = (root / "frontend" / "src" / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+    assert "{msg(errors[key])}" in settings and "{msg(m)}" in settings                  # and both places show them through msg()
+    assert "const frTemplates = " in i18n and "if (m) return french.replace('{p}', m[1])" in i18n   # the texts with a path inside
+
+
 def test_the_texts_name_the_inbox_the_way_the_settings_do_and_never_a_fixed_folder_called_inbox():
     # DOC534.63: the French button said "Scanner l'Inbox" and the messages sent the reader to a folder "_Inbox", while the settings
     # speak of the boîte de réception and the folder is whatever the user chose

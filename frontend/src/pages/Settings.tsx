@@ -92,14 +92,14 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
                   aria-invalid={errors[key] ? true : undefined} aria-describedby={errors[key] ? `err-${key}` : undefined} />
               </Field>
               <Button type="button" variant="outline" size="sm" className="mt-1" onClick={() => setPicking(picking === key ? null : key)}>{t('settings.browse')}</Button>
-              {errors[key] && <p id={`err-${key}`} role="alert" className="text-sm text-rose-700"><span aria-hidden="true">✕ </span>{errors[key]}</p>}
+              {errors[key] && <p id={`err-${key}`} role="alert" className="text-sm text-rose-700"><span aria-hidden="true">✕ </span>{msg(errors[key])}</p>}
               {picking === key && <Picker start={v[key]} onPick={(p) => { set(key, p); setPicking(null) }} onClose={() => setPicking(null)} />}
             </div>
           ))}
           <div>
             <label className="text-sm font-medium" htmlFor="extra-inboxes">{t('settings.extra')}</label>
             <textarea id="extra-inboxes" className="mt-1 w-full rounded-md border p-2 font-mono text-sm" rows={3} value={v.extra} onChange={(e) => set('extra', e.target.value)} />
-            {Object.entries(errors).filter(([k]) => k.startsWith('extra_inboxes')).map(([k, m]) => <p key={k} role="alert" className="text-sm text-rose-700">{m}</p>)}
+            {Object.entries(errors).filter(([k]) => k.startsWith('extra_inboxes')).map(([k, m]) => <p key={k} role="alert" className="text-sm text-rose-700">{msg(m)}</p>)}
           </div>
           <Button type="submit" disabled={busy} aria-busy={busy}>{t('settings.save')}</Button>
           <Notice note={note} />
