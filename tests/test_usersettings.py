@@ -68,6 +68,18 @@ def test_the_user_folder_is_docflow_home_when_set_and_otherwise_a_per_user_place
     monkeypatch.setattr(usersettings.sys, "platform", "linux")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     assert usersettings.user_dir() == tmp_path / "xdg" / "docflow"
+    # DOC534.242: the most common case on Linux, no XDG_CONFIG_HOME at all (or an empty one), and the other platforms' fallbacks
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("XDG_CONFIG_HOME")
+    assert usersettings.user_dir() == tmp_path / "home" / ".config" / "docflow"
+    monkeypatch.setenv("XDG_CONFIG_HOME", "")                                            # set but empty: the same fallback
+    assert usersettings.user_dir() == tmp_path / "home" / ".config" / "docflow"
+    monkeypatch.setattr(usersettings.sys, "platform", "darwin")                         # macOS has no place of its own in the code
+    assert usersettings.user_dir() == tmp_path / "home" / ".config" / "docflow"
+    monkeypatch.setattr(usersettings.sys, "platform", "win32")
+    monkeypatch.delenv("LOCALAPPDATA")
+    monkeypatch.setattr(usersettings.Path, "home", classmethod(lambda cls: tmp_path / "winhome"))
+    assert usersettings.user_dir() == tmp_path / "winhome" / "AppData" / "Local" / "DocFlow"   # Windows without LOCALAPPDATA
 
 
 def test_a_partial_save_keeps_the_other_saved_folders_and_is_checked_against_them(home, tmp_path):
