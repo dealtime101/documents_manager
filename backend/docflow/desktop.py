@@ -46,9 +46,19 @@ def start_server(port: int) -> None:
     from django.core.wsgi import get_wsgi_application
     from waitress import serve
     app = get_wsgi_application()
-    threading.Thread(target=lambda: serve(app, host="127.0.0.1", port=port, threads=6, ident="documents-manager"), daemon=True).start()
+    failure: list[BaseException] = []  # what the server thread died of (port taken, WSGI error): seen at once, not after 30 seconds
+
+    def run() -> None:
+        try:
+            serve(app, host="127.0.0.1", port=port, threads=6, ident="documents-manager")
+        except BaseException as e:  # noqa: BLE001
+            failure.append(e)  # kept for the main thread, which reports it
+
+    threading.Thread(target=run, daemon=True).start()
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
+        if failure:
+            raise RuntimeError(f"the local server stopped: {type(failure[0]).__name__}: {failure[0]}") from failure[0]
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=1):
                 return
@@ -105,14 +115,31 @@ def log_to_file() -> None:
     sys.stderr = sys.stderr or log
 
 
+def show_error(message: str) -> None:
+    """Without a console the user sees nothing: on Windows a message box, everywhere the message goes to the log."""
+    print(message, file=sys.stderr, flush=True)
+    if sys.platform == "win32":
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, message, "Documents Manager", 0x10)  # MB_ICONERROR
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     log_to_file()
     print(time.strftime("%Y-%m-%d %H:%M:%S"), "starting", argv, flush=True)
-    token = prepare_environment()
-    port = free_port()
-    print("server starting on port", port, flush=True)
-    start_server(port)
+    try:
+        token = prepare_environment()
+        port = free_port()
+        print("server starting on port", port, flush=True)
+        start_server(port)
+    except Exception as e:  # noqa: BLE001
+        # a failed start (migration, port, server) must be told, not end in silence
+        import traceback
+
+        from docflow.usersettings import user_dir
+        traceback.print_exc()
+        show_error(f"Documents Manager could not start: {type(e).__name__}: {e}\nDetails: {user_dir() / 'desktop.log'}")
+        return 1
     print("server up", flush=True)
     if "--selftest" in argv:
         result = selftest(port, token)

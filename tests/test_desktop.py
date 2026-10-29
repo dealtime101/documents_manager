@@ -59,6 +59,35 @@ def test_without_a_native_window_the_browser_fallback_stops_when_no_browser_open
     assert desktop.main([]) == 0 and "Stopped." in capsys.readouterr().out   # Ctrl-C ends it cleanly, without a traceback
 
 
+def test_a_server_that_dies_at_start_is_reported_at_once_and_main_tells_the_user(monkeypatch, capsys):
+    # DOC534.37: an exception in the waitress thread was lost (30 s of waiting, then a generic error) and main ended with no message
+    import time
+
+    import django.core.management
+    import waitress
+
+    from docflow import desktop
+
+    def taken(*a, **k):
+        raise OSError("port already in use")
+    monkeypatch.setattr(waitress, "serve", taken)
+    monkeypatch.setattr(django.core.management, "call_command", lambda *a, **k: None)   # the migration is not what is tested here
+    started = time.monotonic()
+    try:
+        desktop.start_server(desktop.free_port())
+    except RuntimeError as e:
+        assert "port already in use" in str(e) and time.monotonic() - started < 20     # the cause, not "within 30 seconds"
+    else:
+        raise AssertionError("start_server should have raised")
+    shown = []
+    for name, value in (("log_to_file", lambda: None), ("prepare_environment", lambda: "tok"), ("free_port", lambda: 1)):
+        monkeypatch.setattr(desktop, name, value)
+    monkeypatch.setattr(desktop, "show_error", shown.append)
+    monkeypatch.setattr(desktop, "start_server", lambda port: (_ for _ in ()).throw(RuntimeError("migration failed")))
+    assert desktop.main([]) == 1                                                      # an exit code, not a traceback
+    assert len(shown) == 1 and "migration failed" in shown[0] and "desktop.log" in shown[0]   # and a message with the log's place
+
+
 def test_a_free_local_port_is_found_and_really_free():
     from docflow.desktop import free_port
     port = free_port()
