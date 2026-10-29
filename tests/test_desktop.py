@@ -96,6 +96,27 @@ def test_a_server_that_dies_at_start_is_reported_at_once_and_main_tells_the_user
     assert len(shown) == 1 and "migration failed" in shown[0] and "desktop.log" in shown[0]   # and a message with the log's place
 
 
+def test_desktop_log_is_rotated_at_launch_when_it_has_grown_too_large(monkeypatch, tmp_path):
+    # DOC534.133: desktop.log was only ever appended to, for years
+    from docflow import desktop
+    monkeypatch.setenv("DOCFLOW_HOME", str(tmp_path))
+    log = tmp_path / "desktop.log"
+    monkeypatch.setattr(sys, "stdout", None)                                         # a windowed program has no console
+    monkeypatch.setattr(sys, "stderr", None)
+    log.write_text("old line\n" * 10)                                                # small: appended to, as before
+    desktop.log_to_file()
+    sys.stdout.write("new line\n")
+    sys.stdout.close()
+    assert log.read_text().endswith("new line\n") and log.read_text().startswith("old line") and not (tmp_path / "desktop.log.1").exists()
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    log.write_bytes(b"x" * (desktop.LOG_MAX_BYTES + 1))                              # too large: kept as .1, a fresh log starts
+    desktop.log_to_file()
+    sys.stdout.write("fresh start\n")
+    sys.stdout.close()
+    assert log.read_text() == "fresh start\n" and (tmp_path / "desktop.log.1").stat().st_size == desktop.LOG_MAX_BYTES + 1
+
+
 def test_the_interface_check_reads_enough_of_the_page_and_looks_at_the_title_only():
     # DOC534.132: 400 bytes were read, so a title after many meta / preload tags was a false failure; and two tests said one thing
     import inspect

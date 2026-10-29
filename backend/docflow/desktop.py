@@ -12,6 +12,7 @@ import urllib.request
 from pathlib import Path
 
 SERVER_IDENT = "documents-manager"
+LOG_MAX_BYTES = 1_000_000  # desktop.log is started afresh (the previous one kept as desktop.log.1) when it is larger at launch
 
 
 def listening_socket() -> socket.socket:
@@ -133,7 +134,13 @@ def log_to_file() -> None:
         return
     from docflow.usersettings import user_dir
     user_dir().mkdir(parents=True, exist_ok=True)
-    log = (user_dir() / "desktop.log").open("a", encoding="utf-8", buffering=1)  # kept open for the whole run
+    path = user_dir() / "desktop.log"
+    try:
+        if path.stat().st_size > LOG_MAX_BYTES:  # rotated at the start of a run: one old file is kept, never more than about twice the limit
+            path.replace(path.with_name(path.name + ".1"))
+    except OSError:
+        pass  # no log yet, or it cannot be moved: it is appended to as before
+    log = path.open("a", encoding="utf-8", buffering=1)  # kept open for the whole run
     sys.stdout = sys.stdout or log
     sys.stderr = sys.stderr or log
 
