@@ -27,13 +27,19 @@ def _enable_wal(conn: sqlite3.Connection) -> None:
     and only reads it. The switch itself does not honour the busy timeout when another connection is switching at the same
     moment (the first scan opens several connections together): wait a moment and look again. If it never works the
     database simply stays in the ordinary journal mode: slower under contention, never wrong."""
+    mode, why = "unknown", None
     for _ in range(100):
-        if conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal":
+        mode = conn.execute("PRAGMA journal_mode").fetchone()[0].lower()
+        if mode == "wal":
             return
         try:
-            conn.execute("PRAGMA journal_mode=WAL")
-        except sqlite3.OperationalError:  # "database is locked": someone else is switching right now
-            time.sleep(0.05)
+            if conn.execute("PRAGMA journal_mode=WAL").fetchone()[0].lower() == "wal":
+                return
+        except sqlite3.OperationalError as e:  # "database is locked": someone else is switching right now
+            why = e
+        time.sleep(0.05)  # whatever happened, wait before looking again: a mode that stays put must not burn the 100 tries at once
+    log.warning("could not switch the history database to the write-ahead log (still in %s mode%s): it works, but is slower "
+                "under contention", mode, f", last error: {why}" if why else "")
 
 
 def _row_id(cur: sqlite3.Cursor) -> int:

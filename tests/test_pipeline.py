@@ -264,6 +264,47 @@ def test_a_document_is_undone_only_when_all_its_operations_are(env):
     assert db.find_sha("s1") is None                             # now nothing is left: no longer filed
 
 
+def test_a_history_database_that_cannot_switch_to_wal_says_so_and_waits_between_tries(monkeypatch, caplog):
+    # DOC534.112: after 100 failed tries nothing was logged, and a mode that stayed put without an error never waited
+    import logging
+    import sqlite3
+
+    from docflow import db as dbmod
+
+    class Conn:
+        def __init__(self, switch):
+            self.switch = switch
+
+        def execute(self, sql):
+            if sql == "PRAGMA journal_mode":
+                return types_row("delete")
+            return self.switch()
+
+    def types_row(value):
+        class Row:
+            def fetchone(self):
+                return (value,)
+        return Row()
+
+    def locked():
+        raise sqlite3.OperationalError("database is locked")
+    sleeps = []
+    monkeypatch.setattr(dbmod.time, "sleep", sleeps.append)
+    with caplog.at_level(logging.WARNING, logger=dbmod.log.name):
+        dbmod._enable_wal(Conn(locked))                                                    # always locked
+    assert len(sleeps) == 100 and any("still in delete mode, last error: database is locked" in r.getMessage() for r in caplog.records)
+    caplog.clear()
+    sleeps.clear()
+    with caplog.at_level(logging.WARNING, logger=dbmod.log.name):
+        dbmod._enable_wal(Conn(lambda: types_row("delete")))                               # no error, the mode just stays
+    assert len(sleeps) == 100 and any("still in delete mode" in r.getMessage() for r in caplog.records)   # it waited, and said it
+    caplog.clear()
+    sleeps.clear()
+    with caplog.at_level(logging.WARNING, logger=dbmod.log.name):
+        dbmod._enable_wal(Conn(lambda: types_row("wal")))                                  # the usual case: switched at once
+    assert sleeps == [] and not caplog.records
+
+
 def test_only_a_uniqueness_violation_is_reported_as_an_identical_document(env):
     # DOC534.111: every IntegrityError was "an identical document is already filed", with its real cause hidden by `from None`
     import sqlite3
