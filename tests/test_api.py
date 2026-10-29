@@ -1627,6 +1627,41 @@ def test_the_database_constraints_are_built_from_the_choices_not_copied_from_the
     assert listed(ScanJob, "scan_state_is_known") == set(ScanJob.State.values)
 
 
+@pytest.mark.django_db
+def test_the_unique_constraints_migration_first_cleans_up_what_the_old_database_may_hold(tmp_path):
+    # DOC534.50: a database written before the constraints (two scans left 'running', a file queued twice) made `migrate` fail
+    import importlib
+
+    from django.db import connections
+    from django.db.backends.sqlite3.base import DatabaseWrapper
+    from django.db.migrations.loader import MigrationLoader
+    migration = importlib.import_module("triage.migrations.0004_one_running_scan_and_pending_item")
+    state_apps = MigrationLoader(None, ignore_no_migrations=True).project_state(("triage", "0003_english_notes")).apps
+    wrapper = DatabaseWrapper({**connections["default"].settings_dict, "NAME": str(tmp_path / "old.db")}, alias="old")
+    connections["old"] = wrapper
+    try:
+        with wrapper.schema_editor() as editor:                                    # the schema as it was BEFORE the constraints
+            for model in state_apps.get_app_config("triage").get_models():
+                editor.create_model(model)
+        ScanJob, Item = state_apps.get_model("triage", "ScanJob"), state_apps.get_model("triage", "Item")
+        jobs = [ScanJob.objects.using("old").create(state=s) for s in ("running", "done", "running", "running")]
+        rows = [Item.objects.using("old").create(source_path=p, sha256=h, engine_status="auto", state=s)
+                for p, h, s in (("/a.pdf", "h1", "pending"), ("/a.pdf", "h1", "pending"), ("/a.pdf", "h1", "approved"),
+                                ("/b.pdf", "h2", "pending"), ("/a.pdf", "h1", "pending"))]
+        with wrapper.schema_editor() as editor:
+            migration.make_room_for_the_constraints(state_apps, editor)
+        states = lambda model: dict(model.objects.using("old").values_list("pk", "state"))  # noqa: E731
+        assert states(ScanJob) == {jobs[0].pk: "error", jobs[1].pk: "done", jobs[2].pk: "error", jobs[3].pk: "running"}   # newest stays
+        assert states(Item) == {rows[0].pk: "pending", rows[1].pk: "removed", rows[2].pk: "approved", rows[3].pk: "pending",
+                                rows[4].pk: "removed"}                                    # the oldest of identical pending items stays
+        with wrapper.cursor() as cursor:                                               # and the two unique indexes can now be built
+            cursor.execute("CREATE UNIQUE INDEX one_running_scan ON triage_scanjob (state) WHERE state = 'running'")
+            cursor.execute("CREATE UNIQUE INDEX one_pending ON triage_item (source_path, sha256) WHERE state = 'pending'")
+    finally:
+        wrapper.close()
+        del connections["old"]
+
+
 def test_the_full_text_migration_says_clearly_that_it_needs_sqlite_with_fts5():
     # DOC474.133: on PostgreSQL, MySQL or a SQLite built without FTS5, migrate stopped on a SQL syntax error with no explanation
     import importlib

@@ -3,6 +3,23 @@
 from django.db import migrations, models
 
 
+def make_room_for_the_constraints(apps, schema_editor):
+    """The constraints below did not exist before, so a database written without them (a crash that left two scans 'running', a
+    file queued twice) would make `migrate` stop on the unique index. Bring the existing rows inside the rules FIRST: only the
+    newest running scan stays running (the others are marked as failed), and of identical pending items only the oldest stays."""
+    db = schema_editor.connection.alias
+    ScanJob, Item = apps.get_model("triage", "ScanJob"), apps.get_model("triage", "Item")
+    running = list(ScanJob.objects.using(db).filter(state="running").order_by("-pk").values_list("pk", flat=True))
+    ScanJob.objects.using(db).filter(pk__in=running[1:]).update(state="error")
+    seen, duplicates = set(), []
+    for pk, path, sha in Item.objects.using(db).filter(state="pending").order_by("pk").values_list("pk", "source_path", "sha256"):
+        if (path, sha) in seen:
+            duplicates.append(pk)
+        seen.add((path, sha))
+    for start in range(0, len(duplicates), 500):  # SQLite caps the number of variables of one statement
+        Item.objects.using(db).filter(pk__in=duplicates[start:start + 500]).update(state="removed")
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +27,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(make_room_for_the_constraints, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='item',
             constraint=models.UniqueConstraint(condition=models.Q(('state', 'pending')), fields=('source_path', 'sha256'), name='one_pending_item_per_file_content'),
