@@ -76,6 +76,23 @@ def test_the_changelog_is_read_into_releases_sections_and_items():
     assert got[1] == {"version": "0.1.0", "date": "2026-10-04", "intro": "Départ.", "sections": []}
 
 
+def test_release_headings_with_a_suffix_trailing_spaces_or_yanked_are_read_and_an_unreadable_one_is_reported(caplog):
+    # DOC534.48: such a heading was not a release: it vanished from the screen and cut the notes of the release before it
+    import logging
+
+    from docflow.changelog import parse
+    text = ("## [1.0.0-beta.1] - 2026-12-01  \n### Added\n- Beta.\n"
+            "## [0.9.0] - 2026-11-20 [YANKED]\n### Fixed\n- Pulled.\n"
+            "## [0.8.0+build.5] - 2026-11-10\n### Added\n- Built.\n"
+            "## [Unreleased]\n### Added\n- Later.\n"
+            "## [0.7.0] - 2026-11-01\n### Added\n- Last.\n")
+    with caplog.at_level(logging.WARNING):
+        got = parse(text)
+    assert [r["version"] for r in got] == ["1.0.0-beta.1", "0.9.0", "0.8.0+build.5", "0.7.0"]
+    assert [s["items"] for r in got for s in r["sections"]] == [["Beta."], ["Pulled."], ["Built."], ["Last."]]
+    assert any("[Unreleased]" in r.getMessage() for r in caplog.records)             # reported, not dropped in silence
+
+
 def test_the_real_changelog_is_read_whole():
     from docflow.changelog import parse
     got = parse((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
