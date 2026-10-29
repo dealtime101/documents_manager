@@ -1264,6 +1264,29 @@ def test_the_search_only_shows_filed_documents_and_follows_the_text_when_an_item
     assert api.get("/api/search?q=autre").json() == []                                             # and a deletion (cascade)
 
 
+def test_the_search_finds_documents_whose_stored_path_uses_backslashes_or_goes_through_a_link(api, sb, monkeypatch):
+    # DOC534.58: result_path was compared with "<resolved library>/%": a Windows path ("\\") or a library reached through a link never matched
+    from triage import services
+    _scan_and_file_everything(api, sb)
+    item = Item.objects.filter(state="approved", source_path__endswith="hydro.pdf").first()
+    stored = item.result_path
+
+    def found():
+        return item.pk in [h["id"] for h in api.get("/api/search?q=electricite").json()]
+    assert found()
+    Item.objects.filter(pk=item.pk).update(result_path=stored.replace("/", "\\"))               # as Windows stores it
+    assert not found()                                                                          # "\\" is a plain character on a POSIX system
+    monkeypatch.setattr(services, "_WINDOWS_PATHS", True)
+    assert found()                                                                              # understood where "\\" is the separator
+    # a library reached through a link: the stored path starts with the link, the configured folder is resolved
+    link = sb / "library-link"
+    link.symlink_to(sb / "library", target_is_directory=True)
+    Item.objects.filter(pk=item.pk).update(result_path=stored.replace(str((sb / "library").resolve()), str(link)))
+    monkeypatch.setattr(services, "_WINDOWS_PATHS", False)
+    monkeypatch.setitem(services.cfg().settings, "library_root", str(link))
+    assert found()
+
+
 def test_the_text_kept_for_a_document_is_capped(api, sb, monkeypatch):
     from triage import services
     from triage.models import ItemText

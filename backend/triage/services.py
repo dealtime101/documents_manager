@@ -569,6 +569,7 @@ def approve_many(items) -> dict:
 
 
 # ------------------------------------------------------------------ search
+_WINDOWS_PATHS = os.name == "nt"  # result_path is stored with "\\" there
 MAX_INDEXED_TEXT = 200_000  # characters kept per document: a 400-page scan must not bloat the database
 MAX_TERMS = 8
 HIT_START, HIT_END = "\x01", "\x02"  # around the words found in a snippet: never part of a real document text
@@ -586,21 +587,28 @@ def search(query: object, limit: object = 20) -> list[dict]:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 50:
         raise ApiError("limit must be a whole number from 1 to 50")
     match = " ".join([*(f'"{w}"' for w in words[:-1]), f'"{words[-1]}"*'])
-    root = cfg().path("library_root").resolve()
-    # only what is IN the library: an approved duplicate is in quarantine, and its copy of the text must not be a second hit
-    under_root = str(root).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"
+    library = cfg().path("library_root")
+    root = library.resolve()
+    # only what is IN the library: an approved duplicate is in quarantine, and its copy of the text must not be a second hit. The
+    # path is compared with "/" (what Windows stores with "\\" is turned into it), under the folder as written AND as resolved
+    # (a library reached through a link is stored by the name it was filed under).
+    prefixes = sorted({library.as_posix().rstrip("/"), root.as_posix().rstrip("/")})
+    under_root = [p.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%" for p in prefixes]
+    stored = "replace(i.result_path, '\\', '/')" if _WINDOWS_PATHS else "i.result_path"
+    where_root = " OR ".join([f"{stored} LIKE %s ESCAPE '\\'"] * len(under_root))
     with connection.cursor() as cur:
         cur.execute(
             "SELECT i.id, i.result_path, i.analysis, snippet(item_fts, 0, %s, %s, '…', 14) FROM item_fts "
             "JOIN triage_item i ON i.id = item_fts.rowid WHERE item_fts MATCH %s AND i.state = %s "
-            "AND i.result_path LIKE %s ESCAPE '\\' "
-            "ORDER BY bm25(item_fts) LIMIT %s", [HIT_START, HIT_END, match, Item.APPROVED, under_root, limit])
+            f"AND ({where_root}) "
+            "ORDER BY bm25(item_fts) LIMIT %s", [HIT_START, HIT_END, match, Item.APPROVED, *under_root, limit])
         rows = cur.fetchall()
     out = []
     for item_id, result_path, analysis, snippet in rows:
         a = json.loads(analysis) if isinstance(analysis, str) else (analysis or {})
         filed = Path(result_path)
-        folder = filed.parent.relative_to(root).as_posix() if root in filed.parents else str(filed.parent)
+        base = next((b for b in (root, library) if b in filed.parents), None)
+        folder = filed.parent.relative_to(base).as_posix() if base else str(filed.parent)
         out.append({"id": item_id, "filename": filed.name, "folder": folder, "company": a.get("company"), "date": a.get("date"),
                     "snippet": snippet})
     return out
