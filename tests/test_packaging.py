@@ -41,6 +41,15 @@ def test_a_failed_tesseract_install_stops_the_script_with_its_own_message():
     assert script.index("has no tesseract.exe", run) < script.index("Copy-Item (Join-Path $install \"tesseract.exe\")")
 
 
+def test_from_takes_the_pinned_language_files_it_already_holds_and_downloads_only_the_others():
+    # DOC534.157: -From claimed to skip the download, yet the three language files were always fetched, so an offline build failed
+    script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")
+    assert "skips the download and the installer" not in script
+    local = script.index('$local = Join-Path $install "tessdata\\$lang.traineddata"')
+    assert "(Get-GitBlobId $local) -eq $blobIds[$lang]" in script[local:local + 200]       # taken only when it is THE pinned file
+    assert local < script.index("Invoke-WebRequest -UseBasicParsing -Uri \"https://raw") < script.index("$blob = Get-GitBlobId $target")
+
+
 def test_a_tesseract_package_without_a_licence_text_is_a_failure_not_a_silent_omission():
     # DOC534.156: Copy-Item ... -ErrorAction SilentlyContinue let the package go out with no licence at all
     script = (PACKAGING / "fetch_tesseract.ps1").read_text(encoding="utf-8")

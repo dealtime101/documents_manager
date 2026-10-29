@@ -3,7 +3,7 @@
 # silently into a folder of build\ (the files are not put in Program Files) and copied. The NSIS installer is run, not unpacked and
 # not uninstalled: it may still leave an uninstall entry in the registry or shortcuts on the build machine. Use a throwaway build
 # machine or CI runner, or pass -From with a Tesseract folder you already have to skip the installer.
-param([string]$From = "",  # an existing Tesseract folder to copy from (skips the download and the installer)
+param([string]$From = "",  # an existing Tesseract folder to copy from (skips the installer; language files that are the pinned ones are taken from it, the others are downloaded)
       [string]$Sha256 = "")  # the SHA-256 the installer must have, while none is pinned below
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -52,7 +52,10 @@ function Get-GitBlobId([string]$path) {
 }
 foreach ($lang in $blobIds.Keys) {
   $target = Join-Path $out "tessdata\$lang.traineddata"
-  Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/$tessdataCommit/$lang.traineddata" -OutFile $target
+  # a file of the folder given with -From is taken when it IS the pinned one (same blob id): that build can then run offline
+  $local = Join-Path $install "tessdata\$lang.traineddata"
+  if ((Test-Path $local) -and ((Get-GitBlobId $local) -eq $blobIds[$lang])) { Copy-Item $local $target }
+  else { Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/$tessdataCommit/$lang.traineddata" -OutFile $target }
   $blob = Get-GitBlobId $target
   if ($blob -ne $blobIds[$lang]) { Remove-Item $target; throw "$lang.traineddata does not match the pinned file: expected $($blobIds[$lang]), got $blob" }
 }
