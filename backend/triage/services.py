@@ -627,10 +627,12 @@ def search(query: object, limit: object = 20) -> list[dict]:
 
 def reindex_text(report=None) -> dict:
     """Read again the text of the documents that have none stored (filed before the search existed, or whose text was empty),
-    from the file where it is now. Local OCR: it can take a while, hence the progress callback."""
+    from the file where it is now. Local OCR: it can take a while, hence the progress callback, report(position, item, total): the
+    place of the document among all those to read, so the operator can tell how much is left (unreadable ones are counted in it)."""
     done = missing = empty = 0
     c = cfg()
-    for it in Item.objects.filter(fulltext__isnull=True).exclude(state=Item.REMOVED).order_by("id"):
+    todo = list(Item.objects.filter(fulltext__isnull=True).exclude(state=Item.REMOVED).order_by("id"))
+    for position, it in enumerate(todo, 1):
         try:
             path = pdf_path(it)
             text = extract_text(path, c.settings.get("ocr")).text
@@ -644,7 +646,7 @@ def reindex_text(report=None) -> dict:
         ItemText.objects.create(item=it, text=text[:MAX_INDEXED_TEXT])
         done += 1
         if report:
-            report(done, it)
+            report(position, it, len(todo))
     return {"indexed": done, "unreadable": missing, "without_text": empty}
 
 

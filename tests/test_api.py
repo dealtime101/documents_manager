@@ -1432,6 +1432,34 @@ def test_documents_filed_before_the_search_existed_are_read_again_by_reindex_tex
     assert services.reindex_text() == {"indexed": 0, "unreadable": 1, "without_text": 0}           # nothing more to do for the readable one
 
 
+def test_reindex_text_reports_the_place_of_each_document_among_all_those_to_read(api, sb):
+    # DOC534.265: the operator of a long local OCR saw "1: path", "2: path" with no idea of how many were left
+    import io
+
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+    from triage import services
+    from triage.models import ItemText
+    _scan_and_file_everything(api, sb)
+    ItemText.objects.all().delete()
+    todo =Item.objects.filter(fulltext__isnull=True).exclude(state=Item.REMOVED).count()
+    assert todo >= 2
+    seen = []
+    services.reindex_text(lambda position, item, total: seen.append((position, total)))
+    assert seen and all(total == todo for _, total in seen) and [p for p, _ in seen] == sorted({p for p, _ in seen})
+    assert seen[-1][0] <= todo
+    ItemText.objects.all().delete()
+    Item.objects.filter(source_path__endswith="second.pdf").update(result_path="/nowhere/gone.pdf")   # one is unreadable: it is still counted
+    seen.clear()
+    services.reindex_text(lambda position, item, total: seen.append((position, total)))
+    assert all(total == todo for _, total in seen)
+    ItemText.objects.all().delete()
+    out = io.StringIO()
+    with pytest.raises(CommandError, match="could not be read"):                                          # the unreadable one ends it with an error
+        call_command("reindex_text", stdout=out)
+    assert any(line.split(":")[0].endswith(f"/{todo}") for line in out.getvalue().splitlines()), out.getvalue()
+
+
 def test_the_search_needs_a_logged_in_user(sb):
     assert APIClient().get("/api/search?q=hydro").status_code == 403
 

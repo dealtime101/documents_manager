@@ -8,8 +8,8 @@ class Command(BaseCommand):
             "it can take a while. Safe to run again: it only touches documents without a stored text.")
 
     def handle(self, *args, **options):
-        def report(n, item):
-            self.stdout.write(f"{n}: {item.source_path}")
+        def report(position, item, total):
+            self.stdout.write(f"{position}/{total}: {item.source_path}")
 
         result = services.reindex_text(report)
         summary = f"{result['indexed']} indexed, {result['unreadable']} unreadable (see the log), {result['without_text']} without any text"
