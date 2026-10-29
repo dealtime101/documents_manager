@@ -74,8 +74,8 @@ export default function Settings({ onSaved }: { onSaved: () => void }) {
       await api.saveSettings({ inbox: v.inbox.trim(), library_root: v.library_root.trim(), quarantine: v.quarantine.trim(),
         extra_inboxes: v.extra.split('\n').map((x) => x.trim()).filter(Boolean) })
       setNote({ ok: true, text: t('settings.saved') })
+      if (first) onSaved()  // only the initial set-up goes on to the queue; a later save stays here, where the "saved" message is
       setFirst(false)
-      onSaved()
     } catch (x) {
       if (x instanceof SettingsRefused) setErrors(x.errors)
       else setNote({ ok: false, text: msg(errorText(x)) })

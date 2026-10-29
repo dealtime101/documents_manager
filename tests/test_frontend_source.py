@@ -81,6 +81,15 @@ def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_sessio
     assert "role=\"status\"" in app and "t('common.loading')" in app
 
 
+def test_saving_the_settings_leaves_the_screen_only_at_the_end_of_the_first_set_up():
+    # DOC534.127: every save sent the user to the queue: changing several settings meant coming back to the tab each time
+    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+    save = settings[settings.index("const save = async"):settings.index("return (\n    <Card>")]
+    assert "if (first) onSaved()" in save and "\n      onSaved()" not in save
+    assert save.index("if (first) onSaved()") < save.index("setFirst(false)")        # read before it is cleared
+    assert "onSaved={() => go({ page: 'queue', group: null })}" in (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")   # the first set-up still goes to the queue
+
+
 def test_the_first_run_check_counts_as_done_only_once_the_server_answered_and_is_tried_again():
     # DOC534.126: checkedSetup was set before the call: a failure meant the Settings screen never opened on a first run, silently
     app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
