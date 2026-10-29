@@ -757,7 +757,9 @@ def test_table_mode_is_one_line_per_file_with_the_outcome_as_a_column(env, monke
     assert by_name["a-filed"].endswith(str(tmp / "lib" / "Bills/Hydro-Québec/2025" / GOOD))   # the destination is a column
     assert by_name["b-held"].endswith(f"left in {tmp / 'inbox'} (validation required)")
     assert by_name["d-apply-fails"].endswith("ERROR: disk full")
-    assert "Cannot read file" in by_name["c-unreadable"] or "error" in by_name["c-unreadable"]
+    # DOC534.207: the status column AND the reason with its cause, where they are written, not "error" anywhere in the line
+    assert by_name["c-unreadable"].split()[0] == "error"
+    assert by_name["c-unreadable"].endswith(f"left in {tmp / 'inbox'} (unreadable: Cannot read file: PdfiumError)"), by_name["c-unreadable"]
     assert summary.startswith("4 file(s)") and "FAILED" in summary
 
 
