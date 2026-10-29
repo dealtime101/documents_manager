@@ -1352,6 +1352,7 @@ def test_a_first_run_opens_the_settings_screen_where_the_folders_are_chosen():
     app = (src / "App.tsx").read_text(encoding="utf-8")
     assert "if (!s.configured) window.location.hash = toHash({ page: 'settings', group: null })" in app and '<TabsTrigger value="settings">' in app
     page = (src / "pages" / "Settings.tsx").read_text(encoding="utf-8")
-    for needle in ("api.saveSettings(", "api.folders(", "SettingsRefused", "aria-invalid", "settings.welcome", "dangerouslySetInnerHTML"):
-        assert (needle in page) == (needle != "dangerouslySetInnerHTML"), needle
+    for needle in ("api.saveSettings(", "api.folders(", "SettingsRefused", "aria-invalid", "settings.welcome"):
+        assert needle in page, needle                                                              # what the screen must use
+    assert "dangerouslySetInnerHTML" not in page                                                   # and what it must never use (DOC534.271)
     assert "saveSettings: async" in (src / "api.ts").read_text(encoding="utf-8")
