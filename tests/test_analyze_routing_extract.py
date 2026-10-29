@@ -449,6 +449,32 @@ def test_native_text_is_covered_by_whole_words_of_the_ocr_text_not_by_pieces_of_
     assert extract._covers("a b c d e f g h i j", "a b c d e f g h i x")                 # a few misread words are still covered
 
 
+def test_the_secrets_of_this_process_are_not_handed_to_the_programs_it_starts(monkeypatch, tmp_path):
+    # DOC534.131: the launcher's sign-in token sat in the environment that Tesseract (and any child) inherited
+    from docflow import desktop
+    monkeypatch.setenv("DOCFLOW_LOCAL_TOKEN", "token-of-this-launch")
+    monkeypatch.setenv("DOCFLOW_SECRET_KEY", "session-key")
+    monkeypatch.setenv("KEEP_ME", "yes")
+    seen = []
+
+    def run(cmd, *a, **k):
+        seen.append(k["env"])
+        return extract.subprocess.CompletedProcess(cmd, 0, stdout="List of available languages in \"/x/\" (1):\neng\nRotate: 0\n"
+                                                   "Orientation confidence: 9.0\n", stderr="")
+    monkeypatch.setattr(extract.subprocess, "run", run)
+    monkeypatch.setattr(extract.shutil, "which", lambda _: "/usr/bin/tesseract")
+    monkeypatch.setattr(extract, "_TESSERACT_IDENTITY", {})
+    extract.ocr_image(b"x", "tesseract", "eng")
+    extract.detect_rotation(b"x", "tesseract")
+    extract.tesseract_identity("/usr/bin/tesseract")
+    monkeypatch.setattr(extract, "find_tesseract", lambda name: "/usr/bin/tesseract")
+    desktop.ocr_languages()
+    assert len(seen) >= 4
+    for env in seen:
+        assert "DOCFLOW_LOCAL_TOKEN" not in env and "DOCFLOW_SECRET_KEY" not in env       # not passed on
+        assert env["KEEP_ME"] == "yes" and env["OMP_THREAD_LIMIT"] == "1"                  # everything else is, and the thread limit is set
+
+
 def test_a_failed_or_timed_out_orientation_check_leaves_a_warning_saying_why(monkeypatch, caplog):
     # DOC534.84: a missing osd.traineddata or a timeout made every sideways page be read as it is, without a word in the log
     import logging

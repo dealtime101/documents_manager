@@ -78,10 +78,15 @@ def _dpi_within_budget(page, wanted: int) -> float | None:
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # Windows: a windowed program must not flash a console per Tesseract run
 
 
+PROCESS_SECRETS = ("DOCFLOW_LOCAL_TOKEN", "DOCFLOW_SECRET_KEY")  # environment variables that only this process may know
+
+
 def _env_for(exe: str) -> dict[str, str]:
     """The environment of a Tesseract run: one thread each (parallelism happens between documents), and the language data that sits
-    next to a bundled tesseract.exe (the packaged application carries its own, so nothing has to be installed)."""
-    env = {**os.environ, "OMP_THREAD_LIMIT": "1"}
+    next to a bundled tesseract.exe (the packaged application carries its own, so nothing has to be installed). The secrets of
+    this process (the launcher's sign-in token, the session key) are NOT passed on: a child program has no use for them."""
+    env = {k: v for k, v in os.environ.items() if k not in PROCESS_SECRETS}
+    env["OMP_THREAD_LIMIT"] = "1"
     tessdata = Path(exe).parent / "tessdata"
     if Path(exe).is_absolute() and tessdata.is_dir():
         env["TESSDATA_PREFIX"] = str(tessdata)
