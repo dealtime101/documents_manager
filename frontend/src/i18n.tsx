@@ -518,6 +518,7 @@ const frMessages: Record<string, string> = {
   'a folder is required': 'un dossier est requis',
   '{p} is not a folder': "{p} n'est pas un dossier",
   '{p} does not exist': "{p} n'existe pas",
+  'access to {p} is refused': "l'accès à {p} est refusé",
   'Windows refuses access to {p}: connect the network share first (open it once in the file explorer, with the right account)':
     "Windows refuse l'accès à {p} : connecter d'abord le partage réseau (l'ouvrir une fois dans l'explorateur de fichiers, avec le bon compte)",
   'must be a different folder from the inbox (filed documents would be scanned again)':

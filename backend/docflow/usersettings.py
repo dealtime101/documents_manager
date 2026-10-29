@@ -62,6 +62,8 @@ def _problem(p: Path) -> str | None:
             return None
         return f"{p} is not a folder"
     except PermissionError:
+        if sys.platform != "win32":  # the advice about a network share and the file explorer is for Windows only
+            return f"access to {p} is refused"
         return f"Windows refuses access to {p}: connect the network share first (open it once in the file explorer, with the right account)"
     except OSError:
         return f"{p} does not exist"

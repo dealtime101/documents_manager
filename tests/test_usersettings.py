@@ -187,8 +187,14 @@ def test_a_folder_windows_refuses_is_reported_as_refused_not_as_missing(home, tm
             raise PermissionError(13, "Access is denied")
         return real_stat(self, *a, **k)
     monkeypatch.setattr(Path, "stat", stat)
+    monkeypatch.setattr(usersettings.sys, "platform", "win32")                          # the network-share advice is Windows's
     errors = usersettings.validate({"inbox": str(refused), "library_root": str(tmp_path / "missing")})
     assert "refuses access" in errors["inbox"] and "connect" in errors["inbox"]
+    # DOC534.139: anywhere else a folder without rights is simply refused: no word of Windows, of shares or of the file explorer
+    monkeypatch.setattr(usersettings.sys, "platform", "linux")
+    plain = usersettings.validate({"inbox": str(refused)})["inbox"]
+    words = plain.replace(str(refused), "")                                             # (the folder of this test is itself called "share")
+    assert plain == f"access to {refused} is refused" and not any(w in words for w in ("Windows", "share", "explorer"))
     assert "does not exist" in errors["library_root"]
     (tmp_path / "afile").write_text("x")
     assert "not a folder" in usersettings.validate({"inbox": str(tmp_path / "afile")})["inbox"]
