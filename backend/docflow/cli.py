@@ -6,6 +6,7 @@
 lists what each option does."""
 import argparse
 import logging
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -229,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "undo":
         try:
             cur, old = undo(db, args.id)
-        except (ValueError, OSError) as e:
+        except (ValueError, OSError, sqlite3.Error) as e:  # sqlite3.Error: a locked or damaged history, as the scan already treats it
             print(f"Cannot undo: {e}")
             return 1
         print(f"Restored: {cur.name} -> {old}")

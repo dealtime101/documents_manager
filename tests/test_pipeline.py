@@ -560,6 +560,14 @@ def test_cli_one_file_whose_proposal_fails_does_not_stop_the_batch(env, monkeypa
     assert "b-good.pdf" in out and "2 file(s)" in out and "1 FAILED" in out   # the next file was still handled
 
 
+def test_undo_says_cannot_undo_when_the_history_database_is_locked_or_damaged(tmp_path, monkeypatch, capsys):
+    # DOC534.88: a sqlite3 error ended `docflow undo` with a traceback instead of "Cannot undo", unlike the scan which treats it
+    import sqlite3
+    monkeypatch.setattr(cli, "undo", lambda db, op_id: (_ for _ in ()).throw(sqlite3.OperationalError("database is locked")))
+    assert cli.main(["--sandbox", str(tmp_path / "sb"), "undo"]) == 1
+    assert "Cannot undo: database is locked" in capsys.readouterr().out
+
+
 def test_cli_an_unexpected_error_while_filing_one_file_does_not_stop_the_batch(env, monkeypatch, capsys, caplog):
     # DOC534.25: apply() raising something other than OSError/ValueError/sqlite3.Error ended the scan with a traceback and no summary
     import logging
