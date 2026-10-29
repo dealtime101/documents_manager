@@ -1038,12 +1038,16 @@ def test_a_retry_after_a_failed_cross_device_copy_gets_the_wanted_name_not_a_suf
     monkeypatch.setattr(pipeline.os, "link", cross)
     real = shutil.copyfileobj
 
+    written = []
+
     def half_then_fail(fin, fout, *a, **k):
-        fout.write(fin.read(100))
+        written.append(fout.write(fin.read(100)))
         raise OSError(errno.ENOSPC, "No space left on device")
     monkeypatch.setattr(shutil, "copyfileobj", half_then_fail)
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match="No space left"):                  # DOC534.214: this failure, not any other I/O error
         apply(p, cfg, db)
+    assert written == [100] and f.exists()                                # a partial copy was really written; the source is untouched
+    assert not list((tmp / "lib").rglob("*.pdf")), "the truncated copy was left behind"
     monkeypatch.setattr(shutil, "copyfileobj", real)  # the share is back
     dst = apply(p, cfg, db)
     assert "(2)" not in dst.name and dst.exists() and sha256_file(dst) == p.sha256
