@@ -195,7 +195,7 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
   const toggle = (id: number) => setTicked((t) => { const n = new Set(t); if (!n.delete(id)) n.add(id); return n })
   // an emptied or out-of-range field must select NOTHING: Number('') is 0 and would tick every approvable item
   const minValid = minConf.trim() !== '' && Number.isFinite(Number(minConf)) && Number(minConf) >= 0 && Number(minConf) <= 100
-  const selectFrom = () => minValid && tick(items.filter((i) => approvable(i) && i.confidence * 100 >= Number(minConf)).map((i) => i.id))
+  const selectFrom = () => minValid && tick(items.filter((i) => approvable(i) && Math.round(i.confidence * 100) >= Number(minConf)).map((i) => i.id))
   const selectSame = (item: Item) => tick(items.filter((i) => approvable(i) && i.company === item.company
     && i.document_type === item.document_type).map((i) => i.id))
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement>) => {

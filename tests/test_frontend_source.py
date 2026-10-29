@@ -523,6 +523,13 @@ def test_an_empty_or_out_of_range_confidence_threshold_selects_nothing():
     assert "disabled={busy || !items.length || !minValid} onClick={selectFrom}" in queue
 
 
+def test_the_confidence_threshold_compares_the_percentage_the_screen_shows_not_a_float_below_it():
+    # DOC534.72: 0.29 * 100 is 28.999999999999996, so a document shown as "29 %" was not ticked by a threshold of 29
+    assert 0.29 * 100 < 29 <= round(0.29 * 100)                                      # the arithmetic the screen has to absorb
+    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text()
+    assert "Math.round(i.confidence * 100) >= Number(minConf)" in queue and "i.confidence * 100 >=" not in queue
+
+
 def test_each_api_type_has_its_own_doc_comment_directly_above_it():
     # DOC474.58: two JSDoc blocks in a row, the first one (about Group) sat above Batch's comment and documented nothing
     api = (UI.parents[1] / "api.ts").read_text()
