@@ -367,6 +367,15 @@ def test_the_scan_refresh_keeps_a_document_being_edited_even_when_it_left_the_li
     assert tick.index("const list = edited") < tick.index("setItems(list)")          # the kept document is in the list that is shown
 
 
+def test_the_library_apply_button_needs_a_preview_computed_for_what_is_typed_now():
+    # DOC534.65: for 400 ms after an edit the old "will be" line stayed and Apply sent the NEW fields
+    page = (UI.parents[1] / "pages" / "Library.tsx").read_text()
+    assert "const ready = !!plan?.final_name && !!plan?.rel_dir && planned === JSON.stringify([form, relDir, finalName])" in page
+    assert "const asked = JSON.stringify([form, relDir, finalName])" in page and "setPlanned(asked)" in page   # what the plan was asked for
+    assert "setPlanned(JSON.stringify([p.fields, '', '']))" in page                  # a proposal from the document is for its own fields
+    assert "disabled={busy || !ready} onClick={apply}" in page and "{plan && ready &&" in page   # Apply AND the preview wait for it
+
+
 def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html():
     got = _node_route("({ search: m.parseHash('#search'), write: m.toHash({ page: 'search', group: null }) })")
     assert got["search"] == {"page": "search", "group": None} and got["write"] == "#search"

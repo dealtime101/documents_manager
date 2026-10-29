@@ -82,15 +82,17 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
 
   useEffect(() => { api.vocabulary().then(setVocab).catch(() => {}); api.destinations().then(setDirs).catch(() => {}) }, [])
   const shown = useRef(file)  // the file the form is about NOW: a proposal read for another one arrives too late and is dropped
-  useEffect(() => { shown.current = file; setForm(EMPTY); setRelDir(''); setFinalName(''); setPlan(null); setProblem(''); setTouched(false) }, [file])
+  const [planned, setPlanned] = useState('')  // the inputs the shown plan was computed FOR: an older preview is not offered for Apply
+  useEffect(() => { shown.current = file; setForm(EMPTY); setRelDir(''); setFinalName(''); setPlan(null); setPlanned(''); setProblem(''); setTouched(false) }, [file])
 
   // the name and folder they give, recomputed shortly after each change
   useEffect(() => {
     if (!touched) return
     let current = true
+    const asked = JSON.stringify([form, relDir, finalName])
     const timer = setTimeout(() => {
       api.libraryPlan(file, form, relDir, finalName)
-        .then((p) => { if (current) { setPlan(p); setProblem('') } })
+        .then((p) => { if (current) { setPlan(p); setPlanned(asked); setProblem('') } })
         .catch((e) => { if (current) { setPlan(null); setProblem(errorText(e)) } })
     }, 400)
     return () => { current = false; clearTimeout(timer) }
@@ -103,7 +105,7 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
     try {
       const p = await api.libraryPlan(asked)
       if (shown.current !== asked) return  // another file was selected while this one was read: its form is not this proposal's
-      setForm(p.fields); setRelDir(''); setFinalName(''); setPlan(p); setProblem(''); setTouched(true)
+      setForm(p.fields); setRelDir(''); setFinalName(''); setPlan(p); setPlanned(JSON.stringify([p.fields, '', ''])); setProblem(''); setTouched(true)
     } catch (e) { if (shown.current === asked) setProblem(errorText(e)) } finally { setBusy(false) }
   }
   const apply = async () => {
@@ -115,7 +117,7 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
       onFiled(r.path)
     } catch (e) { setProblem(errorText(e)) } finally { setBusy(false) }
   }
-  const ready = !!plan?.final_name && !!plan?.rel_dir
+  const ready = !!plan?.final_name && !!plan?.rel_dir && planned === JSON.stringify([form, relDir, finalName])  // and it is for what is typed NOW
 
   return (
     <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto pr-1">
