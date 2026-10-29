@@ -1635,12 +1635,13 @@ def test_the_full_text_migration_says_clearly_that_it_needs_sqlite_with_fts5():
     check = migration.require_sqlite_with_fts5
 
     class Fake:
-        def __init__(self, vendor, fts5=True):
-            self.connection = types.SimpleNamespace(vendor=vendor, cursor=lambda: Cursor(fts5))
+        def __init__(self, vendor, fts5=True, declared=True):
+            self.connection = types.SimpleNamespace(vendor=vendor, cursor=lambda: Cursor(fts5, declared))
 
     class Cursor:
-        def __init__(self, fts5):
-            self.fts5 = fts5
+        """`fts5`: the module works (creating an FTS5 table succeeds). `declared`: what sqlite_compileoption_used would answer."""
+        def __init__(self, fts5, declared):
+            self.fts5, self.declared = fts5, declared
 
         def __enter__(self):
             return self
@@ -1649,16 +1650,20 @@ def test_the_full_text_migration_says_clearly_that_it_needs_sqlite_with_fts5():
             return False
 
         def execute(self, sql):
+            if "fts5" in sql.lower() and "CREATE" in sql and not self.fts5:
+                raise RuntimeError("no such module: fts5")
             return self
 
         def fetchone(self):
-            return (1 if self.fts5 else 0,)
+            return (1 if self.declared else 0,)
     for vendor in ("postgresql", "mysql"):
         with pytest.raises(RuntimeError, match="requires SQLite"):
             check(None, Fake(vendor))
     with pytest.raises(RuntimeError, match="FTS5"):
         check(None, Fake("sqlite", fts5=False))
     check(None, Fake("sqlite", fts5=True))                                           # SQLite with FTS5: fine
+    # DOC534.43: FTS5 loaded or built in without ENABLE_FTS5 being declared works; the compile options are not what is asked
+    check(None, Fake("sqlite", fts5=True, declared=False))
     from django.db import connection
     check(None, types.SimpleNamespace(connection=connection))                       # the SQLite this very test runs on
 

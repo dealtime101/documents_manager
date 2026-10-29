@@ -11,11 +11,14 @@ def require_sqlite_with_fts5(apps, schema_editor):
     if connection.vendor != "sqlite":
         raise RuntimeError(f"The full-text search migration requires SQLite (this database is {connection.vendor}): "
                            "docflow is built for a local SQLite file.")
+    # Ask the module itself, not the compile options: FTS5 can be built in or loaded without ENABLE_FTS5 being declared
     with connection.cursor() as cursor:
-        has_fts5 = cursor.execute("SELECT sqlite_compileoption_used('ENABLE_FTS5')").fetchone()[0]
-    if not has_fts5:
-        raise RuntimeError("The full-text search migration requires a SQLite built with FTS5 "
-                           "(sqlite_compileoption_used('ENABLE_FTS5') is false here).")
+        try:
+            cursor.execute("CREATE VIRTUAL TABLE temp.docflow_fts5_probe USING fts5(x)")
+        except Exception as e:  # noqa: BLE001 - whatever the driver raises (OperationalError, DatabaseError): the module is not there
+            raise RuntimeError("The full-text search migration requires a SQLite with the FTS5 module "
+                               f"(creating an FTS5 table failed here: {e}).") from e
+        cursor.execute("DROP TABLE temp.docflow_fts5_probe")
 
 
 class Migration(migrations.Migration):
