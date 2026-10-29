@@ -855,6 +855,15 @@ def test_the_card_title_comment_does_not_bless_a_card_inside_a_button():
     assert "never goes inside a <button>" in card
 
 
+def test_a_long_source_path_wraps_in_its_card_and_leaves_the_count_in_view():
+    # DOC534.257: an absolute path has no space to break at; it ran out of the card and pushed the number of PDFs out of sight
+    page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
+    row = page[page.index("d.sources.map"):page.index("</CardContent>", page.index("d.sources.map"))]
+    assert 'className="flex justify-between gap-3 border-b py-2 last:border-0"' in row
+    assert '<span className="min-w-0">' in row and 'className="ml-2 break-all text-slate-500">{s.path}' in row
+    assert '<span className="shrink-0 font-medium">{t(\'dash.pdfCount\'' in row
+
+
 def test_a_dashboard_tile_is_a_button_made_of_inline_elements_only():
     # DOC474.80: Card, CardHeader and CardContent render <div>s; a <button> may only hold phrasing content
     page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")

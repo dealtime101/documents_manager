@@ -96,9 +96,11 @@ export default function Dashboard({ open }: { open: (target: Target) => void }) 
         <CardHeader><CardTitle as="h2">{t('dash.sources')}</CardTitle></CardHeader>
         <CardContent className="text-sm">
           {d.sources.map((s) => (
-            <div key={s.path} className="flex justify-between border-b py-2 last:border-0">
-              <span>{t(s.kind === 'inbox' ? 'dash.srcInbox' : 'dash.srcBacklog')}<span className="ml-2 text-slate-500">{s.path}</span></span>
-              <span className="font-medium">{t('dash.pdfCount', { n: s.files })}</span>
+            <div key={s.path} className="flex justify-between gap-3 border-b py-2 last:border-0">
+              {/* a path has no space to break at: min-w-0 lets the label shrink and break-all wraps the path anywhere, so it never
+                  pushes the count out of the card */}
+              <span className="min-w-0">{t(s.kind === 'inbox' ? 'dash.srcInbox' : 'dash.srcBacklog')}<span className="ml-2 break-all text-slate-500">{s.path}</span></span>
+              <span className="shrink-0 font-medium">{t('dash.pdfCount', { n: s.files })}</span>
             </div>
           ))}
         </CardContent>
