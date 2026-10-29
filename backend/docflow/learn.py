@@ -1,4 +1,5 @@
 """Learning from corrections: writes to config/*_learned.yaml (never to the hand-written YAML files)."""
+import logging
 import os
 import re
 import stat
@@ -15,6 +16,10 @@ from .config import Config
 from .fields import norm
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,59}$")
+
+
+log = logging.getLogger("docflow")
+LOCK_ATTEMPTS = 6  # on Windows each attempt waits about 10 s: a minute in all, then an explicit error
 
 
 class LearnedFileError(ValueError):
@@ -88,15 +93,18 @@ def _locked(cfg: Config):
     with open(cfg.learn_dir / ".learn.lock", "a+") as lock:
         if sys.platform == "win32":
             import msvcrt
-            lock.write(" ")  # a byte to lock: Windows locks a byte range, not the whole file
-            lock.flush()
+            if os.fstat(lock.fileno()).st_size == 0:  # a byte to lock (Windows locks a byte range, not the whole file), written ONCE
+                lock.write(" ")
+                lock.flush()
             lock.seek(0)
-            while True:
+            for attempt in range(1, LOCK_ATTEMPTS + 1):
                 try:
                     msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)  # waits up to ~10 s, then raises: try again
                     break
-                except OSError:
-                    continue
+                except OSError as e:
+                    log.warning("learned rules: the lock is still held (attempt %d of %d): %s", attempt, LOCK_ATTEMPTS, e)
+            else:  # a lock never released (or another error): say so, do not hold the request for ever in silence
+                raise TimeoutError(f"the learned rules are locked by another program (gave up after {LOCK_ATTEMPTS} attempts)")
         else:
             import fcntl
             fcntl.flock(lock, fcntl.LOCK_EX)

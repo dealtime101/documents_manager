@@ -77,6 +77,30 @@ def test_one_malformed_learned_alias_costs_that_entry_not_the_start_of_the_progr
         load_config(prod)
 
 
+def test_the_windows_lock_is_written_once_and_gives_up_with_a_message_instead_of_waiting_for_ever(tmp_path, monkeypatch, caplog):
+    # DOC534.109: the loop never ended (an OSError of any kind was retried silently) and every call added a byte to .learn.lock
+    import logging
+    import sys
+    import types
+
+    from docflow import learn
+    calls = []
+    fake = types.SimpleNamespace(LK_LOCK=1, locking=lambda fd, mode, n: calls.append(n))
+    monkeypatch.setitem(sys.modules, "msvcrt", fake)
+    monkeypatch.setattr(learn.sys, "platform", "win32")
+    cfg = cfg_in(tmp_path)
+    for _ in range(3):
+        with learn._locked(cfg):
+            pass
+    assert (cfg.learn_dir / ".learn.lock").stat().st_size == 1 and len(calls) == 3                 # one byte, however many corrections
+    fake.locking = lambda fd, mode, n: (_ for _ in ()).throw(OSError(13, "Permission denied"))     # a lock that is never released
+    with caplog.at_level(logging.WARNING, logger="docflow"):
+        with pytest.raises(TimeoutError, match=f"gave up after {learn.LOCK_ATTEMPTS} attempts"):
+            with learn._locked(cfg):
+                pass
+    assert len([r for r in caplog.records if "lock is still held" in r.getMessage()]) == learn.LOCK_ATTEMPTS   # each try is in the log
+
+
 @pytest.mark.parametrize("name,text,words", [
     ("company_aliases.yaml", "Acme: acme\n", "'Acme' must be a list of patterns"),             # a string: list() would have split it into letters
     ("company_aliases.yaml", "Acme: [1, 2]\n", "'Acme' must be a list of patterns"),
