@@ -24,7 +24,10 @@ const SORT_LABELS = { relevance: 'search.sortRelevance', date: 'search.sortDateU
 /** Search of the filed documents: by the words in their text (read when they were scanned) and/or by the fields read from each
  * (company, type, period, amount). Nothing leaves the machine. */
 export default function Search() {
-  const { t, msg, date } = useI18n()
+  const { t, msg, date, lang } = useI18n()
+  const [year, setYear] = useState(String(new Date().getFullYear()))
+  const [layout, setLayout] = useState('documents')
+  const validYear = /^[12]\d{3}$/.test(year)
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS)
   const [hits, setHits] = useState<SearchHit[] | null>(null)  // null: nothing searched yet
@@ -109,6 +112,29 @@ export default function Search() {
           </li>
         ))}
       </ul>
+      <section className="space-y-2 border-t pt-4" aria-labelledby="statement-title">
+        <h2 id="statement-title" className="text-sm font-semibold">{t('statement.title')}</h2>
+        <p className="text-sm text-slate-600">{t('statement.hint')}</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex w-28 flex-col gap-1 text-sm font-medium">{t('statement.year')}
+            <Input type="number" inputMode="numeric" min="1900" max="2999" value={year} onChange={(e) => setYear(e.target.value)}
+              aria-invalid={!validYear} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">{t('statement.layout')}
+            <select value={layout} onChange={(e) => setLayout(e.target.value)}
+              className="h-8 rounded-lg border border-field bg-transparent px-2 text-sm dark:bg-input/30">
+              <option value="documents">{t('statement.documents')}</option>
+              <option value="totals">{t('statement.totals')}</option>
+            </select>
+          </label>
+          {/* a link, not a script: the browser downloads the file with the session it already has */}
+          <a href={validYear ? api.statementUrl(year, layout, lang === 'fr' ? 'semicolon' : 'comma') : undefined} download
+            aria-disabled={!validYear}
+            className="inline-flex h-8 items-center rounded-lg border px-3 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-50">
+            {t('statement.download')}
+          </a>
+        </div>
+      </section>
     </div>
   )
 }

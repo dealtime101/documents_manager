@@ -1,6 +1,8 @@
 """Bridge between the API and the docflow engine. The client NEVER sends a path: only fields,
 validated here (Pydantic + sanitization); names and destinations are recomputed server-side."""
 import copy
+import csv
+import io
 import json
 import logging
 import os
@@ -594,6 +596,16 @@ _AMOUNT = "CAST(json_extract(i.analysis, '$.amount') AS REAL)"
 _ISO_DAY = "'[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"  # a date the engine could read: the others are "XXXX" or "2025-XX-XX"
 
 
+def _in_library(library: Path) -> tuple[str, list[str]]:
+    """(an SQL condition on `i.result_path`, its values): only what is IN the library. An approved duplicate is in quarantine, and
+    its copy of the text must not be a second hit. The path is compared with "/" (what Windows stores with "\\" is turned into it),
+    under the folder as written AND as resolved (a library reached through a link is stored by the name it was filed under)."""
+    prefixes = sorted({library.as_posix().rstrip("/"), library.resolve().as_posix().rstrip("/")})
+    under_root = [p.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%" for p in prefixes]
+    stored = "replace(i.result_path, '\\', '/')" if _WINDOWS_PATHS else "i.result_path"
+    return " OR ".join([f"{stored} LIKE %s ESCAPE '\\'"] * len(under_root)), under_root
+
+
 def _search_filters(filters: dict) -> tuple[list[str], list]:
     """DOC534.8: the SQL conditions (and their values) for the fields the engine extracted from each filed document: company and
     type contain the text typed (case-insensitive; accents must match), the date lies in a period, the amount in a range. A value
@@ -672,13 +684,7 @@ def search(query: object, limit: object = 20, filters: dict | None = None, sort:
         sort = "-date"  # nothing to rank the hits by: the newest first
     library = cfg().path("library_root")
     root = library.resolve()
-    # only what is IN the library: an approved duplicate is in quarantine, and its copy of the text must not be a second hit. The
-    # path is compared with "/" (what Windows stores with "\\" is turned into it), under the folder as written AND as resolved
-    # (a library reached through a link is stored by the name it was filed under).
-    prefixes = sorted({library.as_posix().rstrip("/"), root.as_posix().rstrip("/")})
-    under_root = [p.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%" for p in prefixes]
-    stored = "replace(i.result_path, '\\', '/')" if _WINDOWS_PATHS else "i.result_path"
-    where_root = " OR ".join([f"{stored} LIKE %s ESCAPE '\\'"] * len(under_root))
+    where_root, under_root = _in_library(library)
     order = {"relevance": "bm25(item_fts)",
              "date": f"({_DATE} GLOB {_ISO_DAY}) DESC, {_DATE} ASC", "-date": f"({_DATE} GLOB {_ISO_DAY}) DESC, {_DATE} DESC",
              "amount": f"{_AMOUNT} IS NULL, {_AMOUNT} ASC", "-amount": f"{_AMOUNT} IS NULL, {_AMOUNT} DESC"}[str(sort)]
@@ -703,6 +709,71 @@ def search(query: object, limit: object = 20, filters: dict | None = None, sort:
                     "document_type": a.get("document_type"), "amount": a.get("amount"), "currency": a.get("currency"),
                     "snippet": snippet})
     return out
+
+
+BYTE_ORDER_MARK = chr(0xFEFF)  # built, not typed: an invisible character in the source is refused by tests/test_encoding.py
+STATEMENT_LAYOUTS = ("documents", "totals")
+STATEMENT_DELIMITERS = {"comma": ",", "semicolon": ";"}  # a spreadsheet in French settings opens a ";" file in columns, not a "," one
+
+
+def _csv_cell(value: object) -> str:
+    """A cell a spreadsheet shows as text: one that starts with = + - @ (or a tab or return) would be run as a formula, so it is
+    given a leading quote, as OWASP advises. A company name comes from a document: it is not to be trusted."""
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
+def _amount(value: object) -> Decimal | None:
+    try:
+        amount = Decimal(str(value))
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() else None
+
+
+def statement(year: object, layout: object = "documents", delimiter: object = "comma") -> tuple[str, str]:
+    """DOC534.9: (file name, CSV text) of the documents filed in the library that are dated in `year`. "documents": one line per
+    document (date, company, type, amount, currency, folder, file name), the oldest first. "totals": one line per company, type and
+    currency, with the number of documents and the sum of their amounts (a document with no amount counts, and adds nothing).
+    Documents whose date was not read have no year and are not in it. The text starts with a byte order mark: Excel then reads UTF-8."""
+    if isinstance(year, bool) or not re.fullmatch(r"[0-9]{4}", str(year)) or not 1900 <= int(str(year)) <= 2999:
+        raise ApiError("year must be a four-digit year")
+    if layout not in STATEMENT_LAYOUTS:
+        raise ApiError(f"layout must be one of: {', '.join(STATEMENT_LAYOUTS)}")
+    if delimiter not in STATEMENT_DELIMITERS:
+        raise ApiError(f"delimiter must be one of: {', '.join(STATEMENT_DELIMITERS)}")
+    library = cfg().path("library_root")
+    root = library.resolve()
+    where_root, under_root = _in_library(library)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT i.result_path, i.analysis FROM triage_item i WHERE i.state = %s AND ({where_root}) "
+                    f"AND {_DATE} GLOB %s", [Item.APPROVED, *under_root, f"{year}-*"])
+        found = cur.fetchall()
+    docs = []
+    for result_path, analysis in found:
+        a = json.loads(analysis) if isinstance(analysis, str) else (analysis or {})
+        filed = Path(result_path)
+        base = next((b for b in (root, library) if b in filed.parents), None)
+        docs.append((a.get("date") or "", a.get("company") or "", a.get("document_type") or "", a.get("amount"),
+                     a.get("currency") or "", filed.parent.relative_to(base).as_posix() if base else str(filed.parent), filed.name))
+    docs.sort(key=lambda d: (d[0], d[1].casefold(), d[2].casefold(), d[6]))
+    out = io.StringIO()
+    writer = csv.writer(out, delimiter=STATEMENT_DELIMITERS[str(delimiter)], lineterminator="\r\n")
+    if layout == "documents":
+        writer.writerow(["date", "company", "type", "amount", "currency", "folder", "file"])
+        for day, company, kind, amount, currency, folder, name in docs:
+            writer.writerow([day, _csv_cell(company), _csv_cell(kind), amount if _amount(amount) is not None else _csv_cell(amount),
+                             currency, _csv_cell(folder), _csv_cell(name)])
+    else:
+        groups: dict[tuple[str, str, str], list] = {}
+        for _, company, kind, amount, currency, _, _ in docs:
+            entry = groups.setdefault((company, kind, currency if _amount(amount) is not None else ""), [0, Decimal(0)])
+            entry[0] += 1
+            entry[1] += _amount(amount) or Decimal(0)
+        writer.writerow(["company", "type", "currency", "documents", "total"])
+        for (company, kind, currency), (count, total) in sorted(groups.items(), key=lambda g: tuple(x.casefold() for x in g[0])):
+            writer.writerow([_csv_cell(company), _csv_cell(kind), currency, count, f"{total:.2f}" if currency else ""])
+    return f"statement-{year}{'-totals' if layout == 'totals' else ''}.csv", BYTE_ORDER_MARK + out.getvalue()
 
 
 def reindex_text(report=None) -> dict:

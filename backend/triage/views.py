@@ -279,6 +279,19 @@ def search(request):
 
 
 @api_view(["GET"])
+def statement(request):
+    """DOC534.9: the CSV of the documents filed in a year, for a spreadsheet or an accountant."""
+    params = request.query_params
+    try:
+        name, text = s.statement(params.get("year"), params.get("layout") or "documents", params.get("delimiter") or "comma")
+    except s.ApiError as e:
+        return err(e)
+    response = FileResponse(io.BytesIO(text.encode("utf-8")), content_type="text/csv; charset=utf-8", as_attachment=True, filename=name)
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@api_view(["GET"])
 def stats(request):
     return Response(s.stats())
 

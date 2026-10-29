@@ -272,4 +272,6 @@ export const api = {
   destinations: () => call<string[]>('GET', '/api/destinations'),
   vocabulary: () => call<{ companies: string[]; types: string[] }>('GET', '/api/vocabulary'),
   pdfUrl: (id: number) => `/api/items/${id}/pdf`,
+  /** The CSV of the documents filed in `year` (a download: the browser sends the session cookie). */
+  statementUrl: (year: string, layout: string, delimiter: string) => `/api/statement?${new URLSearchParams({ year, layout, delimiter })}`,
 }

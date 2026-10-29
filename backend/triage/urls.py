@@ -10,6 +10,7 @@ urlpatterns = [
     path("items/approve-selected", v.approve_selected),
     path("stats", v.stats),
     path("search", v.search),
+    path("statement", v.statement),
     path("rules", v.rules),
     path("rules/forget", v.rules_forget),
     path("rules/route", v.rules_route),
