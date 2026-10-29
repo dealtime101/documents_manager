@@ -1761,6 +1761,40 @@ def test_the_items_have_no_second_index_on_state_alone_the_composite_one_serves_
 
 
 @pytest.mark.django_db
+def test_the_search_migration_says_how_many_filed_documents_have_no_searchable_text_and_what_to_run(tmp_path, caplog):
+    # DOC534.149: the text table is new, so every document filed before it is unsearchable, and nothing said so or how to fix it
+    import importlib
+    import logging
+
+    from django.db import connections
+    from django.db.backends.sqlite3.base import DatabaseWrapper
+    from django.db.migrations.loader import MigrationLoader
+    migration = importlib.import_module("triage.migrations.0008_item_text_search")
+    state_apps = MigrationLoader(None, ignore_no_migrations=True).project_state(("triage", "0007_scanjob_state_choices")).apps
+    wrapper = DatabaseWrapper({**connections["default"].settings_dict, "NAME": str(tmp_path / "old.db")}, alias="old")
+    connections["old"] = wrapper
+    try:
+        with wrapper.schema_editor() as editor:                                    # the schema just before the search existed
+            for model in state_apps.get_app_config("triage").get_models():
+                editor.create_model(model)
+        Item = state_apps.get_model("triage", "Item")
+        with caplog.at_level(logging.WARNING, logger=migration.log.name):
+            with wrapper.schema_editor() as editor:
+                migration.say_what_is_not_searchable_yet(state_apps, editor)       # an empty archive: nothing to say
+            assert not caplog.records
+            for n, state in enumerate(("approved", "approved", "pending", "removed")):
+                Item.objects.using("old").create(source_path=f"/a{n}.pdf", sha256=f"h{n}", engine_status="auto", state=state)
+            with wrapper.schema_editor() as editor:
+                migration.say_what_is_not_searchable_yet(state_apps, editor)
+        said = [r.getMessage() for r in caplog.records]
+        assert len(said) == 1 and "2 filed document(s)" in said[0] and "manage.py reindex_text" in said[0], said   # only the FILED ones
+        assert migration.Migration.operations[-1].code is migration.say_what_is_not_searchable_yet                     # and it is part of the migration
+    finally:
+        wrapper.close()
+        del connections["old"]
+
+
+@pytest.mark.django_db
 def test_the_unique_constraints_migration_first_cleans_up_what_the_old_database_may_hold(tmp_path):
     # DOC534.50: a database written before the constraints (two scans left 'running', a file queued twice) made `migrate` fail
     import importlib
