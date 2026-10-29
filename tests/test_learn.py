@@ -77,6 +77,31 @@ def test_one_malformed_learned_alias_costs_that_entry_not_the_start_of_the_progr
         load_config(prod)
 
 
+@pytest.mark.parametrize("name,text,words", [
+    ("company_aliases.yaml", "Acme: acme\n", "'Acme' must be a list of patterns"),             # a string: list() would have split it into letters
+    ("company_aliases.yaml", "Acme: [1, 2]\n", "'Acme' must be a list of patterns"),
+    ("types_learned.yaml", "- {type: Lettre}\n", "rule 1 must be a mapping with a 'company' and a 'type'"),
+    ("types_learned.yaml", "- oops\n", "rule 1 must be a mapping"),
+    ("routing_learned.yaml", "Acme: {default: {}}\n", "'Acme' must hold default: destination"),
+    ("routing_learned.yaml", "Acme: here\n", "'Acme' must hold default: destination")])
+def test_a_learned_file_with_a_badly_shaped_entry_is_a_clear_learned_file_error_everywhere(tmp_path, name, text, words):
+    # DOC534.108: only the top level was checked: the rest ended in KeyError / AttributeError, or in aliases cut into letters
+    from docflow.learn import LearnedFileError, forget_alias, list_rules
+    cfg = cfg_in(tmp_path)
+    (cfg.learn_dir).mkdir(parents=True, exist_ok=True)
+    f = cfg.learn_dir / name
+    f.write_text(text, encoding="utf-8")
+    with pytest.raises(LearnedFileError, match="left untouched") as caught:
+        list_rules(cfg)
+    assert name in str(caught.value) and words in str(caught.value)
+    if name == "company_aliases.yaml":
+        with pytest.raises(LearnedFileError):
+            learn_company(cfg, "Acme", "texte acme unique")
+        with pytest.raises(LearnedFileError):
+            forget_alias(cfg, "Acme")
+    assert f.read_text(encoding="utf-8") == text                                      # never written over
+
+
 @pytest.mark.parametrize("name,text,found", [("companies.yaml", "- Hydro\n- Voisin\n", "list"), ("settings.yaml", "- a\n", "list"),
                                               ("document_types.yaml", "Hydro: x\n", "dict"), ("routing_rules.yaml", "- x\n", "list")])
 def test_a_hand_written_file_of_the_wrong_shape_names_the_file_and_what_was_found(tmp_path, name, text, found):

@@ -4,8 +4,10 @@ import re
 import stat
 import sys
 import tempfile
+from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 import yaml
 
@@ -30,7 +32,35 @@ def _load(path: Path, default):
     if not isinstance(data, type(default)):
         raise LearnedFileError(f"{path.name} must hold a {type(default).__name__}, not a {type(data).__name__}; it is left "
                                "untouched. Fix it, or move it away to start again.")
+    problem = _SHAPES.get(path.name, lambda _data: None)(data)
+    if problem:  # a hand-edited entry of the wrong shape: said here, instead of a KeyError / AttributeError deep in a rule
+        raise LearnedFileError(f"{path.name}: {problem}; it is left untouched. Fix it, or move it away to start again.")
     return data
+
+
+def _aliases_problem(data: dict) -> str | None:
+    for company, patterns in data.items():
+        if not isinstance(company, str) or not isinstance(patterns, list) or not all(isinstance(x, str) for x in patterns):
+            return f"the entry {company!r} must be a list of patterns"
+    return None
+
+
+def _types_problem(data: list) -> str | None:
+    for i, rule in enumerate(data, 1):
+        if not (isinstance(rule, dict) and isinstance(rule.get("company"), str) and isinstance(rule.get("type"), str)):
+            return f"rule {i} must be a mapping with a 'company' and a 'type'"
+    return None
+
+
+def _routes_problem(data: dict) -> str | None:
+    for company, rule in data.items():
+        default = rule.get("default") if isinstance(rule, dict) else None
+        if not isinstance(company, str) or not (isinstance(default, dict) and isinstance(default.get("destination"), str)):
+            return f"the route of {company!r} must hold default: destination"
+    return None
+
+
+_SHAPES: dict[str, Callable[[Any], str | None]] = {"company_aliases.yaml": _aliases_problem, "types_learned.yaml": _types_problem, "routing_learned.yaml": _routes_problem}
 
 
 def _save(path: Path, data) -> None:
