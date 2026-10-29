@@ -1784,9 +1784,31 @@ def test_a_new_secret_key_is_on_the_disk_before_it_is_published_and_the_publicat
     assert events == []
 
 
+def _statuses_written(source: str) -> set[str]:
+    """Every string a module assigns to something called `status` (a name, an attribute or an annotated default) or passes as a
+    `status=` argument, including the branches of a conditional expression. What a call returns is not read here: the function that
+    makes the value assigns to its own `status` and is read where it is defined."""
+    import ast
+    found: set[str] = set()
+
+    def strings(node):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            found.add(node.value)
+        elif isinstance(node, ast.IfExp):
+            strings(node.body)
+            strings(node.orelse)
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.keyword) and node.arg == "status":
+            strings(node.value)
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any((isinstance(t, ast.Name) and t.id == "status") or (isinstance(t, ast.Attribute) and t.attr == "status") for t in targets):
+                strings(node.value)
+    return found
+
+
 def test_engine_status_is_a_closed_list_in_the_model_and_in_the_database(sb):
     # DOC474.102: a typo such as "confrim" was stored without a word and the item vanished from every filter on that status
-    import re
     from pathlib import Path
 
     from django.db import IntegrityError, transaction
@@ -1797,8 +1819,13 @@ def test_engine_status_is_a_closed_list_in_the_model_and_in_the_database(sb):
     assert set(Item._meta.get_field("engine_status").choices and dict(Item._meta.get_field("engine_status").choices)) == {
         "auto", "confirm", "manual", "duplicate", "logical_duplicate", "error"}
     pipeline = (Path(__file__).resolve().parents[1] / "backend" / "docflow" / "pipeline.py").read_text()
-    produced = set(re.findall(r"status(?:\s*=\s*|=)\"(\w+)\"", pipeline)) - {"classified", "quarantine", "move"}
-    assert produced <= {"auto", "confirm", "manual", "duplicate", "logical_duplicate", "error"}, produced     # the engine writes no other
+    allowed = {"auto", "confirm", "manual", "duplicate", "logical_duplicate", "error"}
+    produced = _statuses_written(pipeline) - {"classified", "quarantine", "move"}                           # (the status of a stored document)
+    assert produced and produced <= allowed, produced                                                       # the engine writes no other
+    # DOC534.194: read from the syntax tree, not by a regex: single quotes, conditional expressions and defaults are found as well
+    assert _statuses_written("p.status = 'weird'\nx = Proposal(path, status='odd' if a else \"auto\")\nstatus: str = 'third'") == {
+        "weird", "odd", "auto", "third"}
+    assert _statuses_written("status = 'auto' if x else 'confirm'") == {"auto", "confirm"} and _statuses_written("other = 'nope'") == set()
 
 
 def test_the_database_constraints_are_built_from_the_choices_not_copied_from_them():
