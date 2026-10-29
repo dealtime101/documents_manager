@@ -17,6 +17,17 @@ def _folders(tmp_path):
     return d
 
 
+def test_the_test_session_works_in_a_throw_away_folder_and_on_the_test_rules():
+    # DOC534.54: conftest imported docflow.config before setting the two variables; this checks what the session really resolves
+    import tempfile
+    from pathlib import Path
+
+    from docflow.config import load_config, shipped_dir
+    assert Path(usersettings.user_dir()).is_relative_to(Path(tempfile.gettempdir()))      # never the real ~/.config/docflow
+    assert shipped_dir() == Path(__file__).parent / "fixtures" / "config"                  # and the test rules, never the shipped ones
+    assert load_config().learn_dir.is_relative_to(Path(tempfile.gettempdir()))
+
+
 def test_the_user_folder_is_docflow_home_when_set_and_otherwise_a_per_user_place(monkeypatch, tmp_path):
     monkeypatch.setenv("DOCFLOW_HOME", str(tmp_path / "h"))
     assert usersettings.user_dir() == tmp_path / "h"
