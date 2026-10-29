@@ -15,7 +15,7 @@ import yaml
 from .config import Config
 from .fields import norm
 
-NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,59}$")
+NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,59}\Z")  # \Z, not $: `$` also matches before a trailing newline ("Acme\n")
 
 
 log = logging.getLogger("docflow")

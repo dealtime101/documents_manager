@@ -17,10 +17,24 @@ def shipped(monkeypatch):
 def test_every_shipped_name_is_a_valid_company_name_and_every_pattern_compiles(shipped):
     assert {"Amazon", "Desjardins", "HelloFresh"} <= set(shipped.companies) and len(shipped.companies) >= 30
     for name, patterns in shipped.companies.items():
-        assert NAME_RE.match(name), name
+        assert NAME_RE.fullmatch(name), name                                  # the whole name, not only its beginning (DOC534.246)
         assert patterns, name
         for p in patterns:
             re.compile(p, re.IGNORECASE)
+
+
+@pytest.mark.parametrize("bad", ["Acme\n", "Acme ", "Ac me", "Acme/x", "Société", "", "-Acme", "A" * 61, "Acme\r\n"])
+def test_a_name_that_only_starts_well_is_not_a_company_name(bad, tmp_path):
+    # DOC534.246: the check used .match, and `$` lets a name end with a newline; the name is used as a folder and a key
+    from docflow.learn import learn_company
+    assert NAME_RE.fullmatch(bad) is None and NAME_RE.match(bad) is None
+    assert learn_company(load_config(sandbox=tmp_path), bad, "texte unique pour ce nom") is False
+    assert not (tmp_path / "learned" / "company_aliases.yaml").exists()
+
+
+@pytest.mark.parametrize("good", ["Amazon", "Hydro-Quebec", "A", "a.b_c+d-e", "A" * 60])
+def test_the_names_the_program_accepts(good):
+    assert NAME_RE.fullmatch(good) and NAME_RE.match(good)
 
 
 @pytest.mark.parametrize("text,expected", [
