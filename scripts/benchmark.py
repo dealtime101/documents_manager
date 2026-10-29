@@ -93,6 +93,7 @@ def load(cache: Path, left_out: Counter | None = None) -> list[dict]:
             continue
         amount = name_amount(parts[-1])
         r.update(date=parts[0].strip(), company=parts[1].strip(), type=parts[2].strip(), amount=amount,
+                 currency=name_currency(parts[-1]),  # None: the name says no currency, so none is expected (as compare.py does)
                  # an ending that looks like an amount but was not read must not silently leave the amount score
                  amount_unread=amount is None and len(parts) > 3 and bool(LOOKS_LIKE_AMOUNT.search(parts[-1])),
                  text=(cache / f"{r['key']}.txt").read_text(encoding="utf-8"))
@@ -121,7 +122,8 @@ def score(cache: Path) -> None:
         co = key(a.company) == key(r["company"]) if a.company else None
         ty = tkey(a.document_type) == tkey(r["type"]) if a.document_type else None
         da = a.date == r["date"]
-        am = None if not r["amount"] else (a.amount is not None and a.amount == Decimal(r["amount"]))
+        am = None if not r["amount"] else (a.amount is not None and a.amount == Decimal(r["amount"])
+                                           and (r["currency"] is None or a.currency == r["currency"]))
         n["company_found"] += a.company is not None
         n["company_ok"] += bool(co)
         n["type_found"] += a.document_type is not None

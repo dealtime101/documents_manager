@@ -634,6 +634,23 @@ def test_benchmark_usage_errors_print_the_usage_not_a_traceback(argv, capsys):
     assert "usage:" in err and "Traceback" not in err
 
 
+def test_benchmark_checks_the_currency_written_in_the_name_like_compare_does(tmp_path, capsys):
+    # DOC534.106: name_currency was never used: "... 100.00 USD.pdf" counted as an exact amount when the engine read 100,00 $ (CAD)
+    import json
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    texts = {"k1": "Acme\nFacture du 7 octobre 2025\nTotal a payer : 100,00 $",                  # CAD, the name says USD: wrong
+             "k2": "Acme\nFacture du 8 octobre 2025\nTotal a payer : 100.00 USD",                 # USD: right
+             "k3": "Acme\nFacture du 9 octobre 2025\nTotal a payer : 50,00 $"}                    # the name says no currency: only the number
+    names = {"k1": "2025-10-07 - Acme - Facture - 100.00 USD.pdf", "k2": "2025-10-08 - Acme - Facture - 100.00 USD.pdf",
+             "k3": "2025-10-09 - Acme - Facture - 50.00.pdf"}
+    for k, text in texts.items():
+        (cache / f"{k}.txt").write_text(text)
+    (cache / "index.json").write_text(json.dumps([{"key": k, "rel": names[k], "name": names[k]} for k in texts]))
+    assert load_script("benchmark").main(["score", str(cache)]) == 0
+    assert "exact amount       : 2/3 = 67%" in capsys.readouterr().out                            # not 3/3
+
+
 def test_benchmark_score_names_the_entries_left_out_because_their_key_is_not_a_plain_file_name(tmp_path, capsys):
     # DOC534.105: that reason was counted but missing from the list, so the line could say "left out: nothing" with entries dropped
     import json
