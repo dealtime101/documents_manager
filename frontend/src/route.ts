@@ -4,7 +4,10 @@ export type Page = 'dashboard' | 'queue' | 'library' | 'history' | 'search' | 'r
 export type Route = { page: Page; group: Group | null }
 
 const PAGES: Page[] = ['dashboard', 'queue', 'library', 'history', 'search', 'rules', 'settings', 'notes']
-const GROUPS: Group[] = ['auto', 'needs_validation', 'duplicates', 'errors']
+// `satisfies Record<Group, true>` makes the compiler refuse this table when a group is added to (or removed from) the Group type
+// in api.ts, instead of parseHash rejecting the new group in silence
+const GROUP_KEYS = { auto: true, needs_validation: true, duplicates: true, errors: true } satisfies Record<Group, true>
+const GROUPS = Object.keys(GROUP_KEYS) as Group[]
 
 /** `#history`, `#queue`, `#queue/duplicates` (also `#/history`): anything else is the whole queue, the page's default. */
 export function parseHash(hash: string): Route {

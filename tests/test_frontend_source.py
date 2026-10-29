@@ -768,6 +768,17 @@ def test_the_dashboard_comment_says_the_today_tile_opens_the_unfiltered_history(
     assert "newest first" in page and "not filtered by date" in page
 
 
+def test_the_route_groups_cannot_drift_from_the_group_type_without_the_compiler_saying_so():
+    # DOC534.174: GROUPS duplicated the Group type of api.ts; a new group was rejected by parseHash in silence
+    import re
+    src = UI.parents[1]
+    route = (src / "route.ts").read_text()
+    assert "const GROUPS: Group[]" not in route
+    assert "satisfies Record<Group, true>" in route and "Object.keys(GROUP_KEYS) as Group[]" in route
+    declared = re.search(r"export type Group = ([^\n]+)", (src / "api.ts").read_text()).group(1)
+    assert sorted(re.findall(r"'(\w+)'", declared)) == sorted(re.findall(r"(\w+): true", route))           # and they agree today
+
+
 def test_the_notes_inline_markup_only_styles_the_matches_of_the_split():
     # DOC534.152: "**unclosed" is no match, yet startsWith('**') made it bold and cut two characters off each end
     page = (UI.parents[1] / "pages" / "Notes.tsx").read_text()
