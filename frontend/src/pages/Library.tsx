@@ -38,6 +38,19 @@ function AskName({ label, initial, ext = '', onOk, onCancel }: { label: string; 
   )
 }
 
+/** A question asked in the page itself, like AskName (the browser's own confirmation box is not reliable in a desktop window): the sentence and two buttons.
+ *  The focus starts on Cancel: a stray Enter never deletes anything. */
+function Confirm({ text, onOk, onCancel }: { text: string; onOk: () => void; onCancel: () => void }) {
+  const { t } = useI18n()
+  return (
+    <div role="alertdialog" aria-label={text} className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm">
+      <p className="min-w-0 flex-1 break-words">{text}</p>
+      <Button type="button" size="sm" onClick={onOk}>{t('library.ok')}</Button>
+      <Button type="button" size="sm" variant="outline" autoFocus onClick={onCancel}>{t('library.cancel')}</Button>
+    </div>
+  )
+}
+
 /** Where to move something: the library's folders, walked one level at a time. */
 function MovePicker({ from, onPick, onCancel }: { from: string; onPick: (to: string) => void; onCancel: () => void }) {
   const { t, msg } = useI18n()
@@ -162,6 +175,7 @@ export default function Library() {
   const [found, setFound] = useState<{ hits: LibraryHit[]; truncated: boolean } | null>(null)
   const [ask, setAsk] = useState<'newFolder' | 'renameFolder' | 'renameFile' | null>(null)
   const [moving, setMoving] = useState<'folder' | 'file' | null>(null)
+  const [confirming, setConfirming] = useState<string | null>(null)  // the folder or file whose deletion is being confirmed
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -173,7 +187,8 @@ export default function Library() {
   }, [path, reload])
 
   const refresh = () => setReload((n) => n + 1)
-  const go = (to: string, select: string | null = null) => { setPath(to); setFile(select); setAsk(null); setMoving(null); setFound(null); setQuery('') }
+  const go = (to: string, select: string | null = null) => { setPath(to); setFile(select); setAsk(null); setMoving(null); setConfirming(null); setFound(null); setQuery('') }
+  const sentence = (target: string) => t(inTrash(target) ? 'library.confirmForever' : 'library.confirmTrash', { name: baseOf(target) })
   const crumbs = path ? path.split('/') : []
 
   /** Runs one change, says what happened, and shows the folder again. */
@@ -184,8 +199,8 @@ export default function Library() {
     finally { setBusy(false) }
   }
   const remove = (target: string) => {
+    setConfirming(null)
     const forever = inTrash(target)
-    if (!confirm(t(forever ? 'library.confirmForever' : 'library.confirmTrash', { name: baseOf(target) }))) return
     void act(async () => {
       await api.libraryDelete(target)
       if (file && (file === target || file.startsWith(`${target}/`))) setFile(null)
@@ -226,7 +241,7 @@ export default function Library() {
             <>
               <Button type="button" variant="outline" size="sm" onClick={() => setAsk('renameFolder')}>{t('library.renameFolder')}</Button>
               <Button type="button" variant="outline" size="sm" onClick={() => setMoving('folder')}>{t('library.moveFolder')}</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => remove(path)}>{t(inTrash(path) ? 'library.deleteForever' : 'library.deleteFolder')}</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(path)}>{t(inTrash(path) ? 'library.deleteForever' : 'library.deleteFolder')}</Button>
             </>
           )}
         </div>
@@ -236,6 +251,7 @@ export default function Library() {
           onOk={(v) => void act(async () => { const r = await api.libraryRename(path, v); go(r.path); return t('library.renamed', { name: v }) })} />}
         {moving === 'folder' && <MovePicker from={path} onCancel={() => setMoving(null)}
           onPick={(to) => void act(async () => { const r = await api.libraryMove(path, to); go(r.path); return t('library.moved', { path: r.path }) })} />}
+        {confirming !== null && confirming === path && <Confirm text={sentence(path)} onCancel={() => setConfirming(null)} onOk={() => remove(path)} />}
         {error && <p role="alert" className="text-sm text-rose-700"><span aria-hidden="true">✕ </span>{msg(error)}</p>}
         <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
           {found ? (
@@ -302,11 +318,12 @@ export default function Library() {
                 </a>
                 <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setAsk('renameFile')}>{t('library.rename')}</Button>
                 <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setMoving('file')}>{t('library.move')}</Button>
-                <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => remove(file)}>{t(inTrash(file) ? 'library.deleteForever' : 'library.delete')}</Button>
+                <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setConfirming(file)}>{t(inTrash(file) ? 'library.deleteForever' : 'library.delete')}</Button>
               </div>
             </div>
             {ask === 'renameFile' && <AskName label={t('library.newName')} initial={baseOf(file)} ext={extOf(file)} onCancel={() => setAsk(null)}
               onOk={(v) => void act(async () => { const r = await api.libraryRename(file, v); setFile(r.path); return t('library.renamed', { name: v }) })} />}
+            {confirming !== null && confirming === file && <Confirm text={sentence(file)} onCancel={() => setConfirming(null)} onOk={() => remove(file)} />}
             {moving === 'file' && <MovePicker from={file} onCancel={() => setMoving(null)}
               onPick={(to) => void act(async () => { const r = await api.libraryMove(file, to); go(dirOf(r.path), r.path); return t('library.moved', { path: r.path }) })} />}
             {isPdf(file) ? (

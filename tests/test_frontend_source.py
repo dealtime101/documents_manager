@@ -343,7 +343,12 @@ def test_the_library_explorer_page_asks_before_deleting_and_only_calls_its_own_e
     used = set(re.findall(r"api\.(\w+)", page))
     assert used <= {"library", "libraryFileUrl", "librarySearch", "libraryNewFolder", "libraryRename", "libraryMove", "libraryDelete",
                     "libraryPlan", "libraryApply", "vocabulary", "destinations"}           # the explorer calls nothing else (no item, no scan)
-    assert "confirm(t(forever ? 'library.confirmForever' : 'library.confirmTrash'" in page   # a deletion is always confirmed first
+    # a deletion is always confirmed first, in the page itself (DOC534.67: confirm() is not reliable in the desktop window)
+    assert "confirm(" not in page and "<Confirm text={sentence(path)}" in page and "<Confirm text={sentence(file)}" in page
+    assert "t(inTrash(target) ? 'library.confirmForever' : 'library.confirmTrash'" in page
+    assert page.count("onClick={() => setConfirming(") == 2 and "onOk={() => remove(path)}" in page and "onOk={() => remove(file)}" in page   # the buttons only ask
+    remover = page[page.index("const remove = "):page.index("const search = ")]
+    assert "api.libraryDelete(target)" in remover and "confirm" not in remover.replace("setConfirming", "")
     api = (src / "api.ts").read_text()
     assert "new URLSearchParams({ path })" in api and "new URLSearchParams({ q })" in api    # paths and queries are encoded, not concatenated
     assert '<TabsTrigger value="library">' in (src / "App.tsx").read_text()
