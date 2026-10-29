@@ -10,6 +10,14 @@ SECOND_PERSON = re.compile(
     r"\b(tu|toi|ton|ta|tes|te|vous|votre|vos)\b|-toi\b|-vous\b"
     r"|\b(d[ée]pose|clique|classe|approuve|choisis|saisis|v[ée]rifie|attends|essaie|r[ée]essaie|corrige|relance"
     r"|d[ée]posez|cliquez|classez|approuvez|choisissez|saisissez|v[ée]rifiez|attendez|essayez|corrigez|relancez)\b"
+    # DOC534.238: the other verbs an interface speaks with (singular and plural imperatives). Left out on purpose: forms that are also a
+    # noun, a participle, a preposition or a third person in the real texts ("note", "faites", "entre", "va", "utilise", "modifie")
+    r"|\b(ouvre|ouvrez|s[ée]lectionne|s[ée]lectionnez|glisse|glissez|ferme|fermez|lancez|copie|copiez|colle|collez|ajoute|ajoutez"
+    r"|supprime|supprimez|retire|retirez|enregistre|enregistrez|valide|validez|modifiez|changez|consulte|consultez|r[ée]essayez"
+    r"|patiente|patientez|revenez|reviens|appuie|appuyez|tape|tapez|entrez|indique|indiquez|pr[ée]cise|pr[ée]cisez|utilisez"
+    r"|regarde|regardez|laissez|gardez|mets|mettez|contacte|contactez|d[ée]place|d[ée]placez|renomme|renommez"
+    r"|t[ée]l[ée]charge|t[ée]l[ée]chargez|connecte|connectez|relis|relisez|prenez|allez|sauvegarde|sauvegardez|confirme|confirmez"
+    r"|annule|annulez|recommence|recommencez)\b"
     r"|\w+-en\b", re.IGNORECASE)
 
 
@@ -50,6 +58,16 @@ def test_every_key_of_the_translation_tables_has_its_text_read():
 def test_the_extraction_really_reads_the_french_strings():
     values = dict(french_values())
     assert len(values) > 80 and values["queue.scan"] == "Analyser la boîte de réception"         # a silent miss would make the next test vacuous
+
+
+def test_the_second_person_pattern_catches_the_common_interface_imperatives_and_spares_ordinary_words():
+    # DOC534.238: "ouvre", "sélectionne", "glisse", "ouvrez", "sélectionnez"... went through
+    for caught in ("Ouvre le dossier", "Sélectionne un fichier", "Glisse le PDF ici", "Ouvrez le dossier", "Sélectionnez un fichier",
+                   "Appuyez sur Entrée", "Enregistrez puis fermez", "Réessayez plus tard", "Cliquez ici", "Vérifie le nom"):
+        assert SECOND_PERSON.search(caught), caught
+    for spared in ("Aucune note de version trouvée.", "Corrections faites à la main, par champ", "Entre deux scans", "Ouvrir le dossier",
+                   "Sélectionner un fichier", "Fichier ouvert", "Dossier supprimé", "Enregistrement réussi"):
+        assert not SECOND_PERSON.search(spared), spared
 
 
 def test_french_interface_text_never_addresses_the_user_in_the_second_person():
