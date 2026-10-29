@@ -43,6 +43,15 @@ def test_a_negative_amount_written_after_the_currency_code_is_read(text, amount,
     assert found is not None and found.value == Decimal(amount) and found.currency == currency
 
 
+@pytest.mark.parametrize("amount,expected", [("-0.004", "0.00$"), ("-0.00", "0.00$"), ("0.004", "0.00$"), ("0", "0.00$"),
+                                              ("-0.005", "-0.01$"), ("-12.5", "-12.50$"), ("12.345", "12.35$")])
+def test_an_amount_that_rounds_to_zero_has_no_minus_sign_in_the_name(amount, expected):
+    # DOC534.113: -0.004 gave "... - -0.00$.pdf", a name unlike the one of "0.00$" for the same document
+    from docflow.naming import format_amount
+    assert format_amount(Decimal(amount)) == expected
+    assert build_filename("2025-01-02", "Acme", "Facture", "", Decimal(amount)).endswith(f" - {expected}.pdf")
+
+
 def test_the_kinds_of_a_found_date_are_all_listed():
     # DOC534.74: the comment named six kinds; the module also produces skip, period, tax_year and month_before
     import re

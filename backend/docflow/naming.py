@@ -97,7 +97,8 @@ def format_amount(amount: Decimal, currency: str = "CAD") -> str:
     try:
         if not amount.is_finite():
             raise InvalidOperation
-        txt = f"{amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
+        rounded = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        txt = f"{rounded + Decimal(0) if rounded.is_zero() else rounded:.2f}"  # -0.004 is 0.00$, never "-0.00$" (a negative zero)
     except InvalidOperation:  # an arithmetic error is not a ValueError: callers refuse a name on ValueError only
         raise ValueError(f"invalid amount: {str(amount)[:30]!r}") from None
     return txt + ("$" if currency == "CAD" else currency)
