@@ -35,7 +35,7 @@ export default function Notes() {
     <div className="space-y-4">
       <p className="text-sm text-slate-600">{t('notes.intro')}</p>
       {releases.map((r, index) => (
-        <Card key={r.version}>
+        <Card key={`${index}-${r.version}`}>
           <CardHeader>
             <CardTitle as="h2">
               {t('notes.version', { v: r.version })} <span className="text-sm font-normal text-slate-600">· {date(r.date)}</span>
@@ -44,11 +44,11 @@ export default function Notes() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {r.intro && <p><Inline text={r.intro} /></p>}
-            {r.sections.map((s) => (
-              <section key={s.title}>
+            {r.sections.map((s, si) => (
+              <section key={`${si}-${s.title}`}>
                 <h3 className="mb-1 font-medium">{s.title}</h3>
                 <ul className="list-disc space-y-1 pl-5">
-                  {s.items.map((item) => <li key={item}><Inline text={item} /></li>)}
+                  {s.items.map((item, ii) => <li key={`${ii}-${item}`}><Inline text={item} /></li>)}
                 </ul>
               </section>
             ))}

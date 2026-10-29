@@ -775,6 +775,13 @@ def test_the_notes_inline_markup_only_styles_the_matches_of_the_split():
     assert "\n        part.startsWith(" not in page
 
 
+def test_the_notes_keys_carry_the_position_so_a_repeated_bullet_or_title_does_not_clash():
+    # DOC534.153: two equal bullets in a section (or two sections with one title) gave React duplicate keys
+    page = (UI.parents[1] / "pages" / "Notes.tsx").read_text()
+    assert "key={item}" not in page and "key={s.title}" not in page and "key={r.version}" not in page
+    assert "key={`${ii}-${item}`}" in page and "key={`${si}-${s.title}`}" in page and "key={`${index}-${r.version}`}" in page
+
+
 def test_the_card_title_comment_does_not_bless_a_card_inside_a_button():
     # DOC534.151: it said a card inside a <button> is fine if the title is no heading, but the card itself is made of <div>s
     card = (UI / "card.tsx").read_text()
