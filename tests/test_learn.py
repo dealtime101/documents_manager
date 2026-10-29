@@ -1,4 +1,6 @@
 import re
+import shutil
+from pathlib import Path
 
 import pytest
 import yaml
@@ -172,8 +174,6 @@ def test_a_learned_type_entry_that_is_not_a_mapping_is_ignored_not_fatal(tmp_pat
 
 def test_the_docstring_of_refresh_learned_counts_the_stat_calls_it_really_makes(tmp_path, monkeypatch):
     # DOC534.254: it said "three stat calls"; there are four (own folder + user settings) and up to seven (a sandbox that inherits)
-    from pathlib import Path
-
     from docflow import config
     prod = _production_with_learned(tmp_path / "prod")
     calls = []
@@ -297,7 +297,6 @@ def _config_dir(tmp_path, companies_yaml: str):
 
 def test_the_thresholds_are_always_complete_and_a_bad_value_names_its_key(tmp_path):
     # DOC534.87: a settings.yaml without (or with half of) `thresholds` made /api/thresholds and the engine fail with a bare KeyError
-    import pytest
     from docflow.config import DEFAULT_THRESHOLDS
 
     def with_settings(text: str):
@@ -323,8 +322,15 @@ def test_company_patterns_accept_empty_and_single_string_values(tmp_path):
     assert cfg.companies["List"] == ["a one", "b two"]
 
 
+def test_the_reader_of_local_reimports_finds_them_and_this_file_has_none():
+    # DOC534.272: pytest, yaml, load_config, shutil and Path were imported again inside functions
+    from conftest import local_reimports
+    assert local_reimports("import os\ndef f():\n    import os\n    import re\n    from os import path\n") == [("f", "os")]
+    assert local_reimports("from os import path\ndef f():\n    from os import path\n") == [("f", "path")]
+    assert local_reimports(Path(__file__).read_text(encoding="utf-8")) == []
+
+
 def test_a_malformed_company_entry_is_named_in_the_error(tmp_path):
-    import pytest
     with pytest.raises(ValueError, match="companies.yaml.*'Broken'"):
         load_config(_config_dir(tmp_path, "Broken:\n  nested: dict\n"), sandbox=tmp_path / "sb")
 
@@ -433,8 +439,6 @@ def test_learned_files_never_touch_hand_written_yaml(tmp_path):
 
 
 def test_a_relative_config_folder_does_not_make_paths_depend_on_the_current_directory(tmp_path, monkeypatch):
-    import shutil
-    from pathlib import Path
     shutil.copytree(Path(__file__).resolve().parent / "fixtures" / "config", tmp_path / "proj" / "config")
     settings = tmp_path / "proj" / "config" / "settings.yaml"
     data = yaml.safe_load(settings.read_text(encoding="utf-8"))
@@ -528,10 +532,6 @@ def test_another_worker_sees_what_this_one_learned_and_forgot(tmp_path):
 def test_a_reload_does_not_depend_on_the_current_directory(tmp_path, monkeypatch):
     # DOC474.65: the reload re-used `config_dir` and `sandbox` as the caller wrote them (relative): after a chdir it read
     # another folder, found nothing, and replaced the companies in memory with an empty set
-    import shutil
-    from pathlib import Path
-
-    from docflow.config import load_config
     shutil.copytree(Path(__file__).resolve().parent / "fixtures" / "config", tmp_path / "cfg")
     (tmp_path / "elsewhere").mkdir()
     monkeypatch.chdir(tmp_path)
@@ -545,10 +545,6 @@ def test_a_reload_does_not_depend_on_the_current_directory(tmp_path, monkeypatch
 
 def test_a_reload_of_a_relative_config_dir_without_sandbox_survives_a_chdir(tmp_path, monkeypatch):
     # DOC474.168: same root cause as .65, the case with NO sandbox: learned files live in the config folder itself
-    import shutil
-    from pathlib import Path
-
-    from docflow.config import load_config
     shutil.copytree(Path(__file__).resolve().parent / "fixtures" / "config", tmp_path / "cfg")
     (tmp_path / "elsewhere").mkdir()
     monkeypatch.chdir(tmp_path)
@@ -574,11 +570,7 @@ def test_a_real_issuer_header_still_becomes_a_pattern(header):
 
 def test_a_sandbox_notices_a_rule_learned_later_in_the_production_files_it_inherits(tmp_path, monkeypatch):
     # DOC474.66: the stamp only watched the sandbox's own learned folder, so what production learned afterwards was never picked up
-    import shutil
-    from pathlib import Path
-
     from docflow import config
-    from docflow.config import load_config
     monkeypatch.setattr(config, "SANDBOX_INHERITS_LEARNED", True)
     shutil.copytree(Path(__file__).resolve().parent / "fixtures" / "config", tmp_path / "prod")      # a COPY: the real files are never touched
     cfg = load_config(tmp_path / "prod", sandbox=tmp_path / "sb")
@@ -591,11 +583,6 @@ def test_a_sandbox_notices_a_rule_learned_later_in_the_production_files_it_inher
 def test_loading_a_configuration_with_a_windows_drive_path_on_a_system_that_cannot_use_it_is_refused(tmp_path):
     # DOC474.67: on Linux "C:\docs" became a folder NAMED "C:\docs" under the current directory, with no error
     import os
-    import shutil
-    from pathlib import Path
-
-    import yaml
-    from docflow.config import load_config
     if os.name == "nt":
         pytest.skip("this system understands Windows drive paths")
     shutil.copytree(Path(__file__).resolve().parent / "fixtures" / "config", tmp_path / "cfg")        # a COPY: the real files are never touched
@@ -617,7 +604,7 @@ def test_loading_a_configuration_with_a_windows_drive_path_on_a_system_that_cann
                                           ("routing_learned.yaml", "a: b: c: d"), ("company_aliases.yaml", "- a list\n- where a mapping belongs\n")])
 def test_a_learned_file_that_cannot_be_read_is_reported_by_name_never_overwritten_and_never_crashes_the_loading(tmp_path, caplog, name, garbage):
     # DOC474.162: a half-written or hand-edited learned file raised a raw YAMLError from every learn, forget and list operation
-    from docflow.learn import LearnedFileError, learn_route, learn_type, list_rules
+    from docflow.learn import LearnedFileError, list_rules
     cfg = cfg_in(tmp_path)
     cfg.learn_dir.mkdir(parents=True, exist_ok=True)
     bad = cfg.learn_dir / name

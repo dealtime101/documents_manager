@@ -223,22 +223,10 @@ def run_node(command: list[str], **kwargs):
 
 def test_no_function_of_this_file_imports_again_what_the_module_already_imports():
     # DOC534.270: pytest, json, shutil, subprocess and re were imported inside several functions, besides the top of the module
-    import ast
-    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
-    top = set()
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            top |= {a.asname or a.name for a in node.names}
-        elif isinstance(node, ast.ImportFrom):
-            top |= {a.asname or a.name for a in node.names}
-    again = []
-    for function in ast.walk(tree):
-        if isinstance(function, ast.FunctionDef):
-            for node in ast.walk(function):
-                if isinstance(node, ast.Import | ast.ImportFrom):
-                    again += [(function.name, a.asname or a.name) for a in node.names if (a.asname or a.name) in top]
-    assert {"json", "re", "shutil", "subprocess", "pytest", "Path", "PureWindowsPath"} <= top
-    assert again == [], again
+    from conftest import local_reimports
+    source = Path(__file__).read_text(encoding="utf-8")
+    assert "import json\nimport re\nimport shutil\nimport subprocess\n" in source           # the module-level imports are there
+    assert local_reimports(source) == []
 
 
 def test_a_node_that_never_ends_fails_the_test_with_a_message(monkeypatch):

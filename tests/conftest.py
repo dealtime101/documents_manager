@@ -16,6 +16,21 @@ atexit.register(shutil.rmtree, _HOME, ignore_errors=True)  # and gone when the s
 os.environ["DOCFLOW_CONFIG_DIR"] = str(Path(__file__).parent / "fixtures" / "config")  # forced too: not the one of the developer's shell
 
 
+def local_reimports(source: str) -> list[tuple[str, str]]:
+    """[(function, name)] for every import made INSIDE a function of a module whose top already imports that name (DOC534.270,
+    DOC534.272): noise that suggests the module-level import is not there."""
+    import ast
+    tree = ast.parse(source)
+    top = {a.asname or a.name for node in tree.body if isinstance(node, ast.Import | ast.ImportFrom) for a in node.names}
+    found = []
+    for function in ast.walk(tree):
+        if isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef):
+            for node in ast.walk(function):
+                if isinstance(node, ast.Import | ast.ImportFrom):
+                    found += [(function.name, a.asname or a.name) for a in node.names if (a.asname or a.name) in top]
+    return found
+
+
 def python_path(*folders: Path) -> str:
     """A PYTHONPATH for a child process: the folders with the separator of the system (':' or ';'), then the one the environment
     already had, which is kept, not replaced (DOC534.204, DOC534.249): a machine may rely on it to find its dependencies."""
