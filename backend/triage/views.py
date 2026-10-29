@@ -5,7 +5,7 @@ import secrets
 from pathlib import Path
 
 from django.conf import settings
-from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth import get_user_model, login
 from django.http import FileResponse
 from django.middleware.csrf import get_token
 from docflow import __version__, usersettings
@@ -16,11 +16,9 @@ from rest_framework.decorators import (
     api_view,
     authentication_classes,
     permission_classes,
-    throttle_classes,
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import SimpleRateThrottle
 
 from . import library as lib
 from . import services as s

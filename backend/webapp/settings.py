@@ -5,7 +5,6 @@ import secrets
 import tempfile
 from pathlib import Path
 
-from django.core.exceptions import ImproperlyConfigured
 from docflow.config import load_config
 from docflow.usersettings import user_dir
 

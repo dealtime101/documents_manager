@@ -60,6 +60,36 @@ def test_no_source_file_holds_an_invisible_format_character():
     assert found == {}, found
 
 
+def unused_imports(source: str) -> list[str]:
+    """Names imported at the top of a module and never used in it (vulture / pyflakes F401); a name listed in __all__ counts as used."""
+    import ast
+    tree = ast.parse(source)
+    imported = {}
+    for node in tree.body:
+        if isinstance(node, ast.Import | ast.ImportFrom):
+            for alias in node.names:
+                if alias.name != "*":
+                    imported[(alias.asname or alias.name).split(".")[0]] = node.lineno
+    used = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    exported = {c.value for n in ast.walk(tree) if isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "__all__" for t in n.targets)
+                for c in ast.walk(n.value) if isinstance(c, ast.Constant) and isinstance(c.value, str)}
+    return sorted(name for name in imported if name not in used and name not in exported)
+
+
+def test_no_module_of_the_backend_imports_a_name_it_does_not_use():
+    # DOC534.704 to .706: `logout`, `throttle_classes` and `ImproperlyConfigured` were imported and never used
+    assert unused_imports("import os\nimport re\nfrom a import b, c\nprint(re, b)\n") == ["c", "os"]
+    assert unused_imports("from a import b\n__all__ = ['b']\n") == []
+    found = {}
+    for path in sorted(ROOT.joinpath("backend").rglob("*.py")):
+        if "migrations" in path.parts or path.name == "__init__.py":                     # (an __init__ may re-export)
+            continue
+        names = unused_imports(path.read_text(encoding="utf-8"))
+        if names:
+            found[str(path.relative_to(ROOT))] = names
+    assert found == {}, found
+
+
 def test_the_reader_finds_what_it_should():
     assert bare_text_reads("p.read_text()\nq.read_text(encoding='utf-8')\nopen(f)\nopen(f, 'rb')\npath.open('r')\npath.open('rb')\n"
                            "pymupdf.open()\nopen(f, encoding='utf-8')\nr = x.read_text('utf-8')") == [1, 3, 5]

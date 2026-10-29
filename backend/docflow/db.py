@@ -2,7 +2,7 @@
 import logging
 import sqlite3
 import time
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
