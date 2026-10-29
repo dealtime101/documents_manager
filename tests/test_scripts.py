@@ -1211,9 +1211,13 @@ def test_the_yaml_rule_files_pass_the_projects_yamllint_line_length():
     config = (root / ".yamllint").read_text(encoding="utf-8")
     limit = int(re.search(r"max:\s*(\d+)", config).group(1))
     assert 100 <= limit <= 160
-    too_long = [(f.name, n) for f in sorted((root / "config").glob("*.yaml"))
+    files = sorted((root / "config").glob("*.yaml")) + sorted((root / "tests" / "fixtures" / "config").glob("*.yaml"))
+    too_long = [(f.name, n) for f in files
                 for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1) if len(line) > limit]
     assert too_long == []
+    # DOC534.707: yamllint's new-line-at-end-of-file (in its default rules) also holds for the fixtures the tests read
+    no_final_newline = [str(f.relative_to(root)) for f in files if not f.read_bytes().endswith(b"\n")]
+    assert no_final_newline == []
 
 
 def test_the_markdown_files_pass_the_projects_markdownlint_line_length():
