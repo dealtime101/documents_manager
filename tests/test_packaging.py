@@ -54,6 +54,17 @@ def test_the_windows_build_leaves_the_calling_console_as_it_found_it():
     assert len([line for line in lines if line.startswith("exit /b")]) == 2
 
 
+def test_a_double_clicked_windows_build_waits_for_a_key_before_its_window_closes():
+    # DOC534.173: started from Explorer, the console closed with the script and hid both the result and the error
+    script = (PACKAGING / "build_windows.bat").read_text(encoding="utf-8")
+    lines = [line.strip() for line in script.splitlines()]
+    assert 'echo %cmdcmdline% | find /i "%~nx0" >nul && if not defined CI set "DBLCLICK=1"' in lines   # not CI, not a console already open
+    assert lines.count("if defined DBLCLICK pause") == 2                              # the success exit and the failure exit
+    for exit_line in [i for i, line in enumerate(lines) if line.startswith("exit /b")]:
+        assert lines[exit_line - 3] == "if defined DBLCLICK pause", lines[exit_line - 3:exit_line + 1]   # before popd and the code page
+    assert lines.index('set "DBLCLICK="') < lines.index('echo %cmdcmdline% | find /i "%~nx0" >nul && if not defined CI set "DBLCLICK=1"')
+
+
 def test_the_windows_build_installs_what_uv_lock_pins_with_hashes():
     # DOC534.172: `pip install . pyinstaller pywebview` took the newest version of each at every build, so two builds of one commit differed
     import re

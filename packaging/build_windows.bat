@@ -6,6 +6,10 @@ for /f "tokens=2 delims=:" %%a in ('chcp') do set "OLDCP=%%a"
 set "OLDCP=%OLDCP: =%"
 chcp 65001 >nul
 pushd "%~dp0\.."
+rem Started by a double-click, cmd was launched with this very file on its command line and closes with the script: wait for a key, so
+rem the result or the error can be read. A console that already exists is left alone, and so is CI (nobody would press the key).
+set "DBLCLICK="
+echo %cmdcmdline% | find /i "%~nx0" >nul && if not defined CI set "DBLCLICK=1"
 where py >nul 2>nul && (set "PY=py -3") || (set "PY=python")
 rem Python 3.12+ (pyproject: requires-python): the interpreter found is checked, and an older build venv is thrown away and made again.
 %PY% -c "import sys; sys.exit(sys.version_info < (3, 12))" || (echo Python 3.12 or newer is needed: %PY% is older or missing. & goto :fail)
@@ -24,12 +28,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File packaging\fetch_tesseract.ps
 ".venv-build\Scripts\pyinstaller.exe" --noconfirm --clean --distpath dist --workpath build packaging\documents-manager.spec || goto :fail
 echo.
 echo Built: %CD%\dist\DocumentsManager.exe
+if defined DBLCLICK pause
 popd
 chcp %OLDCP% >nul
 exit /b 0
 :fail
 echo.
 echo The build failed (see above).
+if defined DBLCLICK pause
 popd
 chcp %OLDCP% >nul
 exit /b 1
