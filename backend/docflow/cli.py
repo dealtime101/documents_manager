@@ -45,7 +45,7 @@ def typed_name(raw: str) -> str | None:
     return stem + (n[-4:] if has_ext else ".pdf")
 
 
-def ask(cfg: Config, p: Proposal) -> str | None:
+def ask(p: Proposal) -> str | None:
     """[A]pprove / [M]odify the name / [I]gnore -> final name, or None if ignored."""
     while True:
         c = input("[A]pprove [M]odify [I]gnore ? ").strip().lower()[:1]
@@ -154,7 +154,7 @@ def scan(cfg: Config, db: DB, dry: bool, interactive: bool, ollama: bool,
                 if table:
                     show(p, cfg)  # the table prints nothing before the outcome: never ask to approve what is not on screen
                 try:
-                    name = ask(cfg, p)
+                    name = ask(p)
                 except (EOFError, KeyboardInterrupt) as e:  # stdin closed, Ctrl-D or Ctrl-C: stop, but still account for the batch
                     interrupted = e
                     pdfs, others = _left_over(files, i)  # this file and the following ones stay exactly where they are

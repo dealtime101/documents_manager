@@ -740,7 +740,7 @@ def test_a_hand_typed_name_gets_its_pdf_extension_when_missing(env, monkeypatch,
     cfg, db, tmp = env
     p = propose(mkpdf(tmp / "inbox" / "x.pdf", HYDRO), cfg, db, RuleBasedAnalyzer(cfg))
     _typed(monkeypatch, "m", typed)
-    assert cli.ask(cfg, p) == expected
+    assert cli.ask(p) == expected
 
 
 @pytest.mark.parametrize("bad", ["../../escape", "sub/dir/x", "..\\x", "a:b", "x?", "..", ".", "   ", "/etc/passwd",
@@ -749,9 +749,15 @@ def test_an_invalid_hand_typed_name_is_refused_and_asked_again(env, monkeypatch,
     cfg, db, tmp = env
     p = propose(mkpdf(tmp / "inbox" / "x.pdf", HYDRO), cfg, db, RuleBasedAnalyzer(cfg))
     _typed(monkeypatch, "m", bad, "m", "Good name", )
-    assert cli.ask(cfg, p) == "Good name.pdf"                        # after the refusal, the question is asked again
+    assert cli.ask(p) == "Good name.pdf"                       # after the refusal, the question is asked again
     if bad.strip():
         assert "Invalid name" in capsys.readouterr().out
+
+
+def test_ask_takes_the_proposal_and_nothing_else():
+    # DOC534.253: ask() carried a cfg it never read, which made the input look dependent on the configuration
+    import inspect
+    assert list(inspect.signature(cli.ask).parameters) == ["p"]
 
 
 def test_approving_without_any_proposed_name_asks_for_one(env, monkeypatch, capsys):
@@ -759,7 +765,7 @@ def test_approving_without_any_proposed_name_asks_for_one(env, monkeypatch, caps
     p = propose(mkpdf(tmp / "inbox" / "x.pdf", HYDRO), cfg, db, RuleBasedAnalyzer(cfg))
     p.final_name = None
     _typed(monkeypatch, "a", "m", "Chosen")
-    assert cli.ask(cfg, p) == "Chosen.pdf"
+    assert cli.ask(p) == "Chosen.pdf"
     assert "no proposed name" in capsys.readouterr().out.lower()
 
 
@@ -1438,7 +1444,7 @@ def test_an_answer_that_is_not_a_m_or_i_is_told_so_and_the_question_is_asked_aga
     from docflow import cli
     answers = iter(["x", "", "I"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
-    assert cli.ask(None, None) is None                      # "I" ends it; neither the config nor the proposal is read before that
+    assert cli.ask(None) is None                            # "I" ends it; the proposal is not read before that
     out = capsys.readouterr().out
     assert out.count("Please answer A, M or I") == 2        # once for "x", once for the empty answer
 
