@@ -137,24 +137,12 @@ def test_the_folder_picker_cannot_go_up_from_the_root():
 
 def test_the_fixed_extension_of_a_file_name_field_is_read_by_screen_readers_with_the_field():
     # DOC534.121: the extension was aria-hidden: nobody using a screen reader learned that it is added by the program
-    bits = BITS.read_text(encoding="utf-8")
-    name_input = bits[bits.index("export function NameInput"):bits.index("export function Notice")]
-    assert "aria-hidden" not in name_input                                                                        # the extension box is no longer hidden
-    assert "aria-describedby={ext ? extId : undefined}" in name_input and "<span id={extId}" in name_input         # tied to the field
-    assert "<span className=\"sr-only\">{t('field.extAdded')} </span>{ext}" in name_input                          # and says what it is
+    # (DOC534.228: the extension tied to the field is run in components/Bits.test.tsx; its sentence must exist in both languages)
     i18n = (BITS.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
     assert "'field.extAdded': 'Extension added automatically:'" in i18n and "'field.extAdded': \"Extension ajoutée automatiquement :\"" in i18n
 
 
 # (DOC534.228: the Rules page's lock, drafts, saving with Enter, reload and failed reload are in pages/Rules.test.tsx, rendered)
-
-
-def test_a_failed_background_refresh_is_quiet_only_when_numbers_are_already_on_screen():
-    # DOC534.118: the tab became visible during the first load, the quiet request replaced it and failed: "Loading" for ever, no error
-    page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
-    assert "const shown = useRef(false)" in page and "shown.current = true" in page
-    assert "if (quiet && shown.current) setStale(true)" in page and "else setErr(errorText(e))" in page
-    assert page.index("shown.current = true") < page.index("if (quiet && shown.current)")
 
 
 def test_the_launcher_token_stays_in_the_address_while_the_server_cannot_be_reached_and_retry_signs_in_again():
@@ -551,14 +539,6 @@ def test_the_outline_of_an_input_reaches_3_to_1_in_both_themes_and_the_tint_toke
     assert "disabled:bg-input/50" in input_source and "--input: oklch(0.922 0 0)" in light and "--input: oklch(1 0 0 / 15%)" in dark   # tints stay
 
 
-def test_the_notice_live_regions_are_never_hidden_while_empty():
-    # DOC474.108: `empty:hidden` is display:none on the empty region, which removes it from the accessibility tree: it comes
-    # back together with its text, the very case the "always in the page" comment is there to avoid
-    bits = (UI.parents[0] / "Bits.tsx").read_text(encoding="utf-8")
-    notice = bits[bits.index("export function Notice"):bits.index("const STATUS_CLASS")]
-    assert 'role="status"' in notice and 'role="alert"' in notice and "empty:hidden" not in notice
-
-
 def test_the_csrf_cookie_value_is_everything_after_the_name_not_the_text_before_the_next_equals_sign():
     # DOC474.165: split('=')[1] cut a value that contains "=" (base64-like) at its first "="
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
@@ -566,14 +546,7 @@ def test_the_csrf_cookie_value_is_everything_after_the_name_not_the_text_before_
     assert ".split('=')[1]" not in csrf and "c.slice('csrftoken='.length)" in csrf
 
 
-def test_an_older_dashboard_answer_never_overwrites_a_newer_one():
-    # DOC474.176: the visibility refresh can overlap the scheduled one; a late OLD answer replaced the newest counters
-    page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
-    body = page[page.index("const fetchNow"):page.index("const load = ")]
-    assert "const mine = ++latest.current" in body                              # every request takes a number first
-    assert body.index("await api.dashboard()") < body.index("if (mine !== latest.current) return")   # a stale answer is dropped
-    assert body.index("if (mine !== latest.current) return") < body.index("setD(fresh)")
-    assert "const latest = useRef(0)" in page
+# (DOC534.228: a stale dashboard answer and a failed background refresh are run in pages/Dashboard.test.tsx)
 
 
 # (DOC534.228: the Queue's polling, bulk approvals, ticks and approve action are run in pages/Queue.test.tsx)
@@ -854,30 +827,10 @@ def test_each_comment_of_the_rules_loader_sits_on_the_line_it_describes():
     assert "true when the rules were read" not in rules[have - 1]
 
 
-def test_a_truncated_label_of_the_accuracy_screen_can_still_be_read_in_full():
-    # DOC474.106: a long company name ended in an ellipsis with no tooltip: two companies starting alike could not be told apart
-    accuracy = (UI.parents[1] / "components" / "Accuracy.tsx").read_text(encoding="utf-8")
-    assert '<span className="min-w-0 truncate" title={label}>{label}</span>' in accuracy
-
-
-def test_the_accuracy_screen_announces_that_it_is_loading_and_that_the_figures_arrived():
-    # DOC474.107: after "Retry" the content changed with no announcement for a screen reader
-    root = UI.parents[1]
-    accuracy, i18n = (root / "components" / "Accuracy.tsx").read_text(encoding="utf-8"), (root / "i18n.tsx").read_text(encoding="utf-8")
-    assert '<p role="status" className="sr-only">' in accuracy                       # always in the page, empty or not
-    status = accuracy[accuracy.index('<p role="status" className="sr-only">'):]
-    status = status[:status.index("</p>")]
-    assert "t('common.loading')" in status and "t('acc.loaded')" in status
+def test_the_accuracy_status_text_exists_in_both_languages():  # (DOC534.228: the status region and the truncated label are run in Accuracy.test.tsx)
+    i18n = (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
     assert "'acc.loaded'" in en and "'acc.loaded'" in fr
-
-
-def test_the_same_message_shown_twice_in_a_row_is_a_new_element_so_it_is_announced_again():
-    # DOC474.109: React leaves the DOM alone when the text is identical, so a screen reader heard nothing the second time
-    bits = (UI.parents[1] / "components" / "Bits.tsx").read_text(encoding="utf-8")
-    notice = bits[bits.index("export function Notice"):bits.index("const STATUS_CLASS")]
-    assert "const shown = useRef(0)" in notice and "if (note !== last.current)" in notice and "shown.current += 1" in notice
-    assert notice.count("key={shown.current}") == 2                                          # the success and the failure paragraph
 
 
 def test_a_note_built_from_other_state_keeps_its_identity_between_renders():
@@ -892,21 +845,14 @@ def test_a_note_built_from_other_state_keeps_its_identity_between_renders():
 def test_an_unknown_value_named_like_an_object_property_is_not_taken_for_a_known_one():
     # DOC474.110: 'constructor' in {...} is true (inherited from Object): a badge got a function as its class, a label a function
     src = UI.parents[1]
-    bits, ops = (src / "components" / "Bits.tsx").read_text(encoding="utf-8"), (src / "ops.ts").read_text(encoding="utf-8")
-    assert "const known = Object.hasOwn(STATUS_CLASS, status)" in bits
-    assert "known ? STATUS_CLASS[status] : STATUS_CLASS.manual" in bits and "?? STATUS_CLASS.manual" not in bits
+    ops = (src / "ops.ts").read_text(encoding="utf-8")       # (the badge is run in components/Bits.test.tsx, DOC534.228)
     assert "Object.hasOwn(OP_KEYS, kind) ? t(OP_KEYS[kind]) : kind" in ops and "kind in OP_KEYS" not in ops
 
 
 def test_a_confidence_level_is_given_by_a_symbol_and_a_word_not_only_by_its_colour():
     # DOC474.111: green / amber / red alone leave out colour-blind readers and screen readers
-    root = UI.parents[1]
-    bits, i18n = (root / "components" / "Bits.tsx").read_text(encoding="utf-8"), (root / "i18n.tsx").read_text(encoding="utf-8")
-    conf = bits[bits.index("export function Confidence"):]
-    assert "const level = (v: number | undefined)" in conf and "'conf.high'" in conf and "'conf.medium'" in conf and "'conf.low'" in conf
-    assert conf.count('<span aria-hidden="true">') >= 1 and conf.count('<span className="sr-only">') >= 1       # a symbol and a hidden word
-    assert "shown(item.confidence)" in conf and "shown(item.conf[k])" in conf                                   # global score and each field
-    assert "percent(item.confidence)" not in conf and "percent(item.conf[k])" not in conf                       # never the bare number
+    # (DOC534.228: the symbol and the hidden word are run in components/Bits.test.tsx; the words must exist in both languages)
+    i18n = (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
     for key in ("conf.high", "conf.medium", "conf.low"):
         assert f"'{key}'" in en and f"'{key}'" in fr, key
@@ -954,15 +900,6 @@ def test_a_failed_reload_after_an_undo_is_shown_with_the_result_of_the_undo():
         assert "withReloadError(" in (UI.parents[1] / "pages" / f"{page}.tsx").read_text(encoding="utf-8")
 
 
-def test_the_retry_button_of_the_accuracy_card_does_not_vanish_under_the_keyboard_focus():
-    # DOC534.148: the click cleared the error, the block and its button went, and the focus fell back to <body>
-    page = (BITS.parent / "Accuracy.tsx").read_text(encoding="utf-8")
-    retry = page[page.index("const retry = "):page.index("const GOOD")] if "const GOOD" in page else page
-    assert "onClick={retry}" in page and "onClick={() => { setError(''); void load() }}" not in page          # the click clears nothing
-    assert "if (retrying) return" in retry and "aria-disabled={retrying}" in page                      # and cannot be repeated meanwhile
-    assert "document.getElementById('accuracy-title')?.focus()" in retry and "if (ok)" in retry         # focus to the card title once it worked
-    assert 'id="accuracy-title" tabIndex={-1}' in page                                                  # which can take focus
-    assert "setError(''); return true" in page and "setError(errorText(e)); return false" in page      # load() says whether it worked
 
 
 # (DOC534.228: the History page's retry, loading region, language, focus and table headers are in pages/History.test.tsx, rendered)
