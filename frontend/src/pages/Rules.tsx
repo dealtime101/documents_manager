@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
+import { withReloadError } from '@/notes'
 
 type Kind = 'alias' | 'type' | 'route'
 
@@ -63,7 +64,7 @@ export default function Rules() {
 
   // the same object until its inputs change: Notice treats a new object as a new message to announce
   const shownNote = useMemo(
-    () => (reloadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(reloadError)}` } : note),
+    () => withReloadError(note, reloadError, msg),
     [reloadError, note, msg])
   const filed = (n: number) => <span className="text-xs text-slate-500">{t('rules.filed', { n })}</span>
   const forgetButton = (kind: Kind, company: string, pattern?: string) => (

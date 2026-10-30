@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, errorText, type Operation } from '@/api'
 import { Notice } from '@/components/Bits'
+import { withReloadError } from '@/notes'
 import { opLabel } from '@/ops'
 import { baseName, dirName } from '@/paths'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,7 @@ export default function History() {
   // (the note keeps what the server said and the path, not a sentence: it is worded here, in the language of the moment)
   const shownNote = useMemo(() => {
     const said = note ? { ok: note.ok, text: note.ok ? t('hist.restored', { path: note.detail }) : msg(note.detail) } : null
-    return loadError ? { ok: false, text: `${said ? `${said.text} ` : ''}${msg(loadError)}` } : said
+    return withReloadError(said, loadError, msg)
   }, [note, loadError, msg, t])
   // one undo at a time: a second click (or a double click) while one is running would ask for the same operation twice
   const [undoing, setUndoing] = useState<number | null>(null)

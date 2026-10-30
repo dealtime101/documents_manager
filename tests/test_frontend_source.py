@@ -36,7 +36,7 @@ def test_a_long_status_label_is_cut_with_an_ellipsis_and_stays_readable_in_the_t
 
 def test_history_shows_a_load_error_through_the_translator_not_as_a_raw_exception_string():
     page = (BITS.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "setLoadError(errorText(e))" in page and "msg(loadError)" in page   # the raw server text goes through msg() when shown
+    assert "setLoadError(errorText(e))" in page and "withReloadError(said, loadError, msg)" in page  # the raw server text goes through msg() when shown
     assert "setNote(String(" not in page                                     # "Error: HTTP error: 500" is not a text msg() knows
 
 
@@ -454,7 +454,7 @@ def test_the_rules_screen_is_a_page_of_the_application_and_changes_only_learned_
     assert "confirm(t('rules.confirmForget', { what: pattern ? `${company} / “${pattern}”` : company }))" in page
     assert "aria-label={pattern ? t('rules.forgetPatternLabel'" in page and ": t('rules.forgetLabel'" in page   # named, per pattern too
     assert "aria-label={t('rules.destinationOf'" in page                                                      # every control is named
-    assert "<Notice note={shownNote} />" in page and "reloadError ?" in page   # results through the live regions (a failed reload too)
+    assert "<Notice note={shownNote} />" in page and "withReloadError(note, reloadError, msg)" in page  # results through the live regions (a failed reload too)
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
     assert "'/api/rules/forget'" in api and "'/api/rules/route'" in api
 
@@ -1014,9 +1014,8 @@ def test_a_failed_reload_after_a_change_keeps_the_rules_and_the_success_message_
     failure = load[load.index(".catch("):]
     assert failure.index("haveRules.current") < failure.index("setReloadError(") < failure.index("setLoadError(")   # kept list first
     assert "const haveRules = useRef(false)" in rules and "haveRules.current = true" in load
-    # both shown, whether the action succeeded or FAILED (DOC534.32: a failed action's text was hidden behind the old reload error)
-    assert "reloadError ? { ok: false, text: `${note ? `${note.text} ` : ''}${msg(reloadError)}` } : note" in rules
-    assert "note?.ok" not in rules
+    # both shown, whether the action succeeded or FAILED (DOC534.32): withReloadError, run by the test of the History page (DOC534.228)
+    assert "withReloadError(note, reloadError, msg)" in rules
 
 
 def test_a_truncated_label_of_the_accuracy_screen_can_still_be_read_in_full():
@@ -1107,12 +1106,16 @@ def test_muted_text_reaches_4_5_to_1_on_every_surface_it_is_drawn_on_in_both_the
 
 def test_a_failed_reload_after_an_undo_is_shown_with_the_result_of_the_undo():
     # DOC474.117: the "restored" message hid the reload error; the list stayed stale with no sign that it was
-    history = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    shown = history[history.index("const shownNote"):history.index("// one undo at a time")]
-    # DOC534.41: the text of the undo is kept whether it succeeded or FAILED
-    assert "return loadError ? { ok: false, text: `${said ? `${said.text} ` : ''}${msg(loadError)}` } : said" in shown
-    assert "note?.ok" not in shown
-    assert "[note, loadError, msg, t]" in shown                                               # (the note keeps its identity)
+    # DOC534.41: the text of the undo is kept whether it succeeded or FAILED; DOC534.228: the function is run, not read
+    got = _node_route("""[m.withReloadError({ok: true, text: 'restored a'}, 'boom', (s) => s.toUpperCase()),
+                          m.withReloadError({ok: false, text: 'refused'}, 'boom', (s) => s),
+                          m.withReloadError(null, 'boom', (s) => '<' + s + '>'),
+                          m.withReloadError({ok: true, text: 'restored a'}, '', (s) => 'never'),
+                          m.withReloadError(null, '', (s) => 'never')]""", module="notes")
+    assert got == [{"ok": False, "text": "restored a BOOM"}, {"ok": False, "text": "refused boom"}, {"ok": False, "text": "<boom>"},
+                   {"ok": True, "text": "restored a"}, None]
+    for page in ("History", "Rules"):                                                        # and both pages use it
+        assert "withReloadError(" in (UI.parents[1] / "pages" / f"{page}.tsx").read_text(encoding="utf-8")
 
 
 def test_the_retry_button_of_the_accuracy_card_does_not_vanish_under_the_keyboard_focus():
