@@ -101,10 +101,7 @@ def test_the_title_of_the_document_follows_the_page_shown():
 
 def test_saving_the_settings_leaves_the_screen_only_at_the_end_of_the_first_set_up():
     # DOC534.127: every save sent the user to the queue: changing several settings meant coming back to the tab each time
-    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
-    save = settings[settings.index("const save = async"):settings.index("return (\n    <Card>")]
-    assert "if (first) onSaved()" in save and "\n      onSaved()" not in save
-    assert save.index("if (first) onSaved()") < save.index("setFirst(false)")        # read before it is cleared
+    # (DOC534.228: that only the first set-up calls onSaved is run in pages/Settings.test.tsx; here, where App sends it)
     assert "onSaved={() => go({ page: 'queue', group: null })}" in (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")   # the first set-up still goes to the queue
 
 
@@ -126,27 +123,16 @@ def test_an_error_of_the_extra_folders_names_its_line_and_is_tied_to_the_box():
                          blanks: [m.lineOfEntry('\\n\\n/x\\n  \\n/y\\n', 0), m.lineOfEntry('\\n\\n/x\\n  \\n/y\\n', 1)],
                          none: [m.lineOfEntry('a', 3), m.lineOfEntry('', 0), m.lineOfEntry('a', NaN)] })""", module="paths")
     assert got == {"plain": [1, 3], "blanks": [3, 5], "none": [None, None, None]}      # the 2nd entry sent is on line 5 of the box
-    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
-    assert "aria-invalid={extraErrors.length ? true : undefined}" in settings and "aria-describedby={extraErrors.length ? 'err-extra-inboxes' : undefined}" in settings
-    assert '<div id="err-extra-inboxes">' in settings and "t('settings.line', { n: line })" in settings and "lineOfEntry(v.extra," in settings
+    # (DOC534.228: the aria attributes and the line shown beside the box are checked on the rendered page, pages/Settings.test.tsx)
     i18n = (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
     assert "'settings.line': 'Line {n}:'" in i18n and "'settings.line': 'Ligne {n} :'" in i18n
 
 
 def test_the_folder_picker_cannot_go_up_from_the_root():
     # DOC534.124: at the root the parent is the root itself (or empty, which reloads the default folder): "Up" did nothing useful
-    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
-    assert "disabled={!list.parent || list.parent === list.path}" in settings and "onClick={() => setTarget(list.parent)}>{t('settings.up')}" in settings
+    # (DOC534.228: the button is disabled at a root on the rendered page, pages/Settings.test.tsx)
     # what the server answers at the roots: the parent of a root is the root (POSIX) and the drive root keeps its backslash (Windows)
     assert str(Path("/").parent) == "/" and str(PureWindowsPath("C:\\").parent) == "C:\\"
-
-
-def test_a_new_save_of_the_settings_clears_the_saved_message_of_the_previous_one():
-    # DOC534.122: after a first good save, a refused one showed its field errors beside the green "saved"
-    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
-    save = settings[settings.index("const save = async"):settings.index("return (\n    <Card>")]
-    assert save.index("setNote(null)") < save.index("await api.saveSettings(") < save.index("setNote({ ok: true")      # cleared first, set on success only
-    assert save.index("setErrors({})") < save.index("await api.saveSettings(")
 
 
 def test_the_fixed_extension_of_a_file_name_field_is_read_by_screen_readers_with_the_field():
@@ -160,24 +146,7 @@ def test_the_fixed_extension_of_a_file_name_field_is_read_by_screen_readers_with
     assert "'field.extAdded': 'Extension added automatically:'" in i18n and "'field.extAdded': \"Extension ajoutée automatiquement :\"" in i18n
 
 
-def test_the_rules_screen_locks_a_change_with_a_ref_read_at_once_not_with_a_state_one_render_late():
-    # DOC534.120: two clicks before the re-render both read busy=false and started two requests
-    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    act = rules[rules.index("const act = "):rules.index("const dropDraft")]
-    assert "const working = useRef(false)" in rules
-    assert "if (working.current) return" in act and "if (busy) return" not in act
-    assert act.index("if (working.current) return") < act.index("working.current = true") < act.index("setBusy(true)")   # taken at once
-    assert act.rindex("working.current = false") > act.index("finally")                                                    # always let go
-    assert "setBusy(true)" in act and "setBusy(false)" in act                                                              # `busy` still drives the buttons
-
-
-def test_forgetting_a_route_also_forgets_the_unsaved_typing_for_that_company():
-    # DOC534.119: the draft stayed in memory: when the company was learned again the field showed the old typing, not the destination
-    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    assert "const dropDraft = (company: string) => setDrafts(" in rules and "delete next[company]" in rules
-    forget = rules[rules.index("const forget = "):rules.index("const saveRoute = ")]
-    assert "kind === 'route' ? () => dropDraft(company) : undefined" in forget            # only a route has a draft
-    assert "() => dropDraft(company))" in rules[rules.index("const saveRoute = "):]       # and saving still clears it, as before
+# (DOC534.228: the Rules page's lock, drafts, saving with Enter, reload and failed reload are in pages/Rules.test.tsx, rendered)
 
 
 def test_a_failed_background_refresh_is_quiet_only_when_numbers_are_already_on_screen():
@@ -955,51 +924,6 @@ def test_each_comment_of_the_rules_loader_sits_on_the_line_it_describes():
     assert "the rules were read at least once" in rules[have]                                    # its own comment, on its own line
     assert "resolves true when the rules were read" in rules[load - 1]                           # the load comment, right above load
     assert "true when the rules were read" not in rules[have - 1]
-
-
-def test_enter_in_the_destination_field_saves_like_the_button_and_nothing_else_submits():
-    # DOC534.258: the destination had to be saved with a click on the button
-    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    row = rules[rules.index("const unchanged"):rules.index("{forgetButton('route', r.company)}")]
-    assert "<form " in row and "onSubmit={(e) => { e.preventDefault(); if (!busy && !unchanged) void saveRoute(r.company, value.trim()) }}" in row
-    assert '<Button type="submit" size="sm" disabled={busy || unchanged}>' in row                    # the one submit button; disabled = no Enter save
-    assert "onClick={() => saveRoute" not in rules                                                   # one way to save, not two
-    forget = rules[rules.index("const forgetButton"):rules.index("const section")]
-    assert '<Button type="button"' in forget                                                         # in a form, Forget must not submit it
-
-
-def test_a_saved_destination_stays_on_screen_until_the_rules_are_reloaded():
-    # DOC474.86: the draft was dropped right after the save, so the field showed the OLD destination until load() ended (and for
-    # good if the reload failed)
-    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    save = rules[rules.index("const saveRoute"):rules.index("const filed")]
-    # DOC534.226: saveRoute hands the call to act(), which awaits it; the awaiting is read where it happens, in act
-    assert "() => api.setRoute(company, destination)" in save
-    assert "dropDraft(company)" in save and save.index("api.setRoute") < save.index("dropDraft")   # (dropDraft = setDrafts without that company)
-    assert "const loaded = await load()" in rules and "if (loaded) after?.()" in rules          # the draft goes only after a good reload
-    act = rules[rules.index("const act"):rules.index("const forget")]
-    assert act.index("await action()") < act.index("await load()") < act.index("after?.()")        # saved, THEN reloaded, THEN the draft goes
-    assert "setDrafts" not in act.split("await load()")[0]                                         # and never before it
-
-
-def test_a_route_destination_is_trimmed_before_it_is_compared_and_sent():
-    # DOC474.87: only the "empty" test trimmed; " Bills/Hydro " was sent as typed, and a change of spaces alone counted as an edit
-    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    # (DOC534.258: the same two things, now behind a form: `unchanged` compares the trimmed value, and the submit sends the trimmed value)
-    assert "const unchanged = value.trim() === r.destination || !value.trim()" in rules
-    assert "void saveRoute(r.company, value.trim())" in rules and "disabled={busy || unchanged}" in rules
-
-
-def test_a_failed_reload_after_a_change_keeps_the_rules_and_the_success_message_on_screen():
-    # DOC474.88: loadError replaces the whole page; a passing error after a successful save hid the list and the "saved" message
-    rules = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    load = rules[rules.index("const load = "):rules.index("useEffect(() => { load() }")]
-    assert "haveRules.current" in load and "setReloadError(" in load and "setLoadError(" in load      # two cases, told apart
-    failure = load[load.index(".catch("):]
-    assert failure.index("haveRules.current") < failure.index("setReloadError(") < failure.index("setLoadError(")   # kept list first
-    assert "const haveRules = useRef(false)" in rules and "haveRules.current = true" in load
-    # both shown, whether the action succeeded or FAILED (DOC534.32): withReloadError, run by the test of the History page (DOC534.228)
-    assert "withReloadError(note, reloadError, msg)" in rules
 
 
 def test_a_truncated_label_of_the_accuracy_screen_can_still_be_read_in_full():
