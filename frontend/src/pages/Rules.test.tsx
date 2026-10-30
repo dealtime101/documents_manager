@@ -20,7 +20,7 @@ const submit = () => fireEvent.submit(field().closest('form')!)
 
 beforeEach(() => {
   localStorage.setItem('docflow.lang', 'en')
-  vi.stubGlobal('confirm', () => true)
+  vi.stubGlobal('confirm', vi.fn(() => true))
   rules.mockReset().mockResolvedValue(learned())
   forgetRule.mockReset().mockResolvedValue({ forgotten: true })
   setRoute.mockReset().mockResolvedValue({})
@@ -98,6 +98,17 @@ test('each forget button of an alias pattern has its own accessible name', async
   expect(screen.getByRole('button', { name: 'Forget the pattern "beta inc" of Beta' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Forget the pattern "beta ltd" of Beta' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Forget the rule of Acme' })).toBeTruthy()
+})
+
+test('forgetting asks first, naming the company and the pattern, and a refusal forgets nothing', async () => {
+  show()
+  await screen.findByLabelText('Destination of Acme')
+  vi.mocked(confirm).mockReturnValueOnce(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Forget the pattern "beta inc" of Beta' }))
+  expect(vi.mocked(confirm).mock.calls[0][0]).toContain('Beta / “beta inc”')
+  expect(forgetRule).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Forget the pattern "beta inc" of Beta' }))
+  await waitFor(() => expect(forgetRule).toHaveBeenCalledWith('alias', 'Beta', 'beta inc'))
 })
 
 test('a failed first load replaces the page with an error and a way to try again', async () => {

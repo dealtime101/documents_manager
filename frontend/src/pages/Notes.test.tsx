@@ -37,6 +37,16 @@ test('an old failure is forgotten once the new language has loaded', async () =>
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
+test('two equal bullets, or two sections with one title, do not clash as React keys', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const twin = { version: '1.0.0', date: '2026-10-05', intro: '', sections: [{ title: 'Same', items: ['same', 'same'] }, { title: 'Same', items: ['x'] }] }
+  changelog.mockResolvedValue([twin, twin])
+  show()
+  await screen.findAllByText('Same')
+  expect(log.mock.calls.filter((c) => String(c[0]).includes('same key'))).toEqual([])
+  log.mockRestore()
+})
+
 test('bold and code are drawn as elements, an unclosed marker stays plain text, and nothing is HTML', async () => {
   changelog.mockResolvedValue([release('Notes', ['**bold** and `code`', '**unclosed at the start and `another', '<b>not html</b>'])])
   const { container } = show()

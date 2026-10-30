@@ -34,6 +34,17 @@ test('typing searches nothing; only the submit does, and only once while one is 
   await screen.findByText('f1.pdf')
 })
 
+test('the words found are marked as elements, never as HTML, and the count is announced', async () => {
+  search.mockResolvedValue([{ ...hit(1), snippet: 'a \x01<b>word</b>\x02 here' }])
+  const { container } = show()
+  fireEvent.change(words(), { target: { value: 'word' } })
+  fireEvent.submit(words().closest('form')!)
+  await screen.findByText('f1.pdf')
+  expect(container.querySelector('mark')?.textContent).toBe('<b>word</b>')       // document text: an element, with the tags as plain text
+  expect(container.querySelector('b')).toBeNull()
+  expect(container.querySelector('[role="status"]')?.textContent).toContain('1')
+})
+
 test('a failed search does not leave the results of the previous one on screen', async () => {
   search.mockResolvedValueOnce([hit(1)]).mockRejectedValueOnce(new Error('boom'))
   show()

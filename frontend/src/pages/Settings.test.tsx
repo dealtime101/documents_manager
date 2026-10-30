@@ -60,6 +60,32 @@ test('a new save clears the saved message of the previous one, and a refusal nam
   expect(screen.getByLabelText('Inbox (folder to watch)').getAttribute('aria-invalid')).toBe('true')
 })
 
+test('the switch for analysing arriving files is labelled, has permanent help tied to it, is loaded and sent back with the rest', async () => {
+  settings.mockResolvedValue({ ...saved(true), watch_inbox: true })
+  show()
+  const box = await screen.findByLabelText('Analyse the files that arrive by themselves') as HTMLInputElement
+  expect(box.checked).toBe(true)                                         // read from the server
+  const help = document.getElementById(box.getAttribute('aria-describedby')!)!
+  expect(help.textContent).toContain('Nothing is moved')                  // the promise: only the analysis is automatic
+  fireEvent.click(box)
+  fireEvent.submit(await form())
+  await waitFor(() => expect(saveSettings).toHaveBeenCalled())
+  expect(saveSettings.mock.calls[0][0]).toMatchObject({ watch_inbox: false })
+})
+
+test('the quarantine help is text under the field, not a placeholder, and the field names its help and its error together', async () => {
+  show()
+  const field = await screen.findByLabelText(/^Quarantine/)
+  expect(field.getAttribute('placeholder')).toBeNull()
+  const help = document.getElementById(field.getAttribute('aria-describedby')!)!
+  expect(help.textContent).toBeTruthy()
+  expect(screen.getByLabelText('Inbox (folder to watch)').getAttribute('aria-describedby')).toBeNull()   // no empty description
+  fireEvent.submit(await form())
+  saveSettings.mockRejectedValue(new SettingsRefused({ quarantine: 'Not a folder.' }))
+  fireEvent.submit(await form())
+  await waitFor(() => expect(field.getAttribute('aria-describedby')).toBe('err-quarantine help-quarantine'))
+})
+
 test('the folder picker cannot go up from the root, and goes up elsewhere', async () => {
   show()
   await form()

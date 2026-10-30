@@ -320,12 +320,7 @@ def test_the_rules_screen_is_a_page_of_the_application_and_changes_only_learned_
     assert got["groupIgnored"] == {"page": "rules", "group": None}
     app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
     assert '<TabsTrigger value="rules">' in app and '<TabsContent value="rules"' in app
-    page = (UI.parents[1] / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    # forgetting asks first, and the question names the company (and the pattern) that would be forgotten (DOC474.243)
-    assert "confirm(t('rules.confirmForget', { what: pattern ? `${company} / “${pattern}”` : company }))" in page
-    assert "aria-label={pattern ? t('rules.forgetPatternLabel'" in page and ": t('rules.forgetLabel'" in page   # named, per pattern too
-    assert "aria-label={t('rules.destinationOf'" in page                                                      # every control is named
-    assert "<Notice note={shownNote} />" in page and "withReloadError(note, reloadError, msg)" in page  # results through the live regions (a failed reload too)
+    # (DOC534.228: the confirmation, the names of the controls and the messages are run in pages/Rules.test.tsx)
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
     assert "'/api/rules/forget'" in api and "'/api/rules/route'" in api
 
@@ -373,9 +368,7 @@ def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html()
     got = _node_route("({ search: m.parseHash('#search'), write: m.toHash({ page: 'search', group: null }) })")
     assert got["search"] == {"page": "search", "group": None} and got["write"] == "#search"
     page = (UI.parents[1] / "pages" / "Search.tsx").read_text(encoding="utf-8")
-    assert "dangerouslySetInnerHTML" not in page and "<mark" in page                      # a snippet is document text: elements only
-    assert 'role="status"' in page and 'role="alert"' in page                              # count and errors are announced
-    assert "api.search(query, filters)" in page and "aria-label={t('search.openLabel'" in page
+    assert "dangerouslySetInnerHTML" not in page                                           # (the marks are run in pages/Search.test.tsx, DOC534.228)
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
     assert "new URLSearchParams({ q, ...Object.fromEntries(" in api                                          # the query is encoded, not concatenated
     assert '<TabsTrigger value="search">' in (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
@@ -529,18 +522,7 @@ def test_the_route_groups_cannot_drift_from_the_group_type_without_the_compiler_
     assert sorted(re.findall(r"'(\w+)'", declared)) == sorted(re.findall(r"(\w+): true", route))           # and they agree today
 
 
-def test_the_notes_inline_markup_only_styles_the_matches_of_the_split():
-    # DOC534.152: "**unclosed" is no match, yet startsWith('**') made it bold and cut two characters off each end
-    page = (UI.parents[1] / "pages" / "Notes.tsx").read_text(encoding="utf-8")
-    assert "i % 2 === 1 && part.startsWith('**')" in page and "i % 2 === 1 && part.startsWith('`')" in page
-    assert "\n        part.startsWith(" not in page
-
-
-def test_the_notes_keys_carry_the_position_so_a_repeated_bullet_or_title_does_not_clash():
-    # DOC534.153: two equal bullets in a section (or two sections with one title) gave React duplicate keys
-    page = (UI.parents[1] / "pages" / "Notes.tsx").read_text(encoding="utf-8")
-    assert "key={item}" not in page and "key={s.title}" not in page and "key={r.version}" not in page
-    assert "key={`${ii}-${item}`}" in page and "key={`${si}-${s.title}`}" in page and "key={`${index}-${r.version}`}" in page
+# (DOC534.228: the notes' inline markup and their keys are run in pages/Notes.test.tsx)
 
 
 def test_the_card_title_comment_does_not_bless_a_card_inside_a_button():
@@ -624,25 +606,13 @@ def test_the_comment_of_the_tab_bar_says_what_its_class_does():
 def test_the_settings_screen_has_a_labelled_switch_for_analysing_arriving_files_that_is_loaded_and_saved():
     # DOC534.5: a checkbox with a visible label and a permanent help text tied to it, read from the server and sent back with the rest
     src = UI.parents[1]
-    settings = (src / "pages" / "Settings.tsx").read_text(encoding="utf-8")
-    assert 'htmlFor="watch-inbox"' in settings and '<input id="watch-inbox" type="checkbox" checked={watch}' in settings
-    assert 'aria-describedby="help-watch"' in settings and '<p id="help-watch"' in settings and "t('settings.watchHelp')" in settings
-    assert "setWatch(s.watch_inbox)" in settings and "watch_inbox: watch" in settings
+    # (DOC534.228: the switch, its help, its loading and its saving are run in pages/Settings.test.tsx)
     assert "watch_inbox: boolean" in (src / "api.ts").read_text(encoding="utf-8")
     from conftest import fr_messages_table
     i18n = (src / "i18n.tsx").read_text(encoding="utf-8")
     assert i18n.count("'settings.watch'") == 2 and i18n.count("'settings.watchHelp'") == 2          # English and French, both
     assert "Rien n\\'est déplacé" in i18n and "Nothing is moved" in i18n                          # the promise: only the analysis is automatic
     assert fr_messages_table(i18n)                                                                   # (the French table is still found)
-
-
-def test_the_quarantine_help_is_text_under_the_field_and_not_a_placeholder():
-    # DOC534.260: a placeholder is gone as soon as the field holds a value, and screen readers do not always read it
-    settings = (UI.parents[1] / "pages" / "Settings.tsx").read_text(encoding="utf-8")
-    assert "placeholder=" not in settings
-    assert "<p id=\"help-quarantine\" className=\"text-xs text-slate-600\">{t('settings.helpQuarantine')}</p>" in settings
-    assert "key === 'quarantine' ? 'help-quarantine' : ''" in settings and "err-${key}" in settings   # tied to the field, with the error id
-    assert ".filter(Boolean).join(' ') || undefined" in settings                                     # no empty aria-describedby
 
 
 def test_each_comment_of_the_rules_loader_sits_on_the_line_it_describes():
