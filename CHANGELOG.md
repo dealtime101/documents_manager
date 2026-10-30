@@ -4,6 +4,29 @@ Format : la version la plus récente en premier ; un numéro `majeur.mineur.corr
 `pyproject.toml`). Mineur : fonction ou comportement nouveau. Correctif : correction seule. Majeur : changement qui demande
 une action de votre part avant de démarrer.
 
+## [0.9.0] - 2026-10-30
+
+### Ajouté
+
+- **Durée de conservation par type** : une règle de `document_types.yaml` accepte `retention_years` (1 à 100). **Bibliothèque** →
+  **Expirés** liste les documents classés dont la date, plus ces années, est dépassée. **Supprimer** demande confirmation, met le
+  document dans `_Trash` et l'inscrit dans l'**Historique**, où on peut l'annuler. Rien n'est supprimé tout seul.
+- **Piles numérisées** : un PDF qui contient plusieurs documents (scanner à chargeur) est repéré dans « À classer » (feuille
+  blanche, autre société, autre numéro de facture). **Couper** écrit un PDF par document et garde la pile intacte.
+- **Sauvegarde et restauration** : un zip avec la base, les corrections apprises et vos règles, chiffrable par mot de passe
+  (`docflow backup`, `docflow restore`, et un bloc dans **Réglages**).
+- **Documents manquants** : le tableau de bord signale ce qui arrive d'habitude à rythme régulier et n'est pas venu.
+- **Relevé annuel** : un CSV des documents classés d'une année, par ligne ou en totaux.
+- **Recherche** : filtres par société, type, période et montant, et tri.
+- **Scans cherchables** : option `ocr.searchable_pdf` pour garder le texte reconnu sous la page.
+- **Photos** : une image déposée dans la boîte de réception est lue puis classée comme PDF d'une page ; l'annulation rend l'original.
+- **Surveillance de la boîte de réception** : option pour analyser seuls les fichiers qui arrivent (rien n'est déplacé).
+
+### Modifié
+
+- Tests de l'interface : les écrans sont maintenant rendus et utilisés (Vitest, Testing Library) au lieu d'être lus comme du texte ;
+  `npm test` les lance.
+
 ## [0.8.1] - 2026-10-07
 
 ### Modifié

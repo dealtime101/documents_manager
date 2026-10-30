@@ -3,6 +3,29 @@
 Format: newest version first; a number `major.minor.patch` (written once, in `pyproject.toml`). Minor: a new feature or behaviour.
 Patch: a fix only. Major: a change that needs something from you before it starts.
 
+## [0.9.0] - 2026-10-30
+
+### Added
+
+- **Retention per type**: a rule of `document_types.yaml` accepts `retention_years` (1 to 100). **Library** → **Expired** lists
+  the filed documents whose date, plus those years, is past. **Delete** asks first, puts the document in `_Trash` and records it
+  in **History**, where it can be undone. Nothing is deleted by itself.
+- **Scanned stacks**: a PDF that holds several documents (a feeder scanner) is spotted in "To file" (blank sheet, another
+  company, another invoice number). **Cut** writes one PDF per document and keeps the stack whole.
+- **Backup and restore**: one zip with the database, the learned corrections and your rules, optionally password-encrypted
+  (`docflow backup`, `docflow restore`, and a block under **Settings**).
+- **Missing documents**: the dashboard lists what usually comes at a steady rhythm and did not.
+- **Annual statement**: a CSV of the documents filed in a year, per line or as totals.
+- **Search**: filters by company, type, period and amount, and sorting.
+- **Searchable scans**: option `ocr.searchable_pdf` keeps the recognised text under the page.
+- **Pictures**: an image dropped in the inbox is read, then filed as a one-page PDF; undo gives the original back.
+- **Inbox watch**: option to analyse files that arrive by themselves (nothing is moved).
+
+### Changed
+
+- Interface tests: the screens are now rendered and used (Vitest, Testing Library) instead of being read as text; `npm test` runs
+  them.
+
 ## [0.8.1] - 2026-10-07
 
 ### Changed
