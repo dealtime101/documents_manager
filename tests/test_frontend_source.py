@@ -243,12 +243,6 @@ def test_the_language_switch_is_named_through_the_translator():
     assert "'lang.label': 'Language'" in source and "'lang.label': 'Langue'" in source
 
 
-def test_the_queue_has_one_live_region_that_is_never_unmounted():
-    page = (BITS.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert page.count("<Notice note={note} />") == 1                         # not one per branch: switching branches would re-create it
-    assert page.index("<Notice note={note} />") < page.index("{current && form ? (")   # and it sits OUTSIDE the conditional
-
-
 def test_the_state_and_group_filters_are_encoded_in_the_query_string():
     got = _node_route("""(async () => { await m.api.items('pending'); await m.api.items('a&b#c d', 'duplicates'); return seen })()""",
                       module="api", setup="""
@@ -451,13 +445,6 @@ def test_the_outline_of_an_input_reaches_3_to_1_in_both_themes_and_the_tint_toke
     assert "disabled:bg-input/50" in input_source and "--input: oklch(0.922 0 0)" in light and "--input: oklch(1 0 0 / 15%)" in dark   # tints stay
 
 
-def test_the_csrf_cookie_value_is_everything_after_the_name_not_the_text_before_the_next_equals_sign():
-    # DOC474.165: split('=')[1] cut a value that contains "=" (base64-like) at its first "="
-    api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
-    csrf = api[api.index("function csrf()"):api.index("/** Every readable string")]
-    assert ".split('=')[1]" not in csrf and "c.slice('csrftoken='.length)" in csrf
-
-
 # (DOC534.228: a stale dashboard answer and a failed background refresh are run in pages/Dashboard.test.tsx)
 
 
@@ -504,15 +491,6 @@ def test_a_network_failure_reaches_the_screens_as_a_translated_api_error_never_a
     from conftest import fr_messages_table
     french = fr_messages_table((UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8"))
     assert "'Network error: the server cannot be reached.': 'Erreur réseau" in french
-
-
-def test_saving_the_settings_goes_through_request_so_a_lost_network_is_a_translated_api_error():
-    # DOC534.92: saveSettings called fetch itself: a server that could not be reached gave "Unexpected error." (a raw TypeError)
-    api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
-    save = api[api.index("saveSettings: async"):api.index("folders: (path")]
-    assert "fetch(" not in save and "await call<FolderSettings>('POST', '/api/settings', values)" in save
-    assert "throw new ApiError(errorMessage(data, r.status), r.status, data)" in api        # the refusal's body reaches the caller
-    assert "e.status === 400" in save and "throw new SettingsRefused(errors)" in save and save.rstrip().endswith("},")
 
 
 def test_a_request_the_server_never_answers_ends_with_a_translated_timeout_and_the_slow_ones_wait_longer():
@@ -615,24 +593,6 @@ def test_the_card_title_comment_does_not_bless_a_card_inside_a_button():
     assert "never goes inside a <button>" in card
 
 
-def test_a_long_source_path_wraps_in_its_card_and_leaves_the_count_in_view():
-    # DOC534.257: an absolute path has no space to break at; it ran out of the card and pushed the number of PDFs out of sight
-    page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
-    row = page[page.index("d.sources.map"):page.index("</CardContent>", page.index("d.sources.map"))]
-    assert 'className="flex justify-between gap-3 border-b py-2 last:border-0"' in row
-    assert '<span className="min-w-0">' in row and 'className="ml-2 break-all text-slate-500">{s.path}' in row
-    assert '<span className="shrink-0 font-medium">{t(\'dash.pdfCount\'' in row
-
-
-def test_a_dashboard_tile_is_a_button_made_of_inline_elements_only():
-    # DOC474.80: Card, CardHeader and CardContent render <div>s; a <button> may only hold phrasing content
-    page = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
-    start = page.index("<button key={label}")
-    tile = page[start:page.index("</button>", start)]
-    assert "<Card" not in tile and "<div" not in tile and "<h" not in tile
-    assert tile.count("<span") >= 3 and "{t(label)}" in tile and "{n}" in tile
-
-
 def test_an_operation_kind_the_front_end_does_not_know_is_shown_as_its_own_name_not_as_a_raw_key():
     # DOC474.81: t(`op.${kind}` as AskKey) printed "op.xxx" for a kind added by the server, and the cast hid it from the compiler
     src = UI.parents[1]
@@ -649,8 +609,7 @@ def test_an_operation_kind_the_front_end_does_not_know_is_shown_as_its_own_name_
 def test_each_forget_button_of_an_alias_pattern_has_its_own_accessible_name():
     # DOC474.85: a company with several patterns gave several buttons all named "Forget the rule of <company>"
     root = UI.parents[1]
-    rules = (root / "pages" / "Rules.tsx").read_text(encoding="utf-8")
-    assert "pattern ? t('rules.forgetPatternLabel', { company, pattern }) : t('rules.forgetLabel', { company })" in rules
+    # (DOC534.228: the buttons' names are run in pages/Rules.test.tsx; the label must exist in both languages)
     i18n = (root / "i18n.tsx").read_text(encoding="utf-8")
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
     for block in (en, fr):
@@ -828,10 +787,7 @@ def test_the_undone_label_is_an_inline_block_so_the_struck_through_row_does_not_
 def test_an_error_that_is_not_an_api_error_is_logged_and_shown_as_a_generic_translated_message():
     # DOC474.146 / .175 (and .78 / .130 for the network case): String(e) put a raw technical text in front of the user
     src = UI.parents[1]
-    api = (src / "api.ts").read_text(encoding="utf-8")
-    helper = api[api.index("export function errorText"):]
-    helper = helper[:helper.index("\n}\n")]
-    assert "e instanceof ApiError" in helper and "console.error(e)" in helper and "'Unexpected error.'" in helper
+    # (DOC534.228: the helper itself is run in api.test.tsx; here, that every screen goes through it)
     offenders = [p.name for p in src.rglob("*.ts*") if p.name != "api.ts" and re.search(r"String\((e|x)\)", p.read_text(encoding="utf-8"))]
     assert offenders == [], offenders                                          # every screen goes through the helper
     for page in ("App.tsx", "components/Accuracy.tsx", "pages/Rules.tsx", "pages/Dashboard.tsx", "pages/Search.tsx",

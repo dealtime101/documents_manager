@@ -39,6 +39,27 @@ test('an older answer never overwrites a newer one (the visibility refresh can o
   expect(screen.queryByText('3', { selector: 'span.text-4xl' })).toBeNull()
 })
 
+test('a tile is a button made of inline elements only, and opens the screen it counts from', async () => {
+  const open = vi.fn()
+  m.dashboard.mockResolvedValue(counters(4))
+  render(<I18nProvider><Dashboard open={open} /></I18nProvider>)
+  await flush()
+  const button = screen.getByRole('button', { name: /Documents to process/ })
+  expect(button.querySelector('div, h1, h2, h3, h4, h5, h6')).toBeNull()      // a <button> may hold phrasing content only
+  expect(button.textContent).toContain('4')
+  fireEvent.click(button)
+  expect(open).toHaveBeenCalledWith({ page: 'queue' })
+})
+
+test('a long source path wraps in its card and leaves the count in view', async () => {
+  m.dashboard.mockResolvedValue({ ...counters(1), sources: [{ kind: 'inbox', path: `C:\\${'very-long-folder-'.repeat(12)}`, files: 12 }] })
+  show()
+  await flush()
+  const count = screen.getByText('12 PDFs')
+  expect(count.className).toContain('shrink-0')                                // the count never shrinks out of sight
+  expect(screen.getByText(/very-long-folder/).className).toContain('break-all')   // and the path breaks anywhere
+})
+
 test('a failed background refresh keeps the numbers on screen and says they are old', async () => {
   m.dashboard.mockResolvedValueOnce(counters(5)).mockRejectedValue(new Error('boom'))
   show()

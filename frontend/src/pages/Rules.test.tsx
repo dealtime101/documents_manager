@@ -92,6 +92,14 @@ test('forgetting a route also forgets the unsaved typing for that company', asyn
   await waitFor(() => expect(field().value).toBe('Bills/Acme'))
 })
 
+test('each forget button of an alias pattern has its own accessible name', async () => {
+  show()
+  await screen.findByLabelText('Destination of Acme')
+  expect(screen.getByRole('button', { name: 'Forget the pattern "beta inc" of Beta' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Forget the pattern "beta ltd" of Beta' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Forget the rule of Acme' })).toBeTruthy()
+})
+
 test('a failed first load replaces the page with an error and a way to try again', async () => {
   rules.mockRejectedValueOnce(new Error('boom'))
   show()

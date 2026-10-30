@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { api, ApiError } from '@/api'
+import { api, ApiError, errorText, SettingsRefused } from '@/api'
 
 // DOC534.228: the real request code runs; only fetch (the network) is replaced.
 afterEach(() => vi.unstubAllGlobals())
@@ -19,6 +19,35 @@ test('a network that is down reaches the screens as an ApiError, not as a raw Ty
   const failure = await api.history().catch((e) => e)
   expect(failure).toBeInstanceOf(ApiError)
   expect(failure.message).toBe('Network error: the server cannot be reached.')
+})
+
+test('the CSRF token sent is everything after the cookie name, even when the value holds an equals sign', async () => {
+  document.cookie = 'csrftoken=abc==def; path=/'
+  const fetcher = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+  vi.stubGlobal('fetch', fetcher)
+  await api.ignore(1)
+  expect(fetcher.mock.calls[0][1].headers['X-CSRFToken']).toBe('abc==def')
+  document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+})
+
+test('saving the settings on a lost network is a translated ApiError, and a refused one carries the field errors', async () => {
+  const values = { inbox: 'a', library_root: 'b', quarantine: '', extra_inboxes: [], watch_inbox: false }
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+  const lost = await api.saveSettings(values).catch((e) => e)
+  expect(lost).toBeInstanceOf(ApiError)
+  expect(lost.message).toBe('Network error: the server cannot be reached.')
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: { inbox: 'Not a folder.' } }), { status: 400 })))
+  const refused = await api.saveSettings(values).catch((e) => e)
+  expect(refused).toBeInstanceOf(SettingsRefused)
+  expect(Object.keys(refused.errors)).toEqual(['inbox'])
+})
+
+test('an error that is not an ApiError is logged and shown as a generic message, never as a raw exception text', () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  expect(errorText(new TypeError('secret internals'))).toBe('Unexpected error.')
+  expect(log).toHaveBeenCalledTimes(1)
+  expect(errorText(new ApiError('Known.'))).toBe('Known.')
+  log.mockRestore()
 })
 
 test('a refusal of the server keeps its status and its body for the caller', async () => {

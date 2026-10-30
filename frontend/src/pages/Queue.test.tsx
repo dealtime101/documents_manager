@@ -130,6 +130,19 @@ test('a ticked document that stops being approvable leaves the selection', async
   expect((screen.getByLabelText('Select f1.pdf') as HTMLInputElement).checked).toBe(false)
 })
 
+test('the one live region of the Queue stays in the page whatever is selected', async () => {
+  show()
+  await screen.findByLabelText('Company')
+  const regions = () => document.querySelectorAll('[role="status"], [role="alert"]').length
+  const before = regions()
+  const region = document.querySelector('[role="status"]')!
+  m.items.mockResolvedValue(list([]))
+  press('Ignore')                                                                             // the open document is gone: no form
+  await waitFor(() => expect(screen.queryByLabelText('Company')).toBeNull())
+  expect(regions()).toBe(before)                                                              // not re-created by the other branch
+  expect(document.querySelector('[role="status"]')).toBe(region)
+})
+
 // the scan's polling: fake timers, and every step flushed by hand
 const tick = () => act(async () => { await vi.advanceTimersByTimeAsync(3000) })
 const mount = async () => {
