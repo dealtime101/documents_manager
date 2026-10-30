@@ -83,38 +83,19 @@ def test_the_component_tests_of_the_pages_pass():
     assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-1000:]
 
 
-def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_session_is_checked():
-    app = (BITS.parents[1] / "App.tsx").read_text(encoding="utf-8")
-    assert "if (auth === null) return null" not in app
-    assert "role=\"status\"" in app and "t('common.loading')" in app
-
-
-def test_the_title_of_the_document_follows_the_page_shown():
-    # DOC534.128: every page had the same title: Back / Forward entries, bookmarks and screen readers could not tell them apart
-    app =(UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
+def test_every_page_of_the_route_has_its_own_name_for_the_title_of_the_document():
+    # DOC534.128: every page had the same title (the title itself is run in App.test.tsx, DOC534.228)
+    app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
     route = (UI.parents[1] / "route.ts").read_text(encoding="utf-8")
     pages = re.search(r"const PAGES = (\[[^\]]+\])", route).group(1)                             # (the list the type is read from)
     names = dict(re.findall(r"(\w+): 'nav\.(\w+)'", app[app.index("const PAGE_NAME"):app.index("const MAX_SETUP_TRIES")]))
     assert set(names) == set(re.findall(r"'(\w+)'", pages)) and all(k == v for k, v in names.items())   # every page has its own name
-    assert "document.title = `${t(PAGE_NAME[page])} \\u00b7 ${t('app.title')}`" in app and "}, [page, t])" in app
 
 
 def test_saving_the_settings_leaves_the_screen_only_at_the_end_of_the_first_set_up():
     # DOC534.127: every save sent the user to the queue: changing several settings meant coming back to the tab each time
     # (DOC534.228: that only the first set-up calls onSaved is run in pages/Settings.test.tsx; here, where App sends it)
     assert "onSaved={() => go({ page: 'queue', group: null })}" in (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")   # the first set-up still goes to the queue
-
-
-def test_the_first_run_check_counts_as_done_only_once_the_server_answered_and_is_tried_again():
-    # DOC534.126: checkedSetup was set before the call: a failure meant the Settings screen never opened on a first run, silently
-    app = (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
-    effect = app[app.index("const [checkedSetup, setCheckedSetup]"):app.index("if (failure) {")]
-    assert effect.index("api.settings().then(") < effect.index("setCheckedSetup(true)")                  # set in the answer, not before the call
-    assert effect.count("setCheckedSetup(true)") == 1
-    assert "window.location.hash = toHash({ page: 'settings', group: null })" in effect and "'#settings'" not in effect   # the route, not a hard-coded hash
-    assert "console.warn('first-run check of the settings failed:', errorText(e))" in effect                # the failure leaves a trace
-    assert "setupTries < MAX_SETUP_TRIES" in effect and "setTimeout(() => setSetupTries((n) => n + 1), SETUP_RETRY_MS)" in effect
-    assert "return () => { cancelled = true; clearTimeout(timer) }" in effect and "[auth, checkedSetup, setupTries]" in effect
 
 
 def test_an_error_of_the_extra_folders_names_its_line_and_is_tied_to_the_box():
@@ -145,30 +126,7 @@ def test_the_fixed_extension_of_a_file_name_field_is_read_by_screen_readers_with
 # (DOC534.228: the Rules page's lock, drafts, saving with Enter, reload and failed reload are in pages/Rules.test.tsx, rendered)
 
 
-def test_the_launcher_token_stays_in_the_address_while_the_server_cannot_be_reached_and_retry_signs_in_again():
-    # DOC534.34: the token was removed from the URL even when the sign-in failed for lack of a network answer, and "Retry" only
-    # re-checked the session: the user stayed "not signed in" until the desktop application was started again
-    app = (BITS.parents[1] / "App.tsx").read_text(encoding="utf-8")
-    start = app[app.index("const start = async () => {"):app.index("useEffect(() => { void start()")]
-    assert "e instanceof ApiError && e.status === undefined) throw e" in start                   # no network answer: the failure is shown
-    assert start.index("e.status === undefined") < start.index("window.history.replaceState")     # the address is cleaned after, not before
-    assert "setFailure(''); void start()" in app and "setFailure(''); refresh()" not in app        # Retry runs the whole start again
-
-
-def test_the_release_notes_ignore_a_late_answer_for_a_language_left_and_forget_an_old_failure():
-    # DOC534.44: after a failure the error stayed for ever, and a quick language switch let the slower answer win
-    notes = (BITS.parents[1] / "pages" / "Notes.tsx").read_text(encoding="utf-8")
-    effect = notes[notes.index("useEffect(() => {"):notes.index("}, [lang])")]
-    assert "let cancelled = false" in effect and "return () => { cancelled = true }" in effect
-    assert "if (!cancelled) { setReleases(rows); setError('') }" in effect                  # the answer is used only if still wanted
-    assert "if (!cancelled) setError(errorText(e))" in effect                                 # and so is the failure
-
-
-def test_every_tab_has_a_tabpanel_inside_the_same_tabs_root():
-    app = (BITS.parents[1] / "App.tsx").read_text(encoding="utf-8")
-    assert app.count("<Tabs ") == 1 and app.count("</Tabs>") == 1            # one root around the tab list AND the pages
-    for page in ("dashboard", "queue", "history"):
-        assert f'<TabsTrigger value="{page}">' in app and f'<TabsContent value="{page}"' in app
+# (DOC534.228: the launcher token, the tab panels, the loading status, the title of the document and the first-run check are run in App.test.tsx)
 
 
 NODE_TIMEOUT = 30  # seconds: these scripts transpile one file and print a line
@@ -435,60 +393,14 @@ def test_the_library_explorer_page_asks_before_deleting_and_only_calls_its_own_e
     used = set(re.findall(r"api\.(\w+)", page))
     assert used <= {"library", "libraryFileUrl", "librarySearch", "libraryNewFolder", "libraryRename", "libraryMove", "libraryDelete",
                     "libraryPlan", "libraryApply", "vocabulary", "destinations"}           # the explorer calls nothing else (no item, no scan)
-    # a deletion is always confirmed first, in the page itself (DOC534.67: confirm() is not reliable in the desktop window)
-    assert "confirm(" not in page and "<Confirm text={sentence(path)}" in page and "<Confirm text={sentence(file)}" in page
-    assert "t(inTrash(target) ? 'library.confirmForever' : 'library.confirmTrash'" in page
-    assert page.count("onClick={() => setConfirming(") == 2 and "onOk={() => remove(path)}" in page and "onOk={() => remove(file)}" in page   # the buttons only ask
-    remover = page[page.index("const remove = "):page.index("const search = ")]
-    assert "api.libraryDelete(target)" in remover and "confirm" not in remover.replace("setConfirming", "")
+    # (a deletion is always confirmed first, in the page itself, DOC534.67: run in pages/Library.test.tsx, DOC534.228; confirm() is not reliable in the desktop window)
+    assert "confirm(" not in page
     api = (src / "api.ts").read_text(encoding="utf-8")
     assert "new URLSearchParams({ path })" in api and "new URLSearchParams({ q })" in api    # paths and queries are encoded, not concatenated
     assert '<TabsTrigger value="library">' in (src / "App.tsx").read_text(encoding="utf-8")
 
 
-def test_a_proposal_read_for_one_library_file_never_fills_the_form_of_another():
-    # DOC534.19: the list stays clickable while a document is read; the late answer for file A must not fill the form of file B
-    page = (UI.parents[1] / "pages" / "Library.tsx").read_text(encoding="utf-8")
-    assert "const shown = useRef(file)" in page and "shown.current = file;" in page       # what the form is about now
-    assert "const asked = file" in page and "api.libraryPlan(asked)" in page              # what was asked, fixed at the click
-    assert page.index("if (shown.current !== asked) return") > page.index("api.libraryPlan(asked)")   # checked after the wait, before filling
-    assert "if (shown.current === asked) setProblem(errorText(e))" in page               # and an error for A is not shown on B
-
-
-
-
-def test_the_library_apply_button_needs_a_preview_computed_for_what_is_typed_now():
-    # DOC534.65: for 400 ms after an edit the old "will be" line stayed and Apply sent the NEW fields
-    page = (UI.parents[1] / "pages" / "Library.tsx").read_text(encoding="utf-8")
-    assert "const ready = !!plan?.final_name && !!plan?.rel_dir && planned === JSON.stringify([form, relDir, finalName])" in page
-    assert "const asked = JSON.stringify([form, relDir, finalName])" in page and "setPlanned(asked)" in page   # what the plan was asked for
-    assert "setPlanned(JSON.stringify([p.fields, '', '']))" in page                  # a proposal from the document is for its own fields
-    assert "disabled={busy || !ready} onClick={apply}" in page and "{plan && ready &&" in page   # Apply AND the preview wait for it
-
-
-def test_a_proposal_for_a_library_file_does_not_start_a_second_plan_request_for_the_same_inputs():
-    # DOC534.66: after "Suggest" the form changed, the effect ran again and asked the server for the plan it had just been given
-    page = (UI.parents[1] / "pages" / "Library.tsx").read_text(encoding="utf-8")
-    effect = page[page.index("// the name and folder they give, recomputed shortly after each change"):page.index("const set = ")]
-    assert "if (planned === asked) return" in effect and "[file, form, relDir, finalName, touched, planned]" in effect
-    assert effect.index("if (planned === asked) return") < effect.index("api.libraryPlan(")   # before any request is scheduled
-    assert "setPlan(null); setPlanned('')" in effect                                        # a failed plan is asked again for the same inputs
-
-
-def test_the_folder_actions_of_the_library_wait_for_the_running_operation_like_the_file_actions():
-    # DOC534.70: rename, move and delete of a folder stayed available while another change was running
-    page = (UI.parents[1] / "pages" / "Library.tsx").read_text(encoding="utf-8")
-    for action in ("setAsk('newFolder')", "setAsk('renameFolder')", "setMoving('folder')", "setConfirming(path)"):
-        assert f'size="sm" disabled={{busy}} onClick={{() => {action}}}' in page, action
-    assert 'size="sm" disabled={busy} onClick={() => setConfirming(file)}' in page            # the file's own delete already did
-
-
-def test_the_move_picker_builds_paths_from_the_folder_its_list_was_read_for():
-    # DOC534.69: while the next folder loaded (or after a failure) the old list was joined with the NEW path: a click led nowhere
-    page = (UI.parents[1] / "pages" / "Library.tsx").read_text(encoding="utf-8")
-    picker = page[page.index("function MovePicker"):page.index("function Classify")]
-    assert "join(at, f)" not in picker and picker.count("join(list.path, f)") == 3
-    assert "onClick={() => setAt(join(list.path, f))}" in picker
+# (DOC534.228: the library's proposals, Apply and its preview, the folder actions and the move picker are run in pages/Library.test.tsx)
 
 
 def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html():
