@@ -1,4 +1,7 @@
+import json
 import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -93,9 +96,31 @@ def test_the_command_line_says_its_version(capsys):
 
 
 def test_the_page_shows_the_version_the_server_sent():
-    app = (ROOT / "frontend" / "src" / "App.tsx").read_text(encoding="utf-8")
-    assert "setVersion(m.version)" in app and "v{version}" in app
-    assert "version: string" in (ROOT / "frontend" / "src" / "api.ts").read_text(encoding="utf-8")
+    """DOC534.243: VersionTag itself is rendered (transpiled with the project's TypeScript, drawn by react-dom), not read as text.
+    That App hands it the server's version is checked by tsc: `m.version` is a string in api.ts and the prop is a string."""
+    frontend = ROOT / "frontend"
+    node, typescript = shutil.which("node"), frontend / "node_modules" / "typescript" / "lib" / "typescript.js"
+    if not node or not typescript.exists() or not (frontend / "node_modules" / "react-dom").exists():
+        pytest.skip("node or the frontend's node_modules is not available")
+    script = """
+      const ts = require(process.argv[1]), fs = require('fs'), path = require('path'), os = require('os');
+      const src = fs.readFileSync(path.join(process.argv[2], 'src/components/VersionTag.tsx'), 'utf8');
+      const js = ts.transpileModule(src, {compilerOptions: {module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX}}).outputText;
+      const dir = fs.mkdtempSync(path.join(process.argv[2], 'node_modules', '.vt-'));
+      try {
+        fs.writeFileSync(path.join(dir, 'VersionTag.cjs'), js);
+        const {renderToStaticMarkup} = require(path.join(process.argv[2], 'node_modules/react-dom/server'));
+        const React = require(path.join(process.argv[2], 'node_modules/react'));
+        const Tag = require(path.join(dir, 'VersionTag.cjs')).default;
+        console.log(JSON.stringify(['1.4.2', ''].map((v) => renderToStaticMarkup(React.createElement(Tag, {version: v})))));
+      } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+    """
+    done = subprocess.run([node, "-e", script, str(typescript), str(frontend)], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stderr
+    shown, empty = json.loads(done.stdout)
+    assert re.fullmatch(r"<span[^>]*>v1\.4\.2</span>", shown), shown
+    assert empty == ""                                                      # nothing before the server has answered
+    assert "version: string" in (frontend / "src" / "api.ts").read_text(encoding="utf-8")
 
 
 SAMPLE = """# Notes de version

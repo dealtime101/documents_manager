@@ -8,6 +8,7 @@ import History from '@/pages/History'
 import Library from '@/pages/Library'
 import Notes from '@/pages/Notes'
 import BackupRestore from '@/components/BackupRestore'
+import VersionTag from '@/components/VersionTag'
 import Settings from '@/pages/Settings'
 import Rules from '@/pages/Rules'
 import Search from '@/pages/Search'
@@ -94,7 +95,7 @@ function Shell() {
     <Tabs value={page} onValueChange={(v) => go({ page: v as Page, group: null })}
       className="mx-auto max-w-[110rem] gap-0 p-4">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="text-xl font-semibold">{t('app.title')}{version && <span className="ml-2 text-xs font-normal text-slate-600">v{version}</span>}</h1>
+        <h1 className="text-xl font-semibold">{t('app.title')}<VersionTag version={version} /></h1>
         {/* the height is in rem (it grows with the text size); a row wider than the screen wraps onto several lines (flex-wrap) instead of being cut off */}
         <TabsList className="h-auto max-w-full flex-wrap group-data-horizontal/tabs:h-auto">
           <TabsTrigger value="dashboard">{t('nav.dashboard')}</TabsTrigger>
