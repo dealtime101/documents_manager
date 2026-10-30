@@ -72,10 +72,15 @@ def test_history_shows_from_and_to_in_the_same_format_and_splits_on_both_separat
     assert r"split(/[\\/]/)" in paths and r"lastIndexOf('\\')" in paths      # '/' and the Windows '\'
 
 
-def test_history_allows_one_undo_at_a_time():
-    page = (BITS.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "disabled={undoing !== null}" in page and "if (undoing !== null" in page   # the button AND the handler refuse a second one
-    assert page.index("setUndoing(id)") < page.index("await api.undo(id)") < page.index("setUndoing(null)")
+def test_the_component_tests_of_the_pages_pass():
+    """DOC534.228: pages are rendered and clicked (Vitest, Testing Library, jsdom) in src/**/*.test.tsx, not read as text. One undo at a
+    time and the failed reload after an undo (History) were source pins before."""
+    frontend = BITS.parents[2]
+    npx = shutil.which("npx")
+    if not npx or not (frontend / "node_modules" / "vitest").exists():
+        pytest.skip("npx or the frontend's node_modules (vitest) is not available")
+    done = subprocess.run([npx, "vitest", "run"], cwd=frontend, capture_output=True, text=True, timeout=180)
+    assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-1000:]
 
 
 def test_the_app_shows_a_loading_status_instead_of_a_blank_page_while_the_session_is_checked():
