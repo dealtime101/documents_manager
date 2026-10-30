@@ -119,6 +119,51 @@ test('"approve automatic" goes on after the point where the previous press stopp
   expect(m.approveAuto).toHaveBeenLastCalledWith(0)                                           // nothing left beyond: from the front again
 })
 
+test('"Select" ticks by the percentage shown, and an empty or out-of-range threshold selects nothing', async () => {
+  m.items.mockResolvedValue(list([item(1, { confidence: 0.29 }), item(2, { confidence: 0.5, status: 'confirm' }), item(3, { status: 'manual' })]))
+  show()
+  await screen.findByLabelText('Select f1.pdf')
+  const field = screen.getByLabelText('Minimum confidence (%)') as HTMLInputElement
+  const select = screen.getByRole('button', { name: 'Select' }) as HTMLButtonElement
+  for (const bad of ['', '  ', '-1', '101', 'abc']) {
+    fireEvent.change(field, { target: { value: bad } })
+    expect(select.disabled).toBe(true)                                         // Number('') is 0 and would tick everything
+  }
+  fireEvent.change(field, { target: { value: '29' } })                         // 0.29 * 100 is 28.999999999999996: shown as 29 %
+  fireEvent.click(select)
+  expect((screen.getByLabelText('Select f1.pdf') as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByLabelText('Select f2.pdf') as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByLabelText('Select f3.pdf') as HTMLInputElement).disabled).toBe(true)   // never a manual one
+})
+
+test('a batch that stopped at the limit says how many documents remain', async () => {
+  m.items.mockResolvedValue(list([item(1)]))
+  m.approveAuto.mockResolvedValue({ approved: [1], failed: [{ id: 9, detail: 'Unreadable.' }], remaining: 3, next_after: 4 })
+  show()
+  await screen.findByLabelText('Company')
+  press('Approve automatic (1)')
+  await waitFor(() => expect(note()).toContain('1 document filed.'))
+  expect(note()).toContain('Failed for 1 document: #9 (Unreadable.).')
+  expect(note()).toContain('3 automatic documents are still waiting: press the button again.')
+})
+
+test('changing the filter keeps the open document and what was typed in it when it is still listed', async () => {
+  const rows = list([item(1), item(2)])
+  m.items.mockResolvedValue(rows)
+  const { rerender } = render(<I18nProvider><Queue group={null} onShowAll={() => {}} /></I18nProvider>)
+  await screen.findByLabelText('Company')
+  type('Company', 'Beta')
+  m.items.mockResolvedValue(list([item(1)]))                                   // the new filter still contains the open document
+  rerender(<I18nProvider><Queue group="auto" onShowAll={() => {}} /></I18nProvider>)
+  await waitFor(() => expect(screen.queryByLabelText('Select f2.pdf')).toBeNull())
+  expect(company().value).toBe('Beta')                                         // and what was typed survives
+  m.items.mockResolvedValue(list([item(2)]))                                   // a filter that does not contain it: it stays on top, with a note
+  rerender(<I18nProvider><Queue group="errors" onShowAll={() => {}} /></I18nProvider>)
+  await waitFor(() => expect(note()).toContain('unsaved changes'))
+  expect(screen.getByLabelText('Select f1.pdf')).toBeTruthy()
+  expect(company().value).toBe('Beta')
+})
+
 test('a ticked document that stops being approvable leaves the selection', async () => {
   show()
   await screen.findByLabelText('Select f1.pdf')

@@ -34,35 +34,7 @@ def test_a_long_status_label_is_cut_with_an_ellipsis_and_stays_readable_in_the_t
     assert "max-w-full" in (UI / "badge.tsx").read_text(encoding="utf-8")
 
 
-def test_history_shows_a_load_error_through_the_translator_not_as_a_raw_exception_string():
-    page = (BITS.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "setLoadError(errorText(e))" in page and "withReloadError(said, loadError, msg)" in page  # the raw server text goes through msg() when shown
-    assert "setNote(String(" not in page                                     # "Error: HTTP error: 500" is not a text msg() knows
-
-
-def test_history_says_no_operations_only_after_a_load_that_succeeded_and_came_back_empty():
-    page = (BITS.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "useState<Operation[] | null>(null)" in page                      # "not loaded yet" is its own state
-    assert "ops?.length === 0" in page and "ops.length === 0" not in page.replace("ops?.length === 0", "")
-    assert "common.loading" in page
-
-
-def test_history_names_an_undone_operation_in_words_and_keeps_its_text_readable():
-    page = (BITS.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "t('hist.undone')" in page                                        # a word, not only a strike-through
-    assert "text-slate-400" not in page                                      # 2.6:1 on white; slate-500 is 4.8:1
-
-
-def test_each_history_undo_button_names_its_operation_and_the_action_column_has_a_header():
-    page = (BITS.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "aria-label={t('hist.undoOp'" in page                             # "Undo operation 12 (file.pdf)", not 12 × "Undo"
-    assert "<th />" not in page and "hist.actions" in page                   # an empty header names nothing
-
-
-def test_history_messages_go_through_the_shared_live_regions():
-    page = (BITS.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "<Notice note=" in page                                           # polite for a success, assertive for a failure
-    assert 'className="rounded bg-slate-100' not in page                     # the old bare paragraph, announced by nothing
+# (DOC534.228: the History page's load error, empty list, undone words, button names and live regions are run in pages/History.test.tsx)
 
 
 def test_history_shows_from_and_to_in_the_same_format_and_splits_on_both_separators():
@@ -450,21 +422,6 @@ def test_the_outline_of_an_input_reaches_3_to_1_in_both_themes_and_the_tint_toke
 
 # (DOC534.228: the Queue's polling, bulk approvals, ticks and approve action are run in pages/Queue.test.tsx)
 
-def test_an_empty_or_out_of_range_confidence_threshold_selects_nothing():
-    # DOC474.34: Number('') is 0, so an emptied field ticked every approvable item, whatever its confidence
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert "const minValid = minConf.trim() !== '' && Number.isFinite(Number(minConf)) && Number(minConf) >= 0 && Number(minConf) <= 100" in queue
-    assert "const selectFrom = () => minValid && tick(" in queue
-    assert "disabled={busy || !items.length || !minValid} onClick={selectFrom}" in queue
-
-
-def test_the_confidence_threshold_compares_the_percentage_the_screen_shows_not_a_float_below_it():
-    # DOC534.72: 0.29 * 100 is 28.999999999999996, so a document shown as "29 %" was not ticked by a threshold of 29
-    assert 0.29 * 100 < 29 <= round(0.29 * 100)                                      # the arithmetic the screen has to absorb
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert "Math.round(i.confidence * 100) >= Number(minConf)" in queue and "i.confidence * 100 >=" not in queue
-
-
 def test_each_api_type_has_its_own_doc_comment_directly_above_it():
     # DOC474.58: two JSDoc blocks in a row, the first one (about Group) sat above Batch's comment and documented nothing
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
@@ -827,14 +784,6 @@ def test_a_long_badge_label_ends_in_an_ellipsis_and_can_be_read_in_full():
     assert 'title={label}>' in bits and '<span className="truncate">{label}</span>' in bits
 
 
-def test_changing_the_filter_keeps_the_open_document_and_what_was_typed_in_it():
-    # DOC474.214: a new group reloads the list; the open document and its unsaved form survive when it is still listed
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert "async (keep?: number | null, stay = false)" in queue
-    assert "if (stay && dirtyRef.current && next?.id === keep) return" in queue
-    assert "load(selRef.current, true)" in queue  # the filter effect asks to stay; a save (load(keep)) still refreshes the form
-
-
 def test_each_doc_comment_of_api_ts_sits_right_above_the_type_it_describes():
     # DOC474.226 feared the Group comment above Batch: each type has its own comment, directly on top of it
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
@@ -843,19 +792,6 @@ def test_each_doc_comment_of_api_ts_sits_right_above_the_type_it_describes():
         assert api.splitlines()[api.splitlines().index(line) + 1].startswith(decl), text
 
 
-def test_the_dashboard_counters_are_announced_when_they_change_not_on_every_refresh():
-    # DOC474.236: the tiles refresh by themselves; a screen reader hears the new numbers, but the "updated at" line stays silent
-    dash = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
-    assert """<p role="status" className="sr-only">{tiles.map(([label, n]) => `${t(label)}: ${n}`).join(', ')}</p>""" in dash
-    updated = next(l for l in dash.splitlines() if "dash.updated" in l)
-    assert "role=" not in updated and "aria-live" not in updated      # a timestamp that changes every 15 s must not be announced
-
-
-def test_a_failed_background_refresh_of_the_dashboard_says_the_figures_may_be_old():
-    # DOC474.237: after a failed quiet refresh the old numbers stayed with no sign but a discreet time
-    dash = (UI.parents[1] / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
-    assert "if (quiet && shown.current) setStale(true)" in dash and "setStale(false)" in dash         # set on a failed refresh, cleared on a good one
-    assert """{stale && <p role="alert\"""" in dash and "t('dash.stale')" in dash
 
 
 def test_a_row_of_tabs_wider_than_the_screen_wraps_instead_of_being_cut_off_or_showing_scroll_arrows():
@@ -930,15 +866,6 @@ def test_the_field_scores_are_a_description_list_so_each_name_is_read_with_its_v
     assert "<dl className=" in bits and "<dt className=" in bits and "<dd className={tone(item.conf[k])}>" in bits
 
 
-def test_a_document_being_edited_stays_in_the_list_when_the_new_filter_does_not_contain_it():
-    # DOC474.214 (rest): the filter is already in the URL, so it cannot be refused; what was typed must not be thrown away
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert "const edited = stay && dirtyRef.current && keep != null && !fetched.some((i) => i.id === keep)" in queue
-    assert "const list = edited ? [edited, ...fetched] : fetched" in queue and "itemsRef.current.find((i) => i.id === keep)" in queue
-    assert "if (edited) setNote({ ok: true, text: tRef.current('queue.keptOutside') })" in queue
-    assert "[group])  // not [t]" in queue                                   # a language switch must not reload the list
-
-
 def test_the_release_notes_have_a_tab_a_route_and_a_screen():
     # the notes live in CHANGELOG.md; the web page shows them under their own tab
     src = UI.parents[1]
@@ -959,10 +886,8 @@ def test_the_model_versus_rules_disagreement_notes_have_a_french_translation_by_
 
 def test_a_batch_that_stopped_at_the_limit_says_how_many_automatic_documents_remain():
     # DOC474.20: "approve all (auto)" files at most MAX_BATCH per request; the screen must say there are more, not look finished
-    src = UI.parents[1]
-    queue = (src / "pages" / "Queue.tsx").read_text(encoding="utf-8")
+    src = UI.parents[1]     # (the message itself is run in pages/Queue.test.tsx, DOC534.228)
     assert "remaining?: number" in (src / "api.ts").read_text(encoding="utf-8")
-    assert "if (r.remaining) text += ` ${t('queue.moreToApprove', { n: r.remaining })}`" in queue
     i18n = (src / "i18n.tsx").read_text(encoding="utf-8")
     assert i18n.count("'queue.moreToApprove.one'") == 2 and i18n.count("'queue.moreToApprove.other'") == 2   # en + fr, singular + plural
 

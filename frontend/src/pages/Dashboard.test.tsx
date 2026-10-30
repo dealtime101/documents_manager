@@ -51,6 +51,33 @@ test('a tile is a button made of inline elements only, and opens the screen it c
   expect(open).toHaveBeenCalledWith({ page: 'queue' })
 })
 
+test('the counters are announced when they change, not on every refresh; the "updated at" line stays silent', async () => {
+  m.dashboard.mockResolvedValueOnce(counters(5)).mockResolvedValueOnce(counters(5)).mockResolvedValue(counters(6))
+  const { container } = show()
+  await flush()
+  const status = [...container.querySelectorAll('[role="status"]')].find((n) => n.className.includes('sr-only') && n.textContent?.includes('Documents to process'))!
+  expect(status.textContent).toContain('Documents to process: 5')
+  const updated = screen.getByText(/^Updated /)
+  expect(updated.getAttribute('role')).toBeNull()
+  expect(updated.closest('[aria-live]')).toBeNull()
+  const text = status.textContent
+  await flush(15_000)                                                          // a refresh with the same numbers: the same text, nothing new to announce
+  expect(status.textContent).toBe(text)
+  await flush(15_000)
+  expect(status.textContent).toContain('Documents to process: 6')
+})
+
+test('a good refresh clears the warning that the figures may be old', async () => {
+  m.dashboard.mockResolvedValueOnce(counters(5)).mockRejectedValueOnce(new Error('boom')).mockResolvedValue(counters(6))
+  show()
+  await flush()
+  await flush(15_000)
+  expect(screen.getAllByRole('alert').map((a) => a.textContent).join(' ')).toContain('may be out of date')
+  await flush(15_000)
+  expect(screen.queryByText(/may be out of date/)).toBeNull()
+  expect(tile(6)).toBeTruthy()
+})
+
 test('a long source path wraps in its card and leaves the count in view', async () => {
   m.dashboard.mockResolvedValue({ ...counters(1), sources: [{ kind: 'inbox', path: `C:\\${'very-long-folder-'.repeat(12)}`, files: 12 }] })
   show()

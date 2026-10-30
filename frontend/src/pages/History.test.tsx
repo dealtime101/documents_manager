@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { I18nProvider, useI18n } from '@/i18n'
 import History from '@/pages/History'
@@ -74,6 +74,33 @@ test('after an undo the keyboard focus lands on its row; after a failure the but
   expect(screen.getByLabelText(/Undo operation 2 /)).toBe(second)
   expect(document.activeElement).toBe(second)
   expect(second.getAttribute('aria-disabled')).toBe('false')                   // aria-disabled, not disabled: it stays focusable
+})
+
+test('"No operations" is said only after a load that succeeded and came back empty', async () => {
+  let done: (v: unknown[]) => void = () => {}
+  history.mockReturnValueOnce(new Promise((resolve) => { done = resolve }))
+  show()
+  expect(screen.queryByText('No operations yet.')).toBeNull()                  // not loaded yet is not "empty"
+  await act(async () => { done([]) })
+  expect(screen.getByText('No operations yet.')).toBeTruthy()
+  cleanup()
+  history.mockRejectedValueOnce(new Error('boom'))
+  show()
+  await screen.findByRole('alert')
+  expect(screen.queryByText('No operations yet.')).toBeNull()                  // a failed load is not "empty" either
+})
+
+test('an undone operation is named in words, and each undo button names its operation', async () => {
+  history.mockResolvedValue([{ ...op(1), undone: 1 }, op(2)])
+  const { container } = show()
+  await screen.findByLabelText('Undo operation 2 (f2.pdf)')
+  expect(screen.queryByLabelText(/Undo operation 1 /)).toBeNull()              // nothing to undo on an undone row
+  const row = container.querySelector('#op-1')!
+  expect(row.textContent).toContain('Undone')                                  // a word, not only a strike-through
+  expect(row.className).toContain('line-through')
+  expect(row.innerHTML).not.toContain('text-slate-400')                        // 2.6:1 on white
+  expect(container.querySelectorAll('button[aria-label^="Undo operation"]')).toHaveLength(1)
+  expect(screen.getByRole('columnheader', { name: 'Action' })).toBeTruthy()    // the action column has a (hidden) header
 })
 
 test('the table names itself and ties each header to its column', async () => {
