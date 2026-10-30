@@ -78,6 +78,8 @@ class Item(models.Model):
     header = models.TextField(blank=True, default="")
     extraction = models.CharField(max_length=20, blank=True, default="")
     notes = models.JSONField(default=list)
+    # DOC534.12: when the file looks like a stack of documents, the page ranges [[first, last], ...] (from 1) it would be cut into
+    split = models.JSONField(null=True)
     result_path = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True)

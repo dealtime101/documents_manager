@@ -16,6 +16,10 @@ extra).
 - The **Dashboard** also lists the documents that did not come: for a company and type filed at a steady rhythm (at least four
   documents, a gap of 7 to 400 days, say a monthly bill), it says when the next one was expected once it is more than a quarter
   of the gap (a week at least) late. **Stop reporting** hides one that no longer matters; it can be brought back there.
+- **A scanned stack** (a feeder scanner makes ONE PDF of several invoices) is spotted in **To file**: a blank separator sheet, a
+  page that names another company, or another invoice number, marks where a document ends. **Cut** writes one PDF per document
+  next to the stack, keeps the stack whole in `originals` of the quarantine, and each piece joins the queue with its own name,
+  destination and preview. A company the rules do not know cannot mark a cut by itself: a blank sheet between the documents does.
 - **Backup and restore** (Settings, or `docflow backup FILE [--encrypt]` and `docflow restore FILE [--settings]`): one zip with the
   database (a whole copy even while the program runs), the learned corrections and your own rules, optionally encrypted with a
   password (AES-256, openable with 7-Zip). A restore keeps a copy of what it replaces in the `backups` folder of the user's folder.

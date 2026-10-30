@@ -26,7 +26,7 @@ from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.db import DB
 from docflow.extract import extract_text, find_tesseract, is_scannable
 from docflow.naming import build_filename, sanitize
-from docflow.pipeline import Proposal, apply, propose, sha256_file
+from docflow.pipeline import Proposal, apply, propose, sha256_file, split_file
 from docflow.pipeline import undo as engine_undo
 from docflow.routing import fill, route, safe_join
 
@@ -213,6 +213,7 @@ def scan(job: ScanJob | None = None) -> dict:
                             source_path=str(f), sha256=p.sha256, engine_status=p.status, analysis=a,
                             original=a and dict(a), final_name=p.final_name or "", rel_dir=p.rel_dir or "",
                             confidence=p.confidence, header=p.header, extraction=p.extraction, notes=p.notes,
+                            split=[list(r) for r in p.split] or None,
                             source_size=hashed[f][1] if f in hashed else None,
                             source_mtime_ns=hashed[f][2] if f in hashed else None)
                         if p.text.strip():  # kept locally so the filed archive can be searched (see search())
@@ -292,7 +293,7 @@ def item_dict(it: Item, library_root: Path | None = None) -> dict:
         "invoice_number": a.get("invoice_number"), "conf": a.get("conf", {}), "confidence": it.confidence,
         "final_name": it.final_name, "rel_dir": it.rel_dir,
         "destination": str(library_root / it.rel_dir) if it.rel_dir and library_root else "",
-        "notes": it.notes, "extraction": it.extraction, "result_path": it.result_path,
+        "notes": it.notes, "extraction": it.extraction, "result_path": it.result_path, "split": it.split,
         "created_at": it.created_at.isoformat(), "resolved_at": it.resolved_at and it.resolved_at.isoformat(),
     }
 
@@ -542,6 +543,31 @@ def decide(it: Item, state: str) -> Item:
     it.state, it.resolved_at = state, timezone.now()
     it.save()
     return it
+
+
+def split_item(it: Item) -> dict:
+    """DOC534.12: a stack of documents scanned as one PDF is cut at the pages the scan suggested. The pieces are written next to it in
+    the folder it came from, the stack itself is kept in quarantine/originals/, the item leaves the queue, and a scan puts the pieces
+    in it as documents of their own, each with its own name, destination and preview."""
+    if it.state != Item.PENDING:
+        raise ApiError("this item has already been handled")
+    if not it.split:
+        raise ApiError("this file was not found to hold several documents")
+    src = pdf_path(it)
+    _claim(it)  # not while an approval is moving the file
+    try:
+        children = split_file(src, it.sha256, [(first, last) for first, last in it.split], cfg().path("quarantine") / "originals")
+    except (OSError, ValueError) as e:
+        _release(it)
+        log.warning("item %s could not be split: %s: %s", it.pk, type(e).__name__, e)
+        raise ApiError(f"the file could not be split: {type(e).__name__}") from None
+    except BaseException:
+        _release(it)
+        raise
+    it.state, it.resolved_at = Item.REMOVED, timezone.now()
+    it.save()
+    _forget_counts()
+    return {"children": len(children), **scan_start()}  # (a scan already running may have listed the folder before: Scan again)
 
 
 MAX_BATCH = 200  # what one request may approve: a tick-box selection, not the whole archive

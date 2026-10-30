@@ -1,5 +1,5 @@
 """Pipeline: detect -> SHA-256 -> duplicate -> extract -> analyse -> name -> route -> score.
-`propose` touches nothing; `apply` and `undo` are the only functions that move files."""
+`propose` touches nothing; `apply`, `undo` and `split_file` are the only functions that move files."""
 import errno
 import hashlib
 import json
@@ -12,10 +12,11 @@ from pathlib import Path
 from .analyze import Analysis, DocumentAnalyzer
 from .config import Config
 from .db import DB, now
-from .extract import extract_text, image_to_pdf, is_image, searchable_pdf
+from .extract import extract_text, image_to_pdf, is_image, searchable_pdf, split_pages
 from .fields import header_line
 from .naming import FORBIDDEN, build_filename
 from .routing import fill, route, safe_join, type_destination_unusable, unknown_placeholder
+from .splitting import suggest
 
 log = logging.getLogger("docflow")
 MAX_PATH = 240  # margin under Windows' 260-character limit
@@ -42,6 +43,7 @@ class Proposal:
     header: str = ""   # first line of the (normalised) text: used to learn a company after a correction
     text: str = ""     # the whole extracted text: kept (locally) by the web interface so the filed archive can be searched
     notes: list[str] = field(default_factory=list)
+    split: list[tuple[int, int]] = field(default_factory=list)  # DOC534.12: page ranges when the file looks like several documents
 
 
 def propose(path: Path, cfg: Config, db: DB, analyzer: DocumentAnalyzer, fallback: DocumentAnalyzer | None = None,
@@ -74,6 +76,10 @@ def propose(path: Path, cfg: Config, db: DB, analyzer: DocumentAnalyzer, fallbac
     elif ex.missing_pages:  # some pages were read, others were not: say so, the analysis below sees only part of the document
         p.notes.append(f"Incomplete text, pages not read: {ex.missing_pages}")  # prefix + number: translated by prefix
     a = analyzer.analyze(ex.text)
+    if ex.pages > 1 and not ex.missing_pages:  # (with pages not read, the page texts cannot say where a document ends)
+        p.split = suggest(ex.page_texts, ex.blank_pages, analyzer)
+        if p.split:
+            p.notes.append("This file seems to hold several documents.")
     used_llm = False
     if fallback and (not a.company or not a.document_type) and ex.text.strip():
         try:
@@ -107,7 +113,7 @@ def propose(path: Path, cfg: Config, db: DB, analyzer: DocumentAnalyzer, fallbac
         p.notes.append("Document potentially already present.")
         return p
     p.status = status_for(p.confidence, cfg.settings["thresholds"], used_llm=used_llm, has_name=bool(p.final_name),
-                          incomplete=bool(ex.missing_pages))
+                          incomplete=bool(ex.missing_pages or p.split))  # a stack is never filed as ONE document without a human
     return p
 
 
@@ -325,6 +331,29 @@ def _file_converted(src: Path, wanted: Path, sha: str, kept_dir: Path, pdf: byte
         dst.unlink(missing_ok=True)
         raise
     return dst, kept, hashlib.sha256(pdf).hexdigest()
+
+
+def split_file(src: Path, sha: str, ranges: list[tuple[int, int]], kept_dir: Path) -> list[Path]:
+    """DOC534.12: `src` (a stack of documents) becomes one PDF per range of pages, written next to it under `<its name> - 1.pdf`, `- 2`...
+    (never over a file), and the stack itself is moved aside to `kept_dir/<its SHA-256>.pdf`: nothing is lost. The file is read ONCE:
+    the bytes that were hashed are the bytes cut. Returns the new files. If anything fails, none of them stays and `src` is untouched."""
+    data = src.read_bytes()
+    if hashlib.sha256(data).hexdigest() != sha:  # the file changed after it was analysed: the ranges no longer describe it
+        raise OSError(f"checksum mismatch: {src} changed since it was analysed")
+    written: list[Path] = []
+    try:
+        for i, part in enumerate(split_pages(data, ranges), 1):
+            written.append(_write_unique(src.with_name(f"{src.stem} - {i}.pdf"), part))
+        kept = kept_dir / f"{sha}{src.suffix.lower()}"
+        if kept.exists():  # named by its content: the same stack was set aside before
+            src.unlink()
+        else:
+            _move_verified(src, kept, sha)
+    except BaseException:
+        for w in written:
+            w.unlink(missing_ok=True)
+        raise
+    return written
 
 
 def _unfile_picture(src: Path, kept: Path, dst: Path, sha: str) -> None:

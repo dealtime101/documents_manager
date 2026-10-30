@@ -15,7 +15,7 @@ import threading
 import time
 import unicodedata
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pypdfium2 as pdfium
@@ -146,6 +146,8 @@ class Extracted:
     pages: int
     missing_pages: int = 0  # pages that needed OCR and could not be read (timeout, failure): the text is then incomplete,
                             # whatever `method` says (it only describes the pages that WERE read)
+    page_texts: list[str] = field(default_factory=list)  # DOC534.12: the text of each page (`text` is these, joined by line breaks)
+    blank_pages: list[int] = field(default_factory=list)  # DOC534.12: the pages (from 1) with nothing at all on them: separator sheets
 
 
 def ocr_image(png: bytes, tesseract: str, languages: str, timeout: float = OCR_TIMEOUT) -> str | None:
@@ -311,6 +313,7 @@ def extract_text(path: Path, ocr: dict | None = None) -> Extracted:
     min_chars = ocr.get("min_chars_per_page", 30)
     scan_chars = ocr.get("min_chars_scanned_page", 200)  # below this, a page that is one big image is read by OCR too
     parts, used_text, used_ocr, missing_pages = [], False, False, 0
+    blank_pages: list[int] = []
     tesseract_exe = find_tesseract(ocr.get("tesseract", "tesseract"))  # searched ONCE: the pages get the full path
     tesseract_found = bool(tesseract_exe)
     pdf = image_to_pdf(path.read_bytes()) if is_image(path) else path
@@ -332,6 +335,7 @@ def extract_text(path: Path, ocr: dict | None = None) -> Extracted:
                 continue
             if blank:  # nothing for OCR to find: read (empty), never "missing", never rendered
                 used_text = True
+                blank_pages.append(index + 1)
                 continue
             exe = tesseract_exe
             if not ocr.get("enabled", True):
@@ -369,7 +373,31 @@ def extract_text(path: Path, ocr: dict | None = None) -> Extracted:
     method = ("mixed" if used_text and used_ocr else "ocr" if used_ocr else
               "ocr_disabled" if missing_pages and not ocr.get("enabled", True) else
               "ocr_unavailable" if missing_pages else "text")
-    return Extracted("\n".join(parts), method, n, missing_pages)
+    return Extracted("\n".join(parts), method, n, missing_pages, parts, blank_pages)
+
+
+def split_pages(data: bytes, ranges: list[tuple[int, int]]) -> list[bytes]:
+    """DOC534.12: one new PDF per range of pages (from 1, both ends included), cut out of `data`. The pages are copied, not redrawn:
+    text, pictures and the text layer of a searchable scan come along. Raises ValueError for a range outside the document."""
+    with _PDFIUM:
+        doc = pdfium.PdfDocument(data)
+        try:
+            n = len(doc)
+            out = []
+            for first, last in ranges:
+                if not 1 <= first <= last <= n:
+                    raise ValueError(f"pages {first}-{last} are not in a document of {n} pages")
+                part = pdfium.PdfDocument.new()
+                try:
+                    part.import_pages(doc, list(range(first - 1, last)))
+                    buf = io.BytesIO()
+                    part.save(buf)
+                    out.append(buf.getvalue())
+                finally:
+                    part.close()
+            return out
+        finally:
+            doc.close()
 
 
 def ocr_text_layer(png: bytes, tesseract: str, languages: str, timeout: float = OCR_TIMEOUT) -> bytes | None:

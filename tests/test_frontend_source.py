@@ -1294,7 +1294,8 @@ def test_the_lists_in_the_messages_use_one_localized_separator_in_both_languages
     queue, library = (pages / "Queue.tsx").read_text(encoding="utf-8"), (pages / "Library.tsx").read_text(encoding="utf-8")
     for source in (queue, library):
         assert ".join('; ')" not in source and ".join(' ; ')" not in source              # no hand-written semicolon separator left
-    assert queue.count("joined(") == 2 and "list(r.learned" in library
+    # (Queue: what was learned, the files that failed, and DOC534.12 the page ranges of a stack)
+    assert queue.count("joined(") == 3 and "list(r.learned" in library
     i18n = (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
     assert "list: (items) => joinList(items, lang === 'fr')" in i18n
     got = _node_route("""({ en: m.joinList(['a', 'b', 'c'], false), fr: m.joinList(['a', 'b', 'c'], true), one: m.joinList(['a'], true),

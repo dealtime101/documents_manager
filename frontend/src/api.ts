@@ -19,6 +19,7 @@ export interface Item {
   notes: string[]
   extraction: string
   result_path: string
+  split: [number, number][] | null  // the page ranges when the file looks like several documents (from 1, both ends included)
 }
 
 export interface Dashboard {
@@ -261,6 +262,7 @@ export const api = {
   approve: (id: number) => call<{ item: Item; learned: Learned[]; learning_failed: boolean }>('POST', `/api/items/${id}/approve`),
   ignore: (id: number) => call('POST', `/api/items/${id}/ignore`),
   remove: (id: number) => call('POST', `/api/items/${id}/remove`),
+  split: (id: number) => call<{ children: number; job: ScanJob }>('POST', `/api/items/${id}/split`, undefined, SLOW_REQUEST_TIMEOUT_MS),
   scan: () => call<{ job: ScanJob }>('POST', '/api/scan'),
   scanStatus: () => call<ScanJob>('GET', '/api/scan/status'),
   approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after }, SLOW_REQUEST_TIMEOUT_MS),  // after: where the previous request stopped

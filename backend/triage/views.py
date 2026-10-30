@@ -212,6 +212,8 @@ def item_action(request, pk, action):
         it = get_item(pk)
         if action == "approve":
             res = s.approve(it)
+        elif action == "split":
+            res = s.split_item(it)
         elif action in ("ignore", "remove"):
             s.decide(it, Item.IGNORED if action == "ignore" else Item.REMOVED)
             res = {}

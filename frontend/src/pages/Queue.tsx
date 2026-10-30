@@ -189,6 +189,15 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
       return summary(r)
     }, sel)
   }
+  const split = (item: Item) => {  // the server cuts at the ranges it suggested; the pieces arrive through a scan it starts
+    const n = item.split?.length ?? 0
+    if (!n || !confirm(t('queue.confirmSplit', { n })) || !keepEdit()) return
+    return run(async () => {
+      const r = await api.split(item.id)
+      setJob(r.job)  // follow that scan like one started by the Scan button
+      return t('queue.splitDone', { n: r.children })
+    })
+  }
   const autoCount = items.filter((i) => i.status === 'auto').length
   const ticks = items.filter((i) => ticked.has(i.id) && approvable(i))  // the polled list also changes under the selection
   const tick = (ids: number[]) => setTicked((t) => new Set([...t, ...ids]))
@@ -280,6 +289,15 @@ export default function Queue({ group, onShowAll }: { group: Group | null; onSho
             </div>
             <Confidence item={current} thresholds={thresholds} />
             {current.notes.map((n) => <p key={n} className="rounded bg-amber-50 p-2 text-sm text-amber-900">⚠ {msg(n)}</p>)}
+            {current.split && (
+              <div className="space-y-2 rounded border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900">
+                <p>{t('queue.splitFound', {
+                  n: current.split.length,
+                  ranges: joined(current.split.map(([a, b]) => (a === b ? t('queue.splitPage', { a }) : t('queue.splitPages', { a, b })))),
+                })}</p>
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => split(current)}>{t('queue.split', { n: current.split.length })}</Button>
+              </div>
+            )}
 
             <datalist id="companies">{vocab.companies.map((c) => <option key={c} value={c} />)}</datalist>
             <datalist id="types">{vocab.types.map((c) => <option key={c} value={c} />)}</datalist>
