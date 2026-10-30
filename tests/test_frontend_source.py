@@ -374,26 +374,11 @@ def test_the_queue_save_action_takes_its_item_and_form_instead_of_asserting_them
     assert "api.save(item.id, payload(values))" in queue and "api.save(current!.id, payload(form!))); return" not in queue
 
 
-def test_the_queue_approve_action_takes_its_item_and_form_and_saves_an_edit_first():
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert "const approve = (item: Item, values: Form) =>" in queue and "onClick={() => approve(current, form)}" in queue
-    body = queue[queue.index("const approve = "):queue.index("const approveAuto")]
-    assert body.index("api.save(item.id") < body.index("api.approve(item.id)")     # an edit is saved BEFORE the approval
-    assert "!" not in re.sub(r"!==|!=|=>|\|\||&&|'[^']*'", "", body.split("=> run(")[0])   # and no non-null assertion in the signature
-
-
-def test_the_queue_form_setter_updates_from_the_latest_state_without_an_assertion():
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    setter = queue[queue.index("const set = (k: keyof Form)"):queue.index("return (\n    // One column")]
-    assert "setForm((f) => (f ? { ...f, [k]: value } : f))" in setter and "form!" not in setter
-    assert "const value = e.target.value" in setter                          # read before the updater runs
-
-
-def test_the_approval_message_is_built_from_a_list_of_sentences_not_by_concatenation():
+def test_the_queue_has_no_non_null_assertion_where_it_takes_its_item_and_form():
     queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
     body = queue[queue.index("const approve = "):queue.index("const approveAuto")]
-    assert "const sentences = [t('queue.filed')]" in body and "sentences.join(' ')" in body
-    assert "t('queue.filed') +" not in body
+    assert "!" not in re.sub(r"!==|!=|=>|\|\||&&|'[^']*'", "", body.split("=> run(")[0])   # (the order and the message are run in Queue.test.tsx)
+    assert "form!" not in queue
 
 
 def test_the_font_licence_travels_with_the_font_files_the_interface_serves():
@@ -482,26 +467,6 @@ def test_a_proposal_read_for_one_library_file_never_fills_the_form_of_another():
     assert "if (shown.current === asked) setProblem(errorText(e))" in page               # and an error for A is not shown on B
 
 
-def test_a_poll_that_began_before_an_action_never_brings_back_the_list_as_it_was():
-    # DOC534.71: a polled answer arriving after run()'s load() reinstalled the old list, which still held the document just filed
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert "const generation = useRef(0)" in queue
-    tick = queue[queue.index("const tick = async () => {"):queue.index("timer = setTimeout(tick, 3000)\n    return")]
-    assert tick.index("const started = generation.current") < tick.index("await api.scanStatus()")           # taken before any request
-    assert tick.index("if (generation.current !== started)") < tick.index("setItems(list)")                  # and compared before the state is written
-    load = queue[queue.index("const load = useCallback("):queue.index("}, [group])")]
-    assert "generation.current += 1" in load.split("await api.items")[0]
-    run = queue[queue.index("const run = async"):queue.index("const changed = ")]
-    assert run.index("generation.current += 1") < run.index("setBusy(true)")
-
-
-def test_the_scan_refresh_keeps_a_document_being_edited_even_when_it_left_the_list():
-    # DOC534.20: the polled refresh dropped the open document (filed elsewhere), `dirty` fell back to false, and the next cycle replaced the form
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    tick = queue[queue.index("const tick = async () => {"):queue.index("timer = setTimeout(tick, 3000)\n    return")]
-    assert "dirtyRef.current && selRef.current !== null && !fetched.some((i) => i.id === selRef.current)" in tick
-    assert "itemsRef.current.find((i) => i.id === selRef.current)" in tick and "const list = edited ? [edited, ...fetched] : fetched" in tick
-    assert tick.index("const list = edited") < tick.index("setItems(list)")          # the kept document is in the list that is shown
 
 
 def test_the_library_apply_button_needs_a_preview_computed_for_what_is_typed_now():
@@ -550,28 +515,7 @@ def test_the_search_screen_marks_the_words_found_as_elements_and_never_as_html()
     assert '<TabsTrigger value="search">' in (UI.parents[1] / "App.tsx").read_text(encoding="utf-8")
 
 
-def test_declining_the_bulk_confirmation_changes_nothing():
-    # DOC474.31: the confirm() sits BEFORE run(), so a "Cancel" neither reloads the list nor resets the selection or the form
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    body = queue[queue.index("const approveSelected"):queue.index("const autoCount")]
-    assert body.index("confirm(") < body.index("run(")
-    assert "return ''" not in body
-
-
-def test_bulk_approvals_ask_before_dropping_an_edit_and_keep_the_current_item():
-    # DOC474.32: like select(), a bulk action confirms when the form is dirty, and reloads keeping the current item
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    for name, end in (("const approveAuto", "const approveSelected"), ("const approveSelected", "const autoCount")):
-        body = queue[queue.index(name):queue.index(end)]
-        assert "keepEdit()" in body and "run(" in body and ", sel)" in body, name
-    assert "const keepEdit = () => !dirty || confirm(t('queue.confirmDiscard'))" in queue
-
-
-def test_approve_automatic_goes_on_after_the_point_where_the_previous_press_stopped():
-    # DOC534.57: pressing again retried the same failures first
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    body = queue[queue.index("const afterAuto = useRef(0)"):queue.index("const approveSelected")]
-    assert "api.approveAuto(afterAuto.current)" in body and "afterAuto.current = r.remaining ? r.next_after ?? 0 : 0" in body
+def test_approve_automatic_sends_where_the_previous_press_stopped():
     assert "approveAuto: (after = 0) => call<Batch>('POST', '/api/items/approve-auto', { after }" in (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
 
 
@@ -615,14 +559,6 @@ def test_the_notice_live_regions_are_never_hidden_while_empty():
     assert 'role="status"' in notice and 'role="alert"' in notice and "empty:hidden" not in notice
 
 
-def test_a_ticked_item_that_stops_being_approvable_leaves_the_selection():
-    # DOC474.145: an item that turned into a duplicate or an error after a reload stayed ticked and was sent to the batch
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    assert queue.index("const approvable = ") < queue.index("setTicked((t) => new Set(list")   # defined before load() uses it
-    assert "list.filter((i) => t.has(i.id) && approvable(i))" in queue          # on every reload (also the polled ones go through load)
-    assert "const ticks = items.filter((i) => ticked.has(i.id) && approvable(i))" in queue   # and again where the count and the call are made
-
-
 def test_the_csrf_cookie_value_is_everything_after_the_name_not_the_text_before_the_next_equals_sign():
     # DOC474.165: split('=')[1] cut a value that contains "=" (base64-like) at its first "="
     api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
@@ -640,15 +576,7 @@ def test_an_older_dashboard_answer_never_overwrites_a_newer_one():
     assert "const latest = useRef(0)" in page
 
 
-def test_the_scan_refresh_reselects_when_the_selected_item_left_the_list_and_forgets_its_tick():
-    # DOC474.33: only "nothing selected" triggered a reselection; an item filed elsewhere left an empty panel next to a full list
-    queue = (UI.parents[1] / "pages" / "Queue.tsx").read_text(encoding="utf-8")
-    tick = queue[queue.index("const tick = async"):queue.index("timer = setTimeout(tick, 3000)\n    return")]   # the end of the tick, not a retry in it
-    assert "selRef.current === null || !list.some((i) => i.id === selRef.current)" in tick
-    assert "!dirtyRef.current" in tick                                           # never over a form the user has edited
-    assert "setTicked((t) => new Set(list.filter((i) => t.has(i.id) && approvable(i)).map((i) => i.id)))" in tick
-    assert "dirtyRef.current = !!dirty" in queue
-
+# (DOC534.228: the Queue's polling, bulk approvals, ticks and approve action are run in pages/Queue.test.tsx)
 
 def test_an_empty_or_out_of_range_confidence_threshold_selects_nothing():
     # DOC474.34: Number('') is 0, so an emptied field ticked every approvable item, whatever its confidence
