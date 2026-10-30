@@ -1,10 +1,13 @@
 # Document types, tried in order (the first match wins: put the most specific first).
 # all: every phrase required | any: at least one | none: none allowed | company: only for this company
 # detail: fixed detail | amount: false = no amount in the name | undated: true = date XXXX if absent
+# retention_years: how many years to keep this type (a whole number, 1 to 100), counted from the date on the document. Library >
+#   Expired then lists what is older, to delete with confirmation (to _Trash, recorded in History). Without it nothing ever expires.
 # The program also learns types from your corrections. Example:
 #
 # - type: Invoice
 #   company: Acme
 #   all: ["invoice"]
+#   retention_years: 7
 ---
 []

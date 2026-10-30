@@ -16,6 +16,10 @@ extra).
 - The **Dashboard** also lists the documents that did not come: for a company and type filed at a steady rhythm (at least four
   documents, a gap of 7 to 400 days, say a monthly bill), it says when the next one was expected once it is more than a quarter
   of the gap (a week at least) late. **Stop reporting** hides one that no longer matters; it can be brought back there.
+- **How long to keep**: give a type of document `retention_years` in `document_types.yaml` (7 for tax papers, say). **Library** →
+  **Expired** then lists the filed documents whose date, plus those years, is past (a document whose date could not be read never
+  expires). **Delete** asks first, puts the document in `_Trash` and records it in **History**, where it can be undone. Nothing is
+  deleted by itself.
 - **A scanned stack** (a feeder scanner makes ONE PDF of several invoices) is spotted in **To file**: a blank separator sheet, a
   page that names another company, or another invoice number, marks where a document ends. **Cut** writes one PDF per document
   next to the stack, keeps the stack whole in `originals` of the quarantine, and each piece joins the queue with its own name,

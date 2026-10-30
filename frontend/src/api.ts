@@ -48,6 +48,13 @@ export interface Missing {
   ignored: { company: string; document_type: string }[]
 }
 
+/** DOC534.13: the filed documents whose type has a retention and whose date, plus those years, is past. `total` can exceed what `expired` holds. */
+export interface Expired {
+  configured: boolean
+  total: number
+  expired: { id: number; path: string; name: string; company: string; document_type: string; date: string; years: number; expired_on: string }[]
+}
+
 /** How often the engine's proposals were accepted without a correction, from the documents already filed. */
 export interface Accuracy {
   total: number
@@ -306,6 +313,8 @@ export const api = {
   libraryRename: (path: string, name: string) => call<{ path: string }>('POST', '/api/library/rename', { path, name }),
   libraryMove: (path: string, to: string) => call<{ path: string }>('POST', '/api/library/move', { path, to }),
   libraryDelete: (path: string) => call<{ path: string | null; permanent: boolean }>('POST', '/api/library/delete', { path }),
+  expired: () => call<Expired>('GET', '/api/library/expired'),
+  deleteExpired: (id: number) => call<{ path: string; name: string }>('POST', '/api/library/expired/delete', { id }),
   /** Without `fields` the server reads the document and proposes them; with them it only computes the name and folder. */
   libraryPlan: (path: string, fields?: LibraryFields, rel_dir = '', final_name = '') =>
     call<LibraryPlan>('POST', '/api/library/plan', { path, fields, rel_dir, final_name }, SLOW_REQUEST_TIMEOUT_MS),

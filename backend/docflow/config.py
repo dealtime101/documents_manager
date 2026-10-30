@@ -44,6 +44,16 @@ class Config:
         self.learned_stamp = stamp
         return True
 
+    def retention(self) -> dict[str, int]:
+        """DOC534.13: the years to keep a document, by type (in lower case), from the `retention_years` of the rules. When several
+        rules of one type say it, the longest wins: a document is never called destroyable by the shortest of two opinions."""
+        out: dict[str, int] = {}
+        for r in self.types:
+            kind = str(r.get("type") or "").strip().casefold() if isinstance(r, dict) else ""
+            if kind and _years(r.get("retention_years")):
+                out[kind] = max(out.get(kind, 0), r["retention_years"])
+        return out
+
     def path(self, key: str) -> Path:
         """A configured path: absolute ones as written (POSIX, 'C:\\x', 'C:/x', '\\\\server\\share'), relative ones under the
         project root. 'C:x' is neither (relative to the current directory OF A DRIVE): refused, never guessed."""
@@ -106,6 +116,22 @@ def _only_dicts(items: list, source: str) -> list[dict]:
     if len(kept) != len(items):
         log.warning("%s: %d entries that are not a mapping ignored", source, len(items) - len(kept))
     return kept
+
+
+RETENTION_MAX_YEARS = 100
+
+
+def _years(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= RETENTION_MAX_YEARS
+
+
+def _check_retention(rules: list) -> None:
+    """DOC534.13: `retention_years` on a hand-written rule is a whole number of years (1 to 100) on a rule that names its type. A
+    value that is not (`"7 ans"`, `0`, `true`) would silently keep nothing or everything: it stops the program, naming the rule."""
+    for r in rules:
+        if isinstance(r, dict) and "retention_years" in r and not (_years(r["retention_years"]) and r.get("type")):
+            raise ValueError(f"document_types.yaml: retention_years of the rule {r.get('type')!r} must be a whole number of years from 1 to "
+                             f"{RETENTION_MAX_YEARS}, on a rule that has a type")
 
 
 PATH_SETTINGS = ("inbox", "library_root", "quarantine", "db", "log")
@@ -232,7 +258,9 @@ def load_config(config_dir: Path | str | None = None, sandbox: Path | None = Non
     taken = {c for r in own_types if (c := r.get("company"))}  # a company the sandbox corrected: its default type replaces the inherited one
     inherited_types = [r for r in _only_dicts(rd(inherited, "types_learned.yaml", [], learned=True), "types_learned.yaml")
                        if r.get("company") not in taken] if inherited else []
-    types = list(rd(hand_dir("document_types.yaml"), "document_types.yaml", [])) + [dict(r, _learned=True) for r in inherited_types + own_types]
+    hand_types = list(rd(hand_dir("document_types.yaml"), "document_types.yaml", []))
+    _check_retention(hand_types)
+    types = hand_types + [dict(r, _learned=True) for r in inherited_types + own_types]
     routing: dict = {}
     for source in ([inherited] if inherited else []) + [learn]:
         routing.update(rd(source, "routing_learned.yaml", {}, learned=True))  # the sandbox's own override the inherited ones

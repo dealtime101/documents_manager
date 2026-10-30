@@ -471,6 +471,8 @@ def undo(db: DB, op_id: int | None = None) -> tuple[Path, Path]:
     if src.exists():
         raise FileExistsError(f"the original location is occupied: {src}")
     sha = db.document_sha(op["document_id"])
+    if op["kind"] == "expire":  # DOC534.13: the file as it was put aside (a picture's PDF is not the content the document row has)
+        sha = json.loads(op["detail"] or "{}").get("sha")
     if sha and sha256_file(dst) != sha:  # replaced or corrupted since it was filed: do not silently put THAT back
         raise ValueError(f"the filed document has changed since it was filed, not restoring it: {dst}")
     _move_verified(dst, src, sha or sha256_file(dst))  # same guarantees as filing: never overwrite, verify before deleting

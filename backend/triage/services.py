@@ -968,10 +968,15 @@ def history(n: int = 30) -> list[dict]:
 def undo(op_id: int) -> dict:
     try:
         with engine_db() as db:
+            op = db.op(op_id)
+            expired = op is not None and op["kind"] == "expire"
             cur, old = engine_undo(db, op_id)
     except (ValueError, OSError) as e:
         raise ApiError(str(e)) from None
-    Item.objects.filter(result_path=str(cur)).update(state=Item.PENDING, result_path="", resolved_at=None)
+    if expired:  # DOC534.13: a document deleted for its age is back in the library, still filed: it does not rejoin the queue
+        Item.objects.filter(result_path=str(cur)).update(result_path=str(old))
+    else:
+        Item.objects.filter(result_path=str(cur)).update(state=Item.PENDING, result_path="", resolved_at=None)
     _forget_counts()
     return {"restored": str(old)}
 

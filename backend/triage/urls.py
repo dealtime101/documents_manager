@@ -36,6 +36,8 @@ urlpatterns = [
     path("library/rename", v.library_rename),
     path("library/move", v.library_move),
     path("library/delete", v.library_delete),
+    path("library/expired", v.library_expired),
+    path("library/expired/delete", v.library_expired_delete),
     path("library/plan", v.library_plan),
     path("library/apply", v.library_apply),
     path("history", v.history),

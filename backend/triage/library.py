@@ -4,20 +4,23 @@ Everything here works INSIDE the library folder only (services._library_target r
 existing file or folder, and "delete" moves to a `_Trash` folder at the library's root: only what is already in `_Trash`
 is removed for good.
 """
+import json
 import os
 import re
 import shutil
 import time
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from django.db import transaction
+from django.db import connection, transaction
+from django.utils import timezone
 from docflow import learn
 from docflow.analyze import Analysis, RuleBasedAnalyzer
 from docflow.extract import extract_text
 from docflow.fields import header_line, parse_number
 from docflow.naming import build_filename, sanitize, strip_accents
-from docflow.pipeline import _link_or_rename, _unique
+from docflow.pipeline import _link_or_rename, _unique, sha256_file
 from docflow.routing import fill, route, safe_join
 
 from . import services as s
@@ -181,6 +184,89 @@ def delete(rel: str) -> dict:
     dst = _unique(trash / p.name)
     _move(p, dst)
     return {"path": _rel(root, dst), "permanent": False}
+
+
+# ------------------------------------------------------------------ documents past their retention
+EXPIRED_MAX = 500  # rows sent at once; `total` says how many there are
+
+
+def _add_years(day: date, years: int) -> date:
+    try:
+        return day.replace(year=day.year + years)
+    except ValueError:  # 29 February in a year that has none: the day after, so the document is kept a day longer, not shorter
+        return date(day.year + years, 3, 1)
+
+
+def _past_retention(today: date) -> list[dict]:
+    """Every filed document of the library whose type has a `retention_years` and whose date, plus those years, is before today.
+    The date is the one the engine read (or the person corrected); a document with no readable date never expires. The oldest first."""
+    years = s.cfg().retention()
+    if not years:
+        return []
+    root = s.cfg().path("library_root")
+    where_root, under_root = s._in_library(root)
+    with connection.cursor() as cur:
+        cur.execute(f"SELECT i.id, i.result_path, i.analysis FROM triage_item i WHERE i.state = %s AND ({where_root}) "
+                    f"AND {s._DATE} GLOB {s._ISO_DAY} ORDER BY i.id", [Item.APPROVED, *under_root])
+        rows = cur.fetchall()
+    found = []
+    for item_id, result_path, analysis in rows:
+        a = json.loads(analysis) if isinstance(analysis, str) else (analysis or {})
+        kept = years.get(str(a.get("document_type") or "").strip().casefold())
+        try:
+            due = _add_years(date.fromisoformat(a["date"]), kept) if kept else None
+        except (KeyError, TypeError, ValueError):
+            continue  # "2025-13-45" has the shape of a date and is not one
+        if due is None or due >= today:
+            continue
+        rel = _inside(root, Path(result_path))
+        if rel is None or rel.split("/")[0] == TRASH:
+            continue  # moved out of the library, or already in the trash
+        found.append({"id": item_id, "path": rel, "name": Path(rel).name, "company": a.get("company") or "",
+                      "document_type": a.get("document_type") or "", "date": a["date"], "years": kept, "expired_on": due.isoformat()})
+    found.sort(key=lambda d: (d["expired_on"], d["id"]))
+    return found
+
+
+def _inside(root: Path, p: Path) -> str | None:
+    """`p` relative to the library root (as written or resolved: a library reached through a link), if the file is there."""
+    for base in (root, root.resolve()):
+        try:
+            rel = p.relative_to(base)
+        except ValueError:
+            continue
+        return rel.as_posix() if (base / rel).is_file() else None
+    return None
+
+
+def expired(today: date | None = None) -> dict:
+    """DOC534.13: the documents that can be destroyed. `configured` is False while no type has a retention (the page then says how)."""
+    found = _past_retention(today or timezone.localdate())
+    return {"configured": bool(s.cfg().retention()), "total": len(found), "expired": found[:EXPIRED_MAX]}
+
+
+def delete_expired(item_id: object, today: date | None = None) -> dict:
+    """DOC534.13: put one expired document in `_Trash` (as Delete does) and record it in the history, where it can be undone. The age is
+    checked here again: the page cannot make the server delete a document that is not past its retention."""
+    due = _past_retention(today or timezone.localdate()) if isinstance(item_id, int) and not isinstance(item_id, bool) else []
+    found = next((d for d in due if d["id"] == item_id), None)
+    if found is None:
+        raise s.ApiError("this document is not past its retention")
+    root, p = _entry(found["path"])
+    with s.engine_db() as db:
+        doc = db.find_sha(Item.objects.get(pk=item_id).sha256)
+        if doc is None:  # no trace in the history = no undo: nothing is deleted
+            raise s.ApiError("this document is not in the history, so its deletion could not be recorded")
+        sha = sha256_file(p)
+        out = delete(found["path"])
+        trash_path = root / out["path"]
+        try:
+            db.add_op(doc["id"], "expire", str(p), str(trash_path), json.dumps({"sha": sha}))
+        except Exception:  # the history and the disk must agree: the document goes back where it was
+            _move(trash_path, p)
+            raise
+    s.log.info("EXPIRED ITEM=%s PATH=%s", item_id, found["path"])
+    return {"path": out["path"], "name": found["name"]}
 
 
 # ------------------------------------------------------------------ re-filing a PDF from its fields

@@ -169,6 +169,16 @@ def library_delete(request):
     return _library_action(request, lambda d: lib.delete(_text(d, "path")))
 
 
+@api_view(["GET"])
+def library_expired(request):
+    return Response(lib.expired())
+
+
+@api_view(["POST"])
+def library_expired_delete(request):
+    return _library_action(request, lambda d: lib.delete_expired(d.get("id")))
+
+
 @api_view(["POST"])
 def library_plan(request):
     def call(d):

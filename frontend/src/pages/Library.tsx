@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, errorText, type LibraryFields, type LibraryHit, type LibraryListing, type LibraryPlan } from '@/api'
 import { Field, NameInput, Notice } from '@/components/Bits'
+import ExpiredDocuments from '@/components/ExpiredDocuments'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
@@ -167,7 +168,7 @@ function Classify({ file, onFiled, setNote }: { file: string; onFiled: (path: st
 
 /** The library: walk the folders, find by name, preview, rename / move / delete, create folders, and re-file a PDF from its fields.
  *  Deleting puts in a `_Trash` folder; only what is already there is removed for good. Nothing is ever replaced. */
-export default function Library() {
+function Explorer() {
   const { t, msg, lang } = useI18n()
   const [path, setPath] = useState('')
   const [reload, setReload] = useState(0)
@@ -341,5 +342,20 @@ export default function Library() {
         )}
       </section>
     </div>
+  )
+}
+
+/** The library has two views: the folders (Explorer) and, DOC534.13, the documents past the retention of their type. */
+export default function Library() {
+  const { t } = useI18n()
+  const [view, setView] = useState<'folders' | 'expired'>('folders')
+  return (
+    <>
+      <div className="mb-3 flex gap-2">
+        <Button type="button" size="sm" variant={view === 'folders' ? 'default' : 'outline'} aria-pressed={view === 'folders'} onClick={() => setView('folders')}>{t('library.foldersTab')}</Button>
+        <Button type="button" size="sm" variant={view === 'expired' ? 'default' : 'outline'} aria-pressed={view === 'expired'} onClick={() => setView('expired')}>{t('library.expiredTab')}</Button>
+      </div>
+      {view === 'folders' ? <Explorer /> : <ExpiredDocuments />}
+    </>
   )
 }
