@@ -704,23 +704,7 @@ def test_each_api_type_has_its_own_doc_comment_directly_above_it():
     assert re.search(r"/\*\* The answer of a bulk approval[^\n]*\*/\nexport type Batch =", api)
 
 
-def test_the_search_runs_on_submit_only_and_never_while_a_search_is_in_flight():
-    # DOC474.60 feared stale answers from searches fired while typing; there is one request at a time, started by a submit
-    page = (UI.parents[1] / "pages" / "Search.tsx").read_text(encoding="utf-8")
-    submit = page[page.index("const submit"):page.index("return (", page.index("const submit"))]
-    assert "if (busy || !canSearch) return" in submit and submit.index("if (busy") < submit.index("api.search")
-    assert page.count("api.search(") == 1                                              # the only caller: submit
-    assert "onChange={(e) => setQuery(e.target.value)}" in page                       # typing only edits the text...
-    assert "onSubmit={submit}" in page and "disabled={busy || !canSearch}" in page      # ...and the button is off while busy
-
-
-def test_the_total_count_header_is_a_whole_number_or_null_never_nan_or_zero_from_an_empty_string():
-    # DOC474.61: Number('') is 0 and Number('abc') is NaN; `total ?? data.length` replaces neither
-    api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
-    start = api.index("const total = r.headers.get('X-Total-Count')")
-    body = api[start:api.index("\n}", start)]                                       # up to the end of request(), return included
-    assert "/^\\d+$/.test(total)" in body                                           # digits only, so '', ' ', 'abc', '-1', '1.5' are out
-    assert "Number(total)" in body and "null" in body
+# (DOC534.228: the search on submit only, a failed search, the total-count header and a lost network are in pages/Search.test.tsx and api.test.tsx)
 
 
 def test_the_dashboard_comment_does_not_promise_that_two_requests_are_never_in_flight_together():
@@ -733,13 +717,8 @@ def test_the_dashboard_comment_does_not_promise_that_two_requests_are_never_in_f
 def test_a_network_failure_reaches_the_screens_as_a_translated_api_error_never_as_a_raw_typeerror():
     # DOC474.78 feared "TypeError: Failed to fetch" in English on the dashboard: send() (which request() and download() go through)
     # converts the fetch rejection first (DOC534.11 moved the fetch there so a file can be uploaded and downloaded the same way)
-    api = (UI.parents[1] / "api.ts").read_text(encoding="utf-8")
-    body = api[api.index("async function send"):api.index("const data = await r.json()")]
-    assert "await fetch(" in body and "catch (e) {" in body                                    # the rejection is caught here...
-    assert "throw new ApiError('Network error: the server cannot be reached.')" in body        # ...and becomes an ApiError
-    assert body.index("await fetch(") < body.index("catch (e) {") < body.index("throw new ApiError('Network error")
-    assert "await send(method, url, body, timeoutMs)" in body and "await send('POST', url, body, timeoutMs)" in api
-    # DOC534.269: and the message has its French text (the one test of this, merged from a twin that only checked the same sentence)
+    # (the conversion itself is run in api.test.tsx, DOC534.228)
+    # DOC534.269: the message has its French text (the one test of this, merged from a twin that only checked the same sentence)
     from conftest import fr_messages_table
     french = fr_messages_table((UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8"))
     assert "'Network error: the server cannot be reached.': 'Erreur réseau" in french
@@ -1134,42 +1113,7 @@ def test_the_retry_button_of_the_accuracy_card_does_not_vanish_under_the_keyboar
     assert "setError(''); return true" in page and "setError(errorText(e)); return false" in page      # load() says whether it worked
 
 
-def test_a_failed_load_of_the_history_can_be_tried_again_from_the_page():
-    # DOC534.144: after a failed first load there was an error and an empty table, and only reloading the whole page tried again
-    page = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert "{loadError && <Button variant=\"outline\" size=\"sm\" onClick={() => void load()}>{t('common.retry')}</Button>}" in page
-    assert page.index("<Notice note={shownNote} />") < page.index("onClick={() => void load()}") < page.index("<table")   # next to the message
-    assert "setLoadError('')" in page[page.index("const load = "):page.index("useEffect(() => { load() }")]       # and a good load clears it
-
-
-def test_the_loading_region_of_the_history_is_in_the_page_before_its_text():
-    # DOC534.143: <p role="status"> appeared together with "Loading...": a live region added with its content is often not announced
-    page = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert """<div role="status">{ops === null && !loadError && <p className="text-slate-500">{t('common.loading')}</p>}</div>""" in page
-    assert """{ops === null && !loadError && <p role="status\"""" not in page            # the region itself is no longer the conditional element
-
-
-def test_the_result_of_an_undo_is_worded_when_shown_so_it_follows_a_change_of_language():
-    # DOC534.142: the sentence was built in the language of the moment and kept: after a switch it stayed in the old one
-    history = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    undo = history[history.index("const undo = async"):history.index("return (\n    <div")]
-    assert "setNote({ ok: true, detail: r.restored })" in undo and "setNote({ ok: false, detail: errorText(e) })" in undo
-    assert "t('hist.restored'" not in undo and "msg(" not in undo                             # nothing worded where the note is made
-    shown = history[history.index("const shownNote"):history.index("// one undo at a time")]
-    assert "t('hist.restored', { path: note.detail })" in shown and "msg(note.detail)" in shown   # worded where it is shown
-    assert "useState<{ ok: boolean; detail: string } | null>(null)" in history
-
-
-def test_keyboard_focus_stays_in_the_history_row_during_and_after_an_undo():
-    # DOC474.118: the pressed button became disabled, then was replaced by the "undone" label: focus fell back to <body>
-    history = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
-    assert 'aria-disabled={undoing !== null}' in history and not re.search(r"(?<!aria-)disabled=\{undoing", history)   # still focusable
-    assert "tabIndex={-1}" in history and "id={`op-${o.id}`}" in history                                       # the row can take focus
-    undo = history[history.index("const undo = "):history.index("return (", history.index("const undo = "))]
-    assert undo.index("await load()") < undo.index("document.getElementById(`op-${id}`)?.focus()")             # after the reload
-    # DOC534.145: only after a SUCCESS (the button is gone then); after a failure the button is still there and keeps the focus
-    assert "let undone = false" in undo and "undone = true" in undo and "if (undone) requestAnimationFrame(" in undo
-    assert undo.index("undone = true") < undo.index("catch (e)") and undo.rindex("undone") > undo.index("setUndoing(null)")
+# (DOC534.228: the History page's retry, loading region, language, focus and table headers are in pages/History.test.tsx, rendered)
 
 
 def test_the_undone_label_is_an_inline_block_so_the_struck_through_row_does_not_strike_it():
@@ -1178,13 +1122,6 @@ def test_the_undone_label_is_an_inline_block_so_the_struck_through_row_does_not_
     history = (UI.parents[1] / "pages" / "History.tsx").read_text(encoding="utf-8")
     assert "o.undone ? 'text-slate-500 line-through' : ''" in history                      # the row IS struck through
     assert re.search(r'<span className="inline-block [^"]*">\{t\(\'hist\.undone\'\)\}</span>', history)   # and the label escapes it
-
-
-def test_a_failed_search_does_not_leave_the_results_of_the_previous_one_on_screen():
-    # DOC474.121: the error appeared above the OLD list, which looked like the answer to the new query
-    page = (UI.parents[1] / "pages" / "Search.tsx").read_text(encoding="utf-8")
-    submit = page[page.index("const submit"):page.index("return (", page.index("const submit"))]
-    assert "setHits(null)" in submit.split("try {")[0], "the old results must go before the new request starts"
 
 
 def test_an_error_that_is_not_an_api_error_is_logged_and_shown_as_a_generic_translated_message():
@@ -1217,13 +1154,8 @@ def test_the_contrast_figures_quoted_in_the_focus_ring_comment_are_the_computed_
     assert abs(1.05 / (old ** 3 + 0.05) - said_before) < 0.06, (said_before, 1.05 / (old ** 3 + 0.05))
 
 
-def test_the_history_table_names_itself_and_ties_each_header_to_its_column():
-    # DOC474.194: no scope on the headers, no caption: a screen reader moving cell by cell could not tell the columns apart
-    root = UI.parents[1]
-    history, i18n = (root / "pages" / "History.tsx").read_text(encoding="utf-8"), (root / "i18n.tsx").read_text(encoding="utf-8")
-    head = history[history.index("<thead>"):history.index("</thead>")]
-    assert len(re.findall(r"<th[\s>]", head)) == 6 and head.count('<th scope="col"') == 6            # all six headers carry the scope
-    assert '<caption className="sr-only">{t(\'hist.caption\')}</caption>' in history
+def test_the_history_caption_exists_in_both_languages():
+    i18n = (UI.parents[1] / "i18n.tsx").read_text(encoding="utf-8")
     en, fr = i18n[i18n.index("const en"):i18n.index("const fr")], i18n[i18n.index("const fr"):]
     assert "'hist.caption'" in en and "'hist.caption'" in fr
 
